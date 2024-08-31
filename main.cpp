@@ -37,28 +37,16 @@ int main() {
     memory[index++] = Register::AL; // register code
     memory[index++] = 0xFA; // imm8
     
-    // copy 0xBC into 8-bit register AH
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::AH; // register code
-    memory[index++] = 0xBC; // imm8
-    
     // copy 0xB1 into 8-bit register BL
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 2; // MOD byte
     memory[index++] = Register::BL; // register code
     memory[index++] = 0xB1; // imm8
-    
-    // copy 0x03 into 8-bit register BH
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::BH; // register code
-    memory[index++] = 0x03; // imm8
 
-    // mul AX by BX
-    memory[index++] = OPCode::MUL; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::BX; // register code
+    // div AL by BL
+    memory[index++] = OPCode::DIV; // instruction
+    memory[index++] = 2; // MOD byte
+    memory[index++] = Register::BL; // register code
 
     // copy register AL to 0x8411
     memory[index++] = OPCode::MOV; // instruction

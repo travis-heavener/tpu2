@@ -326,4 +326,78 @@ namespace instructions {
             }
         }
     }
+
+    void processDIV(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // multiply operands
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
+                u8 A = tpu.readRegister8(Register::AL).getValue();
+                u8 B = tpu.readByte(memory).getValue();
+                u8 dividend = A / B, remainder = A % B;
+                tpu.moveToRegister(Register::AL, dividend);
+                tpu.moveToRegister(Register::AH, remainder);
+
+                // update flags
+                tpu.setFlag(CARRY, remainder == 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(dividend));
+                tpu.setFlag(ZERO, dividend == 0);
+                tpu.setFlag(SIGN, (dividend & (1u << 7)) > 0);
+                tpu.setFlag(OVERFLOW, remainder == 0);
+                break;
+            }
+            case 1: { // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+                u16 A = tpu.readRegister16(Register::AX).getValue();
+                u16 B = tpu.readWord(memory).getValue();
+                u16 dividend = A / B, remainder = A % B;
+                tpu.moveToRegister(Register::AX, dividend);
+                tpu.moveToRegister(Register::DX, remainder);
+
+                // update flags
+                tpu.setFlag(CARRY, remainder == 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(dividend));
+                tpu.setFlag(ZERO, dividend == 0);
+                tpu.setFlag(SIGN, (dividend & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, remainder == 0);
+                break;
+            }
+            case 2: { // Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
+                u8 A = tpu.readRegister8(Register::AL).getValue();
+                u8 B = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                u8 dividend = A / B, remainder = A % B;
+                tpu.moveToRegister(Register::AL, dividend);
+                tpu.moveToRegister(Register::AH, remainder);
+
+                // update flags
+                tpu.setFlag(CARRY, remainder == 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(dividend));
+                tpu.setFlag(ZERO, dividend == 0);
+                tpu.setFlag(SIGN, (dividend & (1u << 7)) > 0);
+                tpu.setFlag(OVERFLOW, remainder == 0);
+                break;
+            }
+            case 3: { // Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+                u16 A = tpu.readRegister16(Register::AX).getValue();
+                u16 B = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                u16 dividend = A / B, remainder = A % B;
+                tpu.moveToRegister(Register::AX, dividend);
+                tpu.moveToRegister(Register::DX, remainder);
+
+                // update flags
+                tpu.setFlag(CARRY, remainder == 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(dividend));
+                tpu.setFlag(ZERO, dividend == 0);
+                tpu.setFlag(SIGN, (dividend & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, remainder == 0);
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: mul.");
+                break;
+            }
+        }
+    }
 }
