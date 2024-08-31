@@ -11,7 +11,7 @@ class Memory {
         Memory();
         ~Memory();
         void reset();
-        Byte& operator[](unsigned short addr) const {  return *(pData + addr);  };
+        Byte& operator[](u16 addr) const {  return *(pData + addr);  };
         Byte& operator[](Word addr) const {  return this->operator[](addr.getValue());  };
     private:
         Byte* pData;

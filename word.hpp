@@ -3,17 +3,37 @@
 
 #include "byte.hpp"
 
+typedef unsigned short u16;
+
 class Word {
     public:
+        // copy constructor
+        Word();
+        Word(u16);
+        Word(const Byte& A, const Byte& B) : byteL(A), byteH(B) {};
+        Word(Word& word) : byteL(word.byteL), byteH(word.byteH) {};
+        
         /* Returns the corresponding ascending bit from the current word, either 0 or 1, stored as an unsigned char. */
-        unsigned char operator[](unsigned char i) const { return (i > 7) ? byteH[i-8] : byteL[i]; };
-        Word& operator=(unsigned short n) { this->byteH = (n & 0xFF00) >> 8; this->byteL = n & 0xFF; return *this; };
+        u8 operator[](u8) const;
+        Word& operator=(u16);
         Word& operator=(Word& n) { return this->operator=(n.getValue()); };
+        
+        // post-inc/dec
+        Word operator++(int);
+        Word operator--(int);
 
-        /* Get the value of the Word as an unsigned short. */
-        unsigned short getValue() const { return (((unsigned short)this->byteH.getValue()) << 8) | this->byteL.getValue(); };
+        // shorthands
+        void setUpper(u16 val) { byteH = val; };
+        void setLower(u16 val) { byteL = val; };
+        const Byte& getUpper() const { return byteH; }
+        const Byte& getLower() const { return byteL; }
+
+        /* Get the value of the Word as an u16. */
+        u16 getValue() const;
     private:
-        Byte byteH = 0, byteL = 0;
+        Byte byteL, byteH;
 };
+
+std::ostream& operator<<(std::ostream&, const Word&);
 
 #endif

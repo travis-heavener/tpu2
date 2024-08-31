@@ -3,20 +3,26 @@
 
 #include <ostream>
 
+typedef unsigned char u8;
+
 class Byte {
     public:
         Byte() { this->data = 0; };
-        Byte(unsigned char n) : data(n) {};
-        
-        /* Returns the corresponding bit from the current byte, either 0 or 1, stored as an unsigned char (unsigned char). */
-        unsigned char operator[](unsigned char i) const;
+        Byte(u8 n) : data(n) {};
 
-        Byte& operator=(unsigned char n);
-        unsigned char getValue() const { return this->data; };
+        // copy constructor
+        Byte(const Byte& byte) : data(byte.data) {};
+        
+        /* Returns the corresponding bit from the current byte, either 0 or 1, stored as an u8 (u8). */
+        u8 operator[](u8 i) const;
+
+        Byte& operator=(u8 n);
+        Byte& operator=(const Byte& byte) { this->data = byte.data; return *this; };
+        u8 getValue() const { return this->data; };
     private:
-        unsigned char data;
+        u8 data;
 };
 
-std::ostream& operator<<(std::ostream& os, const Byte& byte);
+std::ostream& operator<<(std::ostream&, const Byte&);
 
 #endif

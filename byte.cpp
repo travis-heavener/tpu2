@@ -2,13 +2,13 @@
 
 #include "byte.hpp"
 
-unsigned char Byte::operator[](unsigned char i) const {
+u8 Byte::operator[](u8 i) const {
     if (i > 7)
         throw std::out_of_range("Index out of range");
     return (data & (1 << i)) >> i;
 }
 
-Byte& Byte::operator=(unsigned char n) {
+Byte& Byte::operator=(u8 n) {
     this->data = n;
     return *this;
 }
