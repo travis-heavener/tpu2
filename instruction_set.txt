@@ -26,10 +26,10 @@ sub reg, imm16              0x15 /1         Subtracts imm16 from a 16-bit regist
 sub reg, reg                0x15 /2         Subtracts 8-bit registers (second operand from first) and stores in first operand.
 sub reg, reg                0x15 /3         Subtracts 16-bit registers (second operand from first) and stores in first operand.
 
-mul reg, imm8               0x16 /0         Multiplies 8-bit register and imm8 and stores in first operand.
-mul reg, imm16              0x16 /1         Multiplies 16-bit register and imm16 and stores in first operand.
-mul reg, reg                0x16 /2         Multiplies two 8-bit registers and stores in first operand.
-mul reg, reg                0x16 /3         Multiplies two 16-bit registers and stores in first operand.
+mul imm8                    0x16 /0         Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
+mul imm16                   0x16 /1         Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+mul reg                     0x16 /2         Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
+mul reg                     0x16 /3         Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
 
 div reg, imm8               0x17 /0         Divides 8-bit register and imm8 and stores in first operand.
 div reg, imm16              0x17 /1         Divides 16-bit register and imm16 and stores in first operand.

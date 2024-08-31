@@ -2,7 +2,23 @@
 #include "tpu.hpp"
 #include "memory.hpp"
 
-constexpr bool getParity(unsigned short n) {
+constexpr bool getParity(u32 n) {
+    bool parity = false;
+    for (unsigned char i = 0; i < 32; i++)
+        if ((n >> i) & 1)
+            parity = !parity;
+    return parity;
+}
+
+constexpr bool getParity(u16 n) {
+    bool parity = false;
+    for (unsigned char i = 0; i < 16; i++)
+        if ((n >> i) & 1)
+            parity = !parity;
+    return parity;
+}
+
+constexpr bool getParity(u8 n) {
     bool parity = false;
     for (unsigned char i = 0; i < 8; i++)
         if ((n >> i) & 1)
@@ -149,7 +165,7 @@ namespace instructions {
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+                throw std::invalid_argument("Invalid MOD byte for operation: add.");
                 break;
             }
         }
@@ -227,7 +243,85 @@ namespace instructions {
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+                throw std::invalid_argument("Invalid MOD byte for operation: sub.");
+                break;
+            }
+        }
+    }
+
+    void processMUL(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // multiply operands
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
+                u8 A = tpu.readRegister8(Register::AL).getValue();
+                u8 B = tpu.readByte(memory).getValue();
+                u16 product = A * B;
+                tpu.moveToRegister(Register::AX, product);
+
+                // update flags
+                tpu.setFlag(CARRY, product > 0xFF); // same as overflow
+                tpu.setFlag(PARITY, getParity(product));
+                tpu.setFlag(ZERO, product == 0);
+                tpu.setFlag(SIGN, (product & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, product > 0xFF);
+                break;
+            }
+            case 1: { // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+                u16 A = tpu.readRegister8(Register::AX).getValue();
+                u16 B = tpu.readWord(memory).getValue();
+                u32 product = A * B;
+                u16 lower = product & 0x0000FFFF;
+                u16 upper = (product & 0xFFFF0000) >> 16;
+
+                tpu.moveToRegister(Register::AX, lower);
+                tpu.moveToRegister(Register::DX, upper);
+
+                // update flags
+                tpu.setFlag(CARRY, upper > 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(product));
+                tpu.setFlag(ZERO, product == 0);
+                tpu.setFlag(SIGN, (upper & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, upper > 0);
+                break;
+            }
+            case 2: { // Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
+                u8 A = tpu.readRegister8(Register::AL).getValue();
+                u8 B = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                u16 product = A * B;
+                tpu.moveToRegister(Register::AX, product);
+
+                // update flags
+                tpu.setFlag(CARRY, product > 0xFF); // same as overflow
+                tpu.setFlag(PARITY, getParity(product));
+                tpu.setFlag(ZERO, product == 0);
+                tpu.setFlag(SIGN, (product & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, product > 0xFF);
+                break;
+            }
+            case 3: { // Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+                u16 A = tpu.readRegister16(Register::AX).getValue();
+                u16 B = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                u32 product = A * B;
+                u16 lower = product & 0x0000FFFF;
+                u16 upper = (product & 0xFFFF0000) >> 16;
+
+                tpu.moveToRegister(Register::AX, lower);
+                tpu.moveToRegister(Register::DX, upper);
+
+                // update flags
+                tpu.setFlag(CARRY, upper > 0); // same as overflow
+                tpu.setFlag(PARITY, getParity(product));
+                tpu.setFlag(ZERO, product == 0);
+                tpu.setFlag(SIGN, (upper & (1u << 15)) > 0);
+                tpu.setFlag(OVERFLOW, upper > 0);
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: mul.");
                 break;
             }
         }

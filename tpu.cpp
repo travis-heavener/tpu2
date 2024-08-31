@@ -122,6 +122,11 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since TPU has just completed an operation
             break;
         }
+        case OPCode::MUL: {
+            instructions::processMUL(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
     }

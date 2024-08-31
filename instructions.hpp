@@ -9,6 +9,7 @@ namespace instructions {
     void processMOV(TPU& tpu, Memory& memory);
     void processADD(TPU& tpu, Memory& memory);
     void processSUB(TPU& tpu, Memory& memory);
+    void processMUL(TPU& tpu, Memory& memory);
 };
 
 #endif
