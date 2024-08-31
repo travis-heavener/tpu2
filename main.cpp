@@ -42,11 +42,18 @@ int main() {
     memory[index++] = 2; // MOD byte
     memory[index++] = Register::BL; // register code
     memory[index++] = 0xB1; // imm8
-
-    // div AL by BL
-    memory[index++] = OPCode::DIV; // instruction
+    
+    // copy 0xCA into 8-bit register BH
+    memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 2; // MOD byte
-    memory[index++] = Register::BL; // register code
+    memory[index++] = Register::BH; // register code
+    memory[index++] = 0xCA; // imm8
+
+    // calculate AX AND BX
+    memory[index++] = OPCode::AND; // instruction
+    memory[index++] = 3; // MOD byte
+    memory[index++] = Register::AX; // register code
+    memory[index++] = Register::BX; // register code
 
     // copy register AL to 0x8411
     memory[index++] = OPCode::MOV; // instruction

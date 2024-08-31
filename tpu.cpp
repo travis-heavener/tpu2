@@ -132,6 +132,21 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since TPU has just completed an operation
             break;
         }
+        case OPCode::AND: {
+            instructions::processAND(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::OR: {
+            instructions::processOR(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::XOR: {
+            instructions::processXOR(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
     }

@@ -332,7 +332,7 @@ namespace instructions {
         Byte mod = tpu.readByte(memory);
         tpu.sleep(); // wait since TPU has to process mod byte
 
-        // multiply operands
+        // divide operands
         switch (mod.getValue() & 0b111) {
             case 0: { // Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
                 u8 A = tpu.readRegister8(Register::AL).getValue();
@@ -395,9 +395,75 @@ namespace instructions {
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: mul.");
+                throw std::invalid_argument("Invalid MOD byte for operation: div.");
                 break;
             }
         }
     }
+
+    void processAND(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u8 opA = tpu.readByte(memory).getValue();
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Logical AND between 8-bit register and imm8, stored in first operand.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                u8 result = A & tpu.readByte(memory).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), result );
+
+                // update flags
+                tpu.setFlag(PARITY, getParity(result));
+                tpu.setFlag(ZERO, result == 0);
+                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                break;
+            }
+            case 1: { // Logical AND between 16-bit register and imm16, stored in first operand.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                u16 result = A & tpu.readWord(memory).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), result );
+
+                // update flags
+                tpu.setFlag(PARITY, getParity(result));
+                tpu.setFlag(ZERO, result == 0);
+                tpu.setFlag(SIGN, (result & (1u << 15)) > 0);
+                break;
+            }
+            case 2: { // Logical AND between two 8-bit registers, stored in first operand.
+                u8 opB = tpu.readByte(memory).getValue();
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                u8 B = tpu.readRegister8(getRegister8FromCode(opB)).getValue();
+                u8 result = A & B;
+                tpu.moveToRegister( getRegister8FromCode(opA), result );
+
+                // update flags
+                tpu.setFlag(PARITY, getParity(result));
+                tpu.setFlag(ZERO, result == 0);
+                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                break;
+            }
+            case 3: { // Logical AND between two 16-bit registers, stored in first operand.
+                u8 opB = tpu.readByte(memory).getValue();
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                u16 B = tpu.readRegister16(getRegister16FromCode(opB)).getValue();
+                u16 result = A & B;
+                tpu.moveToRegister( getRegister16FromCode(opA), result );
+
+                // update flags
+                tpu.setFlag(PARITY, getParity(result));
+                tpu.setFlag(ZERO, result == 0);
+                tpu.setFlag(SIGN, (result & (1u << 15)) > 0);
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: and.");
+                break;
+            }
+        }
+    }
+
+    void processOR(TPU& tpu, Memory& memory) {}
+    void processXOR(TPU& tpu, Memory& memory) {}
 }

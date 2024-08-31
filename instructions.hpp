@@ -11,6 +11,9 @@ namespace instructions {
     void processSUB(TPU& tpu, Memory& memory);
     void processMUL(TPU& tpu, Memory& memory);
     void processDIV(TPU& tpu, Memory& memory);
+    void processAND(TPU& tpu, Memory& memory);
+    void processOR(TPU& tpu, Memory& memory);
+    void processXOR(TPU& tpu, Memory& memory);
 };
 
 #endif
