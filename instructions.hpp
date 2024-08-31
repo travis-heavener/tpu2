@@ -7,6 +7,7 @@
 // abstraction from TPU.cpp to make processing instructions more tidy
 namespace instructions {
     void processMOV(TPU& tpu, Memory& memory);
+    void processADD(TPU& tpu, Memory& memory);
 };
 
 #endif

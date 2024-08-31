@@ -36,6 +36,11 @@ u16 Word::getValue() const {
     return (((u16)byteH.getValue()) << 8) | byteL.getValue();
 }
 
+void Word::setValue(u16 value) {
+    this->byteH = (u8) ((value & 0xFF00) >> 8);
+    this->byteL = (u8)(value & 0x00FF);
+}
+
 std::ostream& operator<<(std::ostream& os, const Word& word) {
     os << word.getUpper() << word.getLower();
     return os;

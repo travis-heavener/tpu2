@@ -112,6 +112,11 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since TPU has just completed a move
             break;
         }
+        case OPCode::ADD: {
+            instructions::processADD(*this, memory);
+            this->sleep(); // wait since TPU has just completed a move
+            break;
+        }
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
     }
@@ -139,4 +144,13 @@ void TPU::start(Memory& memory) {
 void TPU::sleep() const {
     const long sleepTime = 1e+6 / this->clockFreq;
     std::this_thread::sleep_for(std::chrono::microseconds( sleepTime ));
+}
+
+// update a specific flag
+void TPU::setFlag(u8 flag, bool isSet) {
+    if (isSet) {
+        FLAGS.setValue( FLAGS.getValue() | (1u << flag) );
+    } else {
+        FLAGS.setValue( FLAGS.getValue() & ~(1u << flag) );
+    }
 }

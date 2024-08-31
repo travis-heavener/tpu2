@@ -5,15 +5,11 @@
 
 // flag macros
 // ref: https://www.geeksforgeeks.org/flag-register-8086-microprocessor/?ref=lbp
-#define CARRY 0
-#define PARITY 2
-#define AUX_CARRY 4
-#define ZERO 6
-#define SIGN 7
-#define TRAP 8
-#define INTERRUPT 9
-#define DIRECTION 10
-#define OVERFLOW 11
+#define CARRY 0 // 1 if a carry/borrow bit is used during an arithmetic operation
+#define PARITY 2 // 1 if the result of arithmetic or logical operation has odd parity
+#define ZERO 6 // 1 if the result of arithmetic or logical operation is zero
+#define SIGN 7 // 1 if the result of arithmetic or logical operation is negative
+#define OVERFLOW 11 // 1 if the result of arithmetic operation overflows/underflows
 
 // instruction set opcodes
 enum OPCode {
@@ -99,6 +95,7 @@ class TPU {
         void execute(Memory&);
         void start(Memory&); // for starting/running the clock
         void sleep() const;
+        void setFlag(u8, bool);
 
         // helpers
         Byte readByte(Memory&);

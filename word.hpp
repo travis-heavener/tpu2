@@ -30,6 +30,7 @@ class Word {
 
         /* Get the value of the Word as an u16. */
         u16 getValue() const;
+        void setValue(u16);
     private:
         Byte byteL, byteH;
 };
