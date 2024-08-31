@@ -35,14 +35,14 @@ int main() {
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 2; // MOD byte
     memory[index++] = Register::AH; // register code
-    memory[index++] = 0xFA; // imm8
+    memory[index++] = 0xB1; // imm8
     
     // copy 0xB1 into memory at 0x8411
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 0; // MOD byte
     memory[index++] = 0x11; // imm16 lower half as imm8 (little endian)
     memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = 0xB1; // imm8
+    memory[index++] = 0xFA; // imm8
 
     // copy 0x8411 into register AL
     memory[index++] = OPCode::MOV; // instruction
@@ -51,8 +51,8 @@ int main() {
     memory[index++] = 0x11; // imm16 lower half as imm8 (little endian)
     memory[index++] = 0x84; // imm16 upper half as imm8
 
-    // add AL to AH
-    memory[index++] = OPCode::ADD; // instruction
+    // sub AL from AH
+    memory[index++] = OPCode::SUB; // instruction
     memory[index++] = 2; // MOD byte
     memory[index++] = Register::AH; // register code
     memory[index++] = Register::AL; // register code

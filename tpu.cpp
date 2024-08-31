@@ -109,12 +109,17 @@ void TPU::execute(Memory& memory) {
         case OPCode::NOP: break;
         case OPCode::MOV: {
             instructions::processMOV(*this, memory);
-            this->sleep(); // wait since TPU has just completed a move
+            this->sleep(); // wait since TPU has just completed an operation
             break;
         }
         case OPCode::ADD: {
             instructions::processADD(*this, memory);
-            this->sleep(); // wait since TPU has just completed a move
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::SUB: {
+            instructions::processSUB(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
             break;
         }
         default:

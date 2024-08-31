@@ -21,10 +21,10 @@ add reg, imm16              0x14 /1         Adds 16-bit register and imm16 and s
 add reg, reg                0x14 /2         Adds two 8-bit registers and stores in first operand.
 add reg, reg                0x14 /3         Adds two 16-bit registers and stores in first operand.
 
-sub reg, imm8               0x15 /0         Subtracts 8-bit register and imm8 and stores in first operand.
-sub reg, imm16              0x15 /1         Subtracts 16-bit register and imm16 and stores in first operand.
-sub reg, reg                0x15 /2         Subtracts two 8-bit registers and stores in first operand.
-sub reg, reg                0x15 /3         Subtracts two 16-bit registers and stores in first operand.
+sub reg, imm8               0x15 /0         Subtracts imm8 from an 8-bit register and stores in first operand.
+sub reg, imm16              0x15 /1         Subtracts imm16 from a 16-bit register and stores in first operand.
+sub reg, reg                0x15 /2         Subtracts 8-bit registers (second operand from first) and stores in first operand.
+sub reg, reg                0x15 /3         Subtracts 16-bit registers (second operand from first) and stores in first operand.
 
 mul reg, imm8               0x16 /0         Multiplies 8-bit register and imm8 and stores in first operand.
 mul reg, imm16              0x16 /1         Multiplies 16-bit register and imm16 and stores in first operand.
