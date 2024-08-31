@@ -49,8 +49,8 @@ int main() {
     memory[index++] = Register::BH; // register code
     memory[index++] = 0xCA; // imm8
 
-    // calculate AX OR BX
-    memory[index++] = OPCode::OR; // instruction
+    // calculate AX XOR BX
+    memory[index++] = OPCode::XOR; // instruction
     memory[index++] = 3; // MOD byte
     memory[index++] = Register::AX; // register code
     memory[index++] = Register::BX; // register code
