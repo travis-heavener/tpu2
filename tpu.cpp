@@ -1,5 +1,6 @@
 #include <chrono>
 #include <thread>
+#include <iostream>
 
 #include "tpu.hpp"
 #include "instructions.hpp"
@@ -9,7 +10,7 @@ void TPU::reset() {
     AX = BX = CX = DX = BP = SI = DI = 0x0;
 
     // fix instruction ptr and stack ptr
-    IP = 0x0;
+    IP = INSTRUCTION_PTR_START;
     SP = 0xFFFF; // starts at the end of addressable memory, grows downwards
 
     // clear flags
@@ -161,7 +162,8 @@ void TPU::execute(Memory& memory) {
 // starts the clock and runs until a halt instruction is encountered
 void TPU::start(Memory& memory) {
     while ( !this->__hasSuspended ) {
-        this->execute(memory); // execute next instruction
+        // execute next instruction
+        this->execute(memory);
     }
 }
 

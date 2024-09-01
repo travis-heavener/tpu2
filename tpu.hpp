@@ -3,6 +3,9 @@
 
 #include "memory.hpp"
 
+// define entry point for program counter
+#define INSTRUCTION_PTR_START 0x1000 // reserve first 4 KiB of memory
+
 // flag macros
 // ref: https://www.geeksforgeeks.org/flag-register-8086-microprocessor/?ref=lbp
 #define CARRY 0 // 1 if a carry/borrow bit is used during an arithmetic operation
@@ -43,7 +46,7 @@ enum Register {
 
 // syscall codes
 enum Syscall {
-    STDOUT      = 0x00,     STDERR      = 0x01
+    STDOUT      = 0x00,     STDERR      = 0x01,     STDIN       = 0x02
 };
 
 constexpr Register getRegister16FromCode(unsigned short code) {

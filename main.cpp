@@ -21,7 +21,7 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
-#define CLOCK_FREQ_HZ 5
+#define CLOCK_FREQ_HZ 5000
 
 int main() {
     // initialize the processor & memory
@@ -29,22 +29,43 @@ int main() {
     Memory memory;
 
     // load a string into memory
-    u16 stringStart = 0xFF10;
-    std::string text("Hello world!\n");
-    for (size_t i = 0; i < text.length(); i++) {
-        memory[stringStart + i] = text[i];
-    }
-    
+    u16 stringStart = 0xFF00;
+    u16 textLen = 10; // how many characters long the anticipated input is
+
     // load program into memory
     u16 index = 0;
 
-    // load syscall data for printing to STDERR
+    // load syscall data for reading from STDIN
+    // syscall type
+    memory[index++] = OPCode::MOV; // instruction
+    memory[index++] = 3; // MOD byte
+    memory[index++] = Register::AX; // register code
+    memory[index++] = Syscall::STDIN; // imm8
+    memory[index++] = 0x00;
+    
+    // start address
+    memory[index++] = OPCode::MOV; // instruction
+    memory[index++] = 3; // MOD byte
+    memory[index++] = Register::BX; // register code
+    memory[index++] = stringStart & 0xFF; // imm16 lower half
+    memory[index++] = (stringStart & 0xFF00) >> 8; // imm16 upper half
+
+    // input length
+    memory[index++] = OPCode::MOV; // instruction
+    memory[index++] = 2; // MOD byte
+    memory[index++] = Register::CL; // register code
+    memory[index++] = textLen; // imm8
+
+    // make syscall
+    memory[index++] = OPCode::SYSCALL;
+
+    // load syscall data for printing to STDOUT
     
     // syscall type
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 3; // MOD byte
     memory[index++] = Register::AX; // register code
-    memory[index++] = Syscall::STDERR; // imm8
+    memory[index++] = Syscall::STDOUT; // imm8
     memory[index++] = 0x00;
     
     // start address
@@ -58,7 +79,7 @@ int main() {
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 3; // MOD byte
     memory[index++] = Register::CX; // register code
-    memory[index++] = text.length(); // imm8
+    memory[index++] = textLen; // imm8
     memory[index++] = 0x00;
 
     // make syscall

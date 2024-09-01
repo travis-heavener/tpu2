@@ -1,3 +1,8 @@
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+    #include <conio.h>
+#else
+    #include <curses.h>
+#endif
 #include <iostream>
 
 #include "instructions.hpp"
@@ -44,7 +49,6 @@ namespace instructions {
                 tpu.moveToRegister(Register::SI, charPtr);
                 tpu.moveToRegister(Register::DI, charPtr + length);
                 const u16 DI = tpu.readRegister16(Register::DI).getValue();
-                tpu.sleep(); // sleep cycle since a handful of registers have just been written and read
 
                 while (tpu.readRegister16(Register::SI).getValue() != DI) {
                     if (syscallCode == Syscall::STDOUT) {
@@ -56,6 +60,39 @@ namespace instructions {
                     // sleep between writes
                     tpu.sleep();
                 }
+                break;
+            }
+            case Syscall::STDIN: {
+                u16 charPtr = tpu.readRegister16(Register::BX).getValue(); // get address for string start
+                u8 length = tpu.readRegister16(Register::CX).getValue(); // get the length of string
+
+                // load source index from BX and destination index from BX + length
+                tpu.moveToRegister(Register::SI, charPtr);
+                tpu.moveToRegister(Register::DI, charPtr + length);
+                const u16 DI = tpu.readRegister16(Register::DI).getValue();
+
+                // init curses for Linux for waiting on character input
+                #if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32) || defined(__CYGWIN__)
+                    initscr();
+                #endif
+
+                // read until length is met
+                while (tpu.readRegister16(Register::SI).getValue() != DI) {
+                    for (u8 i = 0; i < length; i++) {
+                        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+                            memory[tpu.readRegister16(Register::SI)++] = getch();
+                        #else
+                            memory[tpu.readRegister16(Register::SI)++] = getch();
+                        #endif
+                    }
+                    
+                    // sleep between reads
+                    tpu.sleep();
+                }
+
+                #if !defined(WIN32) && !defined(_WIN32) && !defined(__WIN32) || defined(__CYGWIN__)
+                    endwin();
+                #endif
                 break;
             }
             default: {
