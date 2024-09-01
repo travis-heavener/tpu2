@@ -2,6 +2,7 @@
 
 #include "tpu.hpp"
 #include "memory.hpp"
+#include "assembler.hpp"
 
 /**
  * The TPU-2 (Terrible Processing Unit version 2) is an emulated 16-bit CPU.
@@ -28,65 +29,8 @@ int main() {
     TPU tpu(CLOCK_FREQ_HZ);
     Memory memory;
 
-    // load a string into memory
-    u16 stringStart = 0xFF00;
-    u16 textLen = 10; // how many characters long the anticipated input is
-
-    // load program into memory
-    u16 index = 0;
-
-    // load syscall data for reading from STDIN
-    // syscall type
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::AX; // register code
-    memory[index++] = Syscall::STDIN; // imm8
-    memory[index++] = 0x00;
-    
-    // start address
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::BX; // register code
-    memory[index++] = stringStart & 0xFF; // imm16 lower half
-    memory[index++] = (stringStart & 0xFF00) >> 8; // imm16 upper half
-
-    // input length
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::CL; // register code
-    memory[index++] = textLen; // imm8
-
-    // make syscall
-    memory[index++] = OPCode::SYSCALL;
-
-    // load syscall data for printing to STDOUT
-    
-    // syscall type
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::AX; // register code
-    memory[index++] = Syscall::STDOUT; // imm8
-    memory[index++] = 0x00;
-    
-    // start address
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::BX; // register code
-    memory[index++] = stringStart & 0xFF; // imm16 lower half
-    memory[index++] = (stringStart & 0xFF00) >> 8; // imm16 upper half
-
-    // string length
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 3; // MOD byte
-    memory[index++] = Register::CX; // register code
-    memory[index++] = textLen; // imm8
-    memory[index++] = 0x00;
-
-    // make syscall
-    memory[index++] = OPCode::SYSCALL;
-
-    // stop the clock
-    memory[index++] = HLT;
+    // load test program to memory
+    loadFileToMemory("./test.tpu", memory);
 
     // start the CPU's clock and wait
     tpu.start(memory);

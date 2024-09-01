@@ -75,6 +75,12 @@ constexpr Register getRegister8FromCode(unsigned short code) {
     }
 }
 
+Register getRegisterFromString(const std::string&);
+
+constexpr bool isRegister8Bit(Register reg) {
+    return reg == Register::AL || reg == Register::AH || reg == Register::BL || reg == Register::BH || reg == Register::CL || reg == Register::CH || reg == Register::DL || reg == Register::DH;
+}
+
 // the memory module is a continuous max of 64KiB, meaning this emulation does NOT
 // handle segmented memory blocks and thus does not use segment registers
 
