@@ -24,13 +24,18 @@
 
 #define CLOCK_FREQ_HZ 5000
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc != 2) {
+        std::cerr << "Invalid usage: <executable> path_to_file.tpu\n";
+        exit(1);
+    }
+    
     // initialize the processor & memory
     TPU tpu(CLOCK_FREQ_HZ);
     Memory memory;
 
     // load test program to memory
-    loadFileToMemory("./tests/logic_test.tpu", memory);
+    loadFileToMemory(argv[1], memory);
 
     // start the CPU's clock and wait
     tpu.start(memory);
