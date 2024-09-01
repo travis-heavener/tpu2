@@ -1,23 +1,19 @@
 ;
-; Simple Hello World program
+; Tests various instructions.
 ;
-mov @0xFF10, 'H'        ; load string to memory
-mov @0xFF11, 'e'
-mov @0xFF12, 'l'
-mov @0xFF13, 'l'
-mov @0xFF14, 'o'
-mov @0xFF15, ' '
-mov @0xFF16, 'w'
-mov @0xFF17, 'o'
-mov @0xFF18, 'r'
-mov @0xFF19, 'l'
-mov @0xFF1A, 'd'
-mov @0xFF1B, '!'
-mov @0xFF1C, '\n'
+mov AX, 0x66BC          ; move first addend to AX
+add AX, 0xC19           ; add 0xC19 to AX, store in AX
+sub AX, 0x98D           ; sub 0x98D from AX, store in AX
+mov @0xFF10, AL         ; move lower byte result to memory
+mov @0xFF11, AH         ; move upper byte result to memory
+
+; mov @0xFF10, 'M'
+; mov @0xFF11, 'F'
+mov @0xFF12, '\n'       ; add newline
 
 mov AX, 0x0             ; syscall type
-mov BX, 0xFF10          ; start address of string
-mov CX, 13              ; length of string
+mov BX, 0xFF10          ; start address of output
+mov CX, 3               ; length of output
 syscall                 ; invoke syscall
 
 hlt                     ; stop the clock

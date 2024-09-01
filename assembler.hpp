@@ -2,6 +2,7 @@
 #define __ASSEMBLER_HPP
 
 #include <string>
+#include <vector>
 
 #include "memory.hpp"
 

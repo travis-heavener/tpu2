@@ -8,6 +8,11 @@
 #include "memory.hpp"
 #include "tpu.hpp"
 
+// abstractions from processLine for readability
+void parseMOV(const std::vector<std::string>&, Memory&, u16&);
+void parseADDSUB(const std::vector<std::string>&, Memory&, u16&, bool);
+void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
+
 // helper for trimming strings in place
 void ltrimString(std::string& str) {
     while (str.length() > 0 && std::isspace(str[0])) {
@@ -19,6 +24,11 @@ void rtrimString(std::string& str) {
     while (str.length() > 0 && std::isspace(*str.rbegin())) {
         str.erase(str.end()-1, str.end());
     }
+}
+
+void trimString(std::string& str) {
+    ltrimString(str);
+    rtrimString(str);
 }
 
 // remove comments from a string
@@ -66,6 +76,12 @@ char parseCharacter(const std::string& charString) {
     }
 }
 
+// shorthand to check args and throw error if invalid size
+void checkArgs(const std::vector<std::string>& args, u8 size) {
+    if (args.size() != size)
+        throw std::invalid_argument("Invalid number of arguments.");
+}
+
 // extract instruction arguments from line
 void loadInstructionArgs(const std::string& line, std::vector<std::string>& args) {
     // ltrim the line (already rtrimmed)
@@ -77,12 +93,8 @@ void loadInstructionArgs(const std::string& line, std::vector<std::string>& args
 
     // split on commas
     while (std::getline(sstream, buf, ',')) {
-        // trim buffered split
-        ltrimString(buf);
-        rtrimString(buf);
-
-        // skip empty buffers
-        if (buf.size() == 0) continue;
+        trimString(buf); // trim buffered split
+        if (buf.size() == 0) continue; // skip empty buffers
 
         // collapse characters into raw bytes
         if (buf[0] == '\'') {
@@ -94,9 +106,7 @@ void loadInstructionArgs(const std::string& line, std::vector<std::string>& args
                 throw std::invalid_argument("Invalid character: " + buf);
             
             // parse char-string to primitive character
-            args.push_back(
-                std::to_string( (u16)parseCharacter(buf.substr(1, buf.length()-2)) )
-            );
+            args.push_back(std::to_string( (u16)parseCharacter(buf.substr(1, buf.length()-2)) ));
             continue;
         }
 
@@ -105,107 +115,20 @@ void loadInstructionArgs(const std::string& line, std::vector<std::string>& args
         if (isAddr) buf.erase(buf.begin(), buf.begin()+1);
 
         // convert hex & binary to decimal
-        if (buf.size() > 2 && buf.substr(0, 2) == "0x") {
-            unsigned long long num = std::stoul(buf.substr(2), nullptr, 16);
-            if (num > 0xFFFF) throw std::invalid_argument("Numeric literal exceeds 0xFFFF.");
-            buf = std::to_string(num);
-        } else if (buf.size() > 2 && buf.substr(0, 2) == "0b") {
-            unsigned long long num = std::stoul(buf.substr(2), nullptr, 2);
-            if (num > 0xFFFF) throw std::invalid_argument("Numeric literal exceeds 0xFFFF.");
-            buf = std::to_string(num);
-        } else if (buf.size() > 2 && buf.substr(0, 2) == "0d") {
-            unsigned long long num = std::stoul(buf.substr(2));
+        const std::string firstTwoChars = buf.substr(0, 2);
+        if (buf.size() > 2 && (firstTwoChars == "0x" || firstTwoChars == "0d" || firstTwoChars == "0b")) {
+            u8 base = firstTwoChars == "0x" ? 16 : firstTwoChars == "0b" ? 2 : 10;
+            unsigned long long num = std::stoul(buf.substr(2), nullptr, base);
+            
+            // prevent overflow
             if (num > 0xFFFF) throw std::invalid_argument("Numeric literal exceeds 0xFFFF.");
             buf = std::to_string(num);
         }
 
-        // denote an address
+        // mark as an address
         if (isAddr) buf.insert(buf.begin(), '@');
 
-        // append argument
-        args.push_back(buf);
-    }
-}
-
-// abstraction to parse a MOV instruction
-void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
-    if (args.size() != 2) // check for extra args
-        throw std::invalid_argument("Invalid number of arguments.");
-    memory[instIndex++] = OPCode::MOV;
-    
-    // determine MOD byte
-    switch (args[0][0]) {
-        case '@': { // 0 & 1
-            u16 addr = std::stoul(args[0].substr(1)); // dest
-
-            try { // try as register (1)
-                Register reg = getRegisterFromString(args[1]);
-                memory[instIndex++] = 1; // MOD byte
-                memory[instIndex++] = addr & 0x00FF; // lower half
-                memory[instIndex++] = (addr & 0xFF00) >> 8; // upper half
-                memory[instIndex++] = reg;
-            } catch(std::invalid_argument&) {
-                // try as imm8 (0)
-                u32 arg = std::stoul(args[1]);
-                if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-                memory[instIndex++] = 0; // MOD byte
-                memory[instIndex++] = addr & 0x00FF; // lower half
-                memory[instIndex++] = (addr & 0xFF00) >> 8; // upper half
-                memory[instIndex++] = (u8)arg;
-            }
-            break;
-        }
-        default: { // 2-6
-            // get register
-            Register regA = getRegisterFromString(args[0]);
-            bool isRegA8 = isRegister8Bit(regA);
-
-            // try second operand as addr (4)
-            if (args[1][0] == '@') {
-                if (!isRegA8) throw std::invalid_argument("Expected 8-bit register.");
-                
-                u16 addr = std::stoul(args[1].substr(1));
-                memory[instIndex++] = 4; // MOD byte
-                memory[instIndex++] = regA; // dest
-                memory[instIndex++] = addr & 0x00FF; // lower half
-                memory[instIndex++] = (addr & 0xFF00) >> 8; // upper half
-            } else {
-                // try second operand as register (5-6)
-                Register regB;
-                try {
-                    regB = getRegisterFromString(args[1]);
-                } catch (std::invalid_argument&) {
-                    // try as imm8 or imm16 (2-3)
-                    u32 arg = std::stoul(args[1]);
-                    if (isRegA8) { // try as imm8 (2)
-                        if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-                        memory[instIndex++] = 2; // MOD byte
-                        memory[instIndex++] = regA; // dest
-                        memory[instIndex++] = (u8)arg;
-                    } else { // try as imm16 (3)
-                        if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
-                        memory[instIndex++] = 3; // MOD byte
-                        memory[instIndex++] = regA; // dest
-                        memory[instIndex++] = arg & 0x00FF; // lower half
-                        memory[instIndex++] = (arg & 0xFF00) >> 8; // upper half
-                    }
-                    break;
-                }
-
-                // treat as register (5-6)
-                bool isRegB8 = isRegister8Bit(regB);
-                if (isRegA8 && isRegB8) { // try as 8-bit (5)
-                    memory[instIndex++] = 5; // MOD byte
-                } else if (!isRegA8 && !isRegB8) { // try as 16-bit (6)
-                    memory[instIndex++] = 6; // MOD byte
-                } else {
-                    throw std::invalid_argument("8-bit and 16-bit register mismatch.");
-                }
-                memory[instIndex++] = regA; // dest
-                memory[instIndex++] = regB; // src
-            }
-            break;
-        }
+        args.push_back(buf); // append argument
     }
 }
 
@@ -222,10 +145,8 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     // read each line
     u16 instIndex = INSTRUCTION_PTR_START;
     std::string line;
-    while (std::getline(inHandle, line)) {
-        // process the line
-        processLine(line, memory, instIndex);
-    }
+    while (std::getline(inHandle, line))
+        processLine(line, memory, instIndex); // process the line
 
     // close file
     inHandle.close();
@@ -233,15 +154,10 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
 
 // process an individual line and load it into memory
 void processLine(std::string& line, Memory& memory, u16& instIndex) {
-    // remove comments
-    stripComments(line);
+    stripComments(line); // remove comments
+    trimString(line); // ltrim & rtrim string
 
-    // ltrim & rtrim string
-    ltrimString(line);
-    rtrimString(line);
-
-    // ignore empty strings
-    if (line.length() == 0) return;
+    if (line.length() == 0) return; // ignore empty strings
 
     // grab keyword
     size_t spaceIndex = line.find(' ');
@@ -249,25 +165,20 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
 
     // grab args
     std::vector<std::string> args;
-    if (spaceIndex != std::string::npos)
-        loadInstructionArgs(line.substr(spaceIndex), args);
+    if (spaceIndex != std::string::npos) loadInstructionArgs(line.substr(spaceIndex), args);
 
     // handle each instruction
     if (kwd == "nop") {
-        if (args.size() != 0) // check for extra args
-            throw std::invalid_argument("Invalid number of arguments.");
+        checkArgs(args, 0); // check for extra args
         memory[instIndex++] = OPCode::NOP; // add instruction
     } else if (kwd == "hlt") {
-        if (args.size() != 0) // check for extra args
-            throw std::invalid_argument("Invalid number of arguments.");
+        checkArgs(args, 0); // check for extra args
         memory[instIndex++] = OPCode::HLT; // add instruction
     } else if (kwd == "syscall") {
-        if (args.size() != 0) // check for extra args
-            throw std::invalid_argument("Invalid number of arguments.");
+        checkArgs(args, 0); // check for extra args
         memory[instIndex++] = OPCode::SYSCALL; // add instruction
     } else if (kwd == "jmp" || kwd == "jz" || kwd == "jnz") {
-        if (args.size() != 1) // check for extra args
-            throw std::invalid_argument("Invalid number of arguments.");
+        checkArgs(args, 1); // check for extra args
         memory[instIndex++] = OPCode::JMP;
         memory[instIndex++] = kwd == "jmp" ? 0 : kwd == "jz" ? 1 : 2; // MOD byte
 
@@ -278,9 +189,136 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
         memory[instIndex++] = addr & 0x00FF; // lower half
         memory[instIndex++] = (addr & 0xFF00) >> 8; // upper half
     } else if (kwd == "mov") {
+        checkArgs(args, 2); // check for extra args
         parseMOV(args, memory, instIndex);
+    } else if (kwd == "add" || kwd == "sub") {
+        checkArgs(args, 2); // check for extra args
+        parseADDSUB(args, memory, instIndex, kwd == "add");
+    } else if (kwd == "mul" || kwd == "div") {
+        checkArgs(args, 1); // check for extra args
+        parseMULDIV(args, memory, instIndex, kwd == "mul");
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);
     }
+}
+
+// abstraction to parse a MOV instruction
+void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    // determine MOD byte
+    u8 MOD = 0;
+    std::vector<u8> bytesToWrite;
+    switch (args[0][0]) {
+        case '@': { // 0 & 1
+            u16 addr = std::stoul(args[0].substr(1)); // dest
+            bytesToWrite.push_back(addr & 0x00FF); // lower half
+            bytesToWrite.push_back((addr & 0xFF00) >> 8); // upper half
+
+            Register regB;
+            try { // try as register (1)
+                regB = getRegisterFromString(args[1]);
+            } catch(std::invalid_argument&) { // try as imm8 (0)
+                u32 arg = std::stoul(args[1]);
+                if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+                MOD = 0;
+                bytesToWrite.push_back((u8)arg); // imm8
+                break;
+            }
+
+            // base case, try register
+            // ensure register is 8-bit
+            if (!isRegister8Bit(regB)) throw std::invalid_argument("Expected 8-bit register.");
+            MOD = 1; // MOD byte
+            bytesToWrite.push_back(regB); // src register
+            break;
+        }
+        default: { // 2-6
+            // get register
+            Register regA = getRegisterFromString(args[0]);
+            bytesToWrite.push_back(regA); // dest
+            bool isRegA8 = isRegister8Bit(regA);
+
+            // try second operand as addr (4)
+            if (args[1][0] == '@') {
+                if (!isRegA8) throw std::invalid_argument("Expected 8-bit register.");
+                u16 addr = std::stoul(args[1].substr(1));
+                MOD = 4;
+                bytesToWrite.push_back(addr & 0x00FF); // lower half
+                bytesToWrite.push_back((addr & 0xFF00) >> 8); // upper half
+            } else {
+                // try second operand as register (5-6)
+                Register regB;
+                try {
+                    regB = getRegisterFromString(args[1]);
+                } catch (std::invalid_argument&) {
+                    // try as imm8 or imm16 (2-3)
+                    u32 arg = std::stoul(args[1]);
+                    bytesToWrite.push_back(arg & 0x00FF); // lower half
+                    if (isRegA8) { // try as imm8 (2)
+                        if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+                        MOD = 2;
+                    } else { // try as imm16 (3)
+                        if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
+                        MOD = 3;
+                        bytesToWrite.push_back((arg & 0xFF00) >> 8); // upper half
+                    }
+                    break;
+                }
+
+                // base case, it's a register->register move
+                bool isRegB8 = isRegister8Bit(regB); // prevent register mismatch
+                if (isRegA8 != isRegB8) throw std::invalid_argument("8-bit and 16-bit register mismatch.");
+                
+                MOD = isRegA8 ? 5 : 6; // try as 8-bit (5) or 16-bit (6)
+                bytesToWrite.push_back(regB); // src
+            }
+            break;
+        }
+    }
+
+    // write bytes
+    memory[instIndex++] = OPCode::MOV;
+    memory[instIndex++] = MOD;
+    for (u8 b : bytesToWrite) memory[instIndex++] = b;
+}
+
+void parseADDSUB(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isAdd) {
+    std::vector<u8> bytesToWrite;
+    
+    // determine target register
+    Register reg = getRegisterFromString(args[0]);
+    bool isRegA8 = isRegister8Bit(reg);
+    bytesToWrite.push_back(reg);
+
+    // determine MOD byte
+    u8 MOD = 0;
+    try { // try second operand as register
+        Register regB = getRegisterFromString(args[1]);
+        bool isRegB8 = isRegister8Bit(regB); // prevent register mismatch
+        if (isRegA8 != isRegB8) throw std::invalid_argument("8-bit and 16-bit register mismatch.");
+        MOD = isRegA8 ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
+        bytesToWrite.push_back(regB); // src
+    } catch (std::invalid_argument&) { // try as imm8/16
+        // try as imm8 or imm16 (0-1)
+        u32 arg = std::stoul(args[1]);
+        bytesToWrite.push_back(arg & 0x00FF); // lower half
+        
+        if (isRegA8) { // try as imm8 (0)
+            if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+            MOD = 0;
+        } else { // try as imm16 (1)
+            if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
+            MOD = 1;
+            bytesToWrite.push_back((arg & 0xFF00) >> 8); // upper half
+        }
+    }
+
+    // write bytes
+    memory[instIndex++] = isAdd ? OPCode::ADD : OPCode::SUB;
+    memory[instIndex++] = MOD;
+    for (u8 b : bytesToWrite) memory[instIndex++] = b;
+}
+
+void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isMul) {
+
 }
