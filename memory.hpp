@@ -1,8 +1,8 @@
 #ifndef __MEMORY_HPP
 #define __MEMORY_HPP
 
-#include "byte.hpp"
-#include "word.hpp"
+#include "util/byte.hpp"
+#include "util/word.hpp"
 
 #define MAX_MEMORY 0xFFFF+1 // 2 ^ 16 addressable bytes
 
