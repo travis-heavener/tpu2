@@ -320,5 +320,31 @@ void parseADDSUB(const std::vector<std::string>& args, Memory& memory, u16& inst
 }
 
 void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isMul) {
+    std::vector<u8> bytesToWrite;
 
+    // determine MOD byte
+    u8 MOD = 0;
+    try { // try second operand as register
+        Register reg = getRegisterFromString(args[0]);
+        MOD = isRegister8Bit(reg) ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
+        bytesToWrite.push_back(reg); // src
+    } catch (std::invalid_argument&) { // try as imm8/16
+        // try as imm8 or imm16 (0-1)
+        u32 arg = std::stoul(args[0]);
+        bytesToWrite.push_back(arg & 0x00FF); // lower half
+        
+        if (arg > 0xFFFF) {
+            throw std::invalid_argument("Expected 16-bit literal.");
+        } else if (arg > 0xFF) { // try as imm16 (0)
+            MOD = 1;
+            bytesToWrite.push_back((arg & 0xFF00) >> 8); // upper half
+        } else { // try as imm8 (0)
+            MOD = 0;
+        }
+    }
+
+    // write bytes
+    memory[instIndex++] = isMul ? OPCode::MUL : OPCode::DIV;
+    memory[instIndex++] = MOD;
+    for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }

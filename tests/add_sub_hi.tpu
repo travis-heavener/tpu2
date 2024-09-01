@@ -6,9 +6,6 @@ add AX, 0xC19           ; add 0xC19 to AX, store in AX
 sub AX, 0x98D           ; sub 0x98D from AX, store in AX
 mov @0xFF10, AL         ; move lower byte result to memory
 mov @0xFF11, AH         ; move upper byte result to memory
-
-; mov @0xFF10, 'M'
-; mov @0xFF11, 'F'
 mov @0xFF12, '\n'       ; add newline
 
 mov AX, 0x0             ; syscall type

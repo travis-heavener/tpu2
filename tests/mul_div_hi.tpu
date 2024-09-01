@@ -1,0 +1,22 @@
+;
+; Tests various instructions.
+;
+mov AX, 0xD290          ; move first factor to AX
+add AX, 0xA             ; add 0xA to AX, store in AX
+mov BX, 0x10            ; move 0x10 into BX to force 16-bit div
+div BX                  ; div AX by BX, store in AX and remainder in DX
+
+mov @0xFF12, DL         ; move lower byte remainder to memory
+
+mov BX, 0x8             ; move 0x8 into BX to force 16-bit mul
+mul BX                  ; mul BX and AX, store in AX
+
+mov @0xFF10, AL         ; move lower byte result to memory
+mov @0xFF11, AH         ; move upper byte result to memory
+
+mov AX, 0x0             ; syscall type
+mov BX, 0xFF10          ; start address of output
+mov CX, 3               ; length of output
+syscall                 ; invoke syscall
+
+hlt                     ; stop the clock

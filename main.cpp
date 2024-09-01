@@ -30,7 +30,7 @@ int main() {
     Memory memory;
 
     // load test program to memory
-    loadFileToMemory("./test.tpu", memory);
+    loadFileToMemory("./tests/mul_div_hi.tpu", memory);
 
     // start the CPU's clock and wait
     tpu.start(memory);

@@ -31,7 +31,7 @@ sub reg, reg                0x15 /3         Subtracts 16-bit registers (second o
 mul imm8                    0x16 /0         Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
 mul imm16                   0x16 /1         Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
 mul reg                     0x16 /2         Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-mul reg                     0x16 /3         Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+mul reg                     0x16 /3         Multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
 
 div imm8                    0x17 /0         Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
 div imm16                   0x17 /1         Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
