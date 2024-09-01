@@ -1,20 +1,20 @@
 INSTRUCTION                 OPCODE          COMMENTS
 --------------------------------------------------------------------------------------------------------------------------------
-nop                         0x00 /0         No operation.
+nop                         0x00            No operation.
 
-hlt                         0x01 /0         Halts/stops the clock on the CPU.
+hlt                         0x01            Halts/stops the clock on the CPU.
 
-syscall                     0x02 /0         Triggers a syscall.
+syscall                     0x02            Triggers a syscall.
 
-jmp [addr]                  0x04 /0         Moves the instruction pointer to the specified 16-bit memory address.
-jz [addr]                   0x04 /1         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
-jnz [addr]                  0x04 /2         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
+jmp @addr                   0x04 /0         Moves the instruction pointer to the specified 16-bit memory address.
+jz @addr                    0x04 /1         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
+jnz @addr                   0x04 /2         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
 
-mov [addr], imm8            0x05 /0         Move imm8 into address in memory
-mov [addr], reg             0x05 /1         Move value in 8-bit register to memory address.
+mov @addr, imm8             0x05 /0         Move imm8 into address in memory
+mov @addr, reg              0x05 /1         Move value in 8-bit register to memory address.
 mov reg, imm8               0x05 /2         Move imm8 into 8-bit register
 mov reg, imm16              0x05 /3         Move imm16 into 16-bit register
-mov reg, [addr]             0x05 /4         Move 8-bit value from memory address into 8-bit register.
+mov reg, @addr              0x05 /4         Move 8-bit value from memory address into 8-bit register.
 mov reg, reg                0x05 /5         Move value between 8-bit registers.
 mov reg, reg                0x05 /6         Move value between 16-bit registers.
 
