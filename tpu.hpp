@@ -41,6 +41,11 @@ enum Register {
     FLAGS   = 0x11
 };
 
+// syscall codes
+enum Syscall {
+    STDOUT      = 0x00
+};
+
 constexpr Register getRegister16FromCode(unsigned short code) {
     switch (code) {
         case AX: return AX;
@@ -102,9 +107,8 @@ class TPU {
         Byte readByte(Memory&);
         Word readWord(Memory&);
         void moveToRegister(Register, unsigned short);
-        const Word& readRegister16(Register) const;
-        const Byte& readRegister8(Register) const;
-        void syscall();
+        Word& readRegister16(Register);
+        Byte& readRegister8(Register);
     private:
         int clockFreq;
         bool __hasSuspended = false; // true when a halt instruction is met

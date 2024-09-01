@@ -58,7 +58,7 @@ void TPU::moveToRegister(Register reg, unsigned short value) {
     }
 }
 
-const Word& TPU::readRegister16(Register reg) const {
+Word& TPU::readRegister16(Register reg) {
     switch (reg) {
         case Register::AX: return AX;
         case Register::BX: return BX;
@@ -74,16 +74,16 @@ const Word& TPU::readRegister16(Register reg) const {
     }
 }
 
-const Byte& TPU::readRegister8(Register reg) const {
+Byte& TPU::readRegister8(Register reg) {
     switch (reg) {
-        case Register::AL: return AX.getLower();
-        case Register::AH: return AX.getUpper();
-        case Register::BL: return BX.getLower();
-        case Register::BH: return BX.getUpper();
-        case Register::CL: return CX.getLower();
-        case Register::CH: return CX.getUpper();
-        case Register::DL: return DX.getLower();
-        case Register::DH: return DX.getUpper();
+        case Register::AL: return (Byte&)AX.getLower();
+        case Register::AH: return (Byte&)AX.getUpper();
+        case Register::BL: return (Byte&)BX.getLower();
+        case Register::BH: return (Byte&)BX.getUpper();
+        case Register::CL: return (Byte&)CX.getLower();
+        case Register::CH: return (Byte&)CX.getUpper();
+        case Register::DL: return (Byte&)DX.getLower();
+        case Register::DH: return (Byte&)DX.getUpper();
         default: throw std::invalid_argument("Invalid 8-bit register for get: " + reg);
     }
 }
@@ -104,12 +104,13 @@ void TPU::execute(Memory& memory) {
             break;
         }
         case OPCode::SYSCALL: {
-            this->syscall();
+            instructions::executeSyscall(*this, memory);
+            this->sleep(); // wait since the TPU has just completed a syscall
             break;
         }
         case OPCode::JMP: {
             instructions::processJMP(*this, memory);
-            this->sleep(); // wait since TPU has just completed an unconditional JMP
+            this->sleep(); // wait since TPU has just completed JMP/JZ/JNZ
             break;
         }
         case OPCode::MOV: {
@@ -154,17 +155,6 @@ void TPU::execute(Memory& memory) {
         }
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
-    }
-}
-
-// execute a syscall, switching on the value in AX
-void TPU::syscall() {
-    // wait because TPU has to process its current state
-    this->sleep();
-
-    // switch on AX register value
-    switch (AX.getValue()) {
-        
     }
 }
 

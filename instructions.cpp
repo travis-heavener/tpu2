@@ -1,3 +1,5 @@
+#include <iostream>
+
 #include "instructions.hpp"
 #include "tpu.hpp"
 #include "memory.hpp"
@@ -27,6 +29,30 @@ constexpr bool getParity(u8 n) {
 }
 
 namespace instructions {
+    // execute a syscall, switching on the value in AX
+    void executeSyscall(TPU& tpu, Memory& memory) {
+
+        // switch on AX register value
+        switch (tpu.readRegister16(Register::AX).getValue()) {
+            case Syscall::STDOUT: {
+                u16 charPtr = tpu.readRegister16(Register::BX).getValue(); // get address for string start
+                u16 length = tpu.readRegister16(Register::CX).getValue(); // get the length of string
+
+                // load source index from BX and destination index from BX + length
+                tpu.moveToRegister(Register::SI, charPtr);
+                tpu.moveToRegister(Register::DI, charPtr + length);
+                const u16 DI = tpu.readRegister16(Register::DI).getValue();
+                tpu.sleep(); // sleep cycle since a handful of registers have just been written and read
+
+                while (tpu.readRegister16(Register::SI).getValue() != DI) {
+                    std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue();
+                    tpu.sleep(); // sleep between writes
+                }
+                break;
+            }
+        }
+    }
+
     void processJMP(TPU& tpu, Memory& memory) {
         // determine operands from mod byte
         Byte mod = tpu.readByte(memory);

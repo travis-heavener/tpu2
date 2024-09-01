@@ -28,99 +28,46 @@ int main() {
     TPU tpu(CLOCK_FREQ_HZ);
     Memory memory;
 
+    // load a string into memory
+    u16 stringStart = 0xFF10;
+    std::string text("Hello world!\n");
+    for (size_t i = 0; i < text.length(); i++) {
+        memory[stringStart + i] = text[i];
+    }
+    
     // load program into memory
     u16 index = 0;
 
-    // copy 0xFA into 8-bit register AL
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::AL; // register code
-    memory[index++] = 0xFA; // imm8
+    // load syscall data for printing to STDOUT
     
-    // copy 0xB1 into 8-bit register BL
+    // syscall type
     memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::BL; // register code
-    memory[index++] = 0xB1; // imm8
-    
-    // copy 0xCA into 8-bit register BH
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 2; // MOD byte
-    memory[index++] = Register::BH; // register code
-    memory[index++] = 0xCA; // imm8
-
-    // calculate AX XOR BX
-    memory[index++] = OPCode::XOR; // instruction
     memory[index++] = 3; // MOD byte
     memory[index++] = Register::AX; // register code
+    memory[index++] = 0x00; // imm8
+    memory[index++] = 0x00;
+    
+    // start address
+    memory[index++] = OPCode::MOV; // instruction
+    memory[index++] = 3; // MOD byte
     memory[index++] = Register::BX; // register code
+    memory[index++] = stringStart & 0xFF; // imm16 lower half
+    memory[index++] = (stringStart & 0xFF00) >> 8; // imm16 upper half
 
-    // copy register AL to 0x8411
+    // string length
     memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x11; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::AL; // register code
+    memory[index++] = 3; // MOD byte
+    memory[index++] = Register::CX; // register code
+    memory[index++] = text.length(); // imm8
+    memory[index++] = 0x00;
 
-    // jmp over the next few instructions to HLT
-    memory[index++] = OPCode::JMP;
-    memory[index++] = 0; // MOD byte
-    memory[index++] = 0; // jmp target address lower half (little endian)
-    memory[index++] = 0; // jmp target address upper half
-    u16 jmpAddr = index-2;
-    
-    // copy register AH to 0x8412
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x12; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::AH; // register code
-    
-    // copy register DL to 0x8413
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x13; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::DL; // register code
-    
-    // copy register DH to 0x8414
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x14; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::DH; // register code
-
-    // copy flags to BX
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 6; // MOD byte
-    memory[index++] = Register::BX; // register code
-    memory[index++] = Register::FLAGS; // register code
-
-    // copy BL to 0x8415
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x15; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::BL; // register code
-    
-    // copy BH to 0x8416
-    memory[index++] = OPCode::MOV; // instruction
-    memory[index++] = 1; // MOD byte
-    memory[index++] = 0x16; // imm16 lower half as imm8 (little endian)
-    memory[index++] = 0x84; // imm16 upper half as imm8
-    memory[index++] = Register::BH; // register code
+    // make syscall
+    memory[index++] = OPCode::SYSCALL;
 
     // stop the clock
     memory[index++] = HLT;
 
-    // update the index to jump to
-    memory[jmpAddr] = (index-1) & 0xFF; // jmp target address
-    memory[jmpAddr+1] = ((index-1) & 0xFF00) >> 8; // jmp target address
-
     // start the CPU's clock and wait
     tpu.start(memory);
-
-    std::cout << Word(memory[0x8413], memory[0x8414]) << ' ' << Word(memory[0x8411], memory[0x8412]) << '\n';
-    std::cout << Word(memory[0x8415], memory[0x8416]) << '\n';
     return 0;
 }
