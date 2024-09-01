@@ -43,7 +43,7 @@ enum Register {
 
 // syscall codes
 enum Syscall {
-    STDOUT      = 0x00
+    STDOUT      = 0x00,     STDERR      = 0x01
 };
 
 constexpr Register getRegister16FromCode(unsigned short code) {

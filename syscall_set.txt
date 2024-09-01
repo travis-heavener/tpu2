@@ -1,3 +1,4 @@
 SYSCALL CODE            COMMENTS
 -----------------------------------------------------------------------------------
 0x00                    Prints to STDOUT the sequence of bytes starting at the memory address in BX for a length stored in CX.
+0x01                    Prints to STDERR the sequence of bytes starting at the memory address in BX for a length stored in CX.

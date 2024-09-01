@@ -33,8 +33,10 @@ namespace instructions {
     void executeSyscall(TPU& tpu, Memory& memory) {
 
         // switch on AX register value
-        switch (tpu.readRegister16(Register::AX).getValue()) {
-            case Syscall::STDOUT: {
+        u16 syscallCode = tpu.readRegister16(Register::AX).getValue();
+        switch (syscallCode) {
+            case Syscall::STDOUT:
+            case Syscall::STDERR: {
                 u16 charPtr = tpu.readRegister16(Register::BX).getValue(); // get address for string start
                 u16 length = tpu.readRegister16(Register::CX).getValue(); // get the length of string
 
@@ -45,9 +47,19 @@ namespace instructions {
                 tpu.sleep(); // sleep cycle since a handful of registers have just been written and read
 
                 while (tpu.readRegister16(Register::SI).getValue() != DI) {
-                    std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
-                    tpu.sleep(); // sleep between writes
+                    if (syscallCode == Syscall::STDOUT) {
+                        std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
+                    } else {
+                        std::cerr << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
+                    }
+                    
+                    // sleep between writes
+                    tpu.sleep();
                 }
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid syscall code: " + syscallCode);
                 break;
             }
         }

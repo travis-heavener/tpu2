@@ -38,13 +38,13 @@ int main() {
     // load program into memory
     u16 index = 0;
 
-    // load syscall data for printing to STDOUT
+    // load syscall data for printing to STDERR
     
     // syscall type
     memory[index++] = OPCode::MOV; // instruction
     memory[index++] = 3; // MOD byte
     memory[index++] = Register::AX; // register code
-    memory[index++] = 0x00; // imm8
+    memory[index++] = Syscall::STDERR; // imm8
     memory[index++] = 0x00;
     
     // start address
