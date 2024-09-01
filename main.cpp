@@ -21,7 +21,7 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
-#define CLOCK_FREQ_HZ 100000
+#define CLOCK_FREQ_HZ 5
 
 int main() {
     // initialize the processor & memory

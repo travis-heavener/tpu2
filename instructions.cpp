@@ -45,7 +45,7 @@ namespace instructions {
                 tpu.sleep(); // sleep cycle since a handful of registers have just been written and read
 
                 while (tpu.readRegister16(Register::SI).getValue() != DI) {
-                    std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue();
+                    std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
                     tpu.sleep(); // sleep between writes
                 }
                 break;
