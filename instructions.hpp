@@ -16,6 +16,7 @@ namespace instructions {
     void processAND(TPU& tpu, Memory& memory);
     void processOR(TPU& tpu, Memory& memory);
     void processXOR(TPU& tpu, Memory& memory);
+    void processNOT(TPU& tpu, Memory& memory);
 };
 
 #endif

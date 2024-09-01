@@ -1,0 +1,39 @@
+;
+; Tests a few logic gates.
+;
+
+; test AND
+mov AL, 0xCE
+mov BL, 0x52
+and AL, BL
+and AL, BL
+mov @0xFF00, AL
+
+; test OR
+mov AL, 0x27
+mov BL, 0x68
+or AL, BL
+mov @0xFF01, AL
+
+; test XOR
+mov AL, 0x69
+mov BL, 0x6
+xor AL, BL
+mov @0xFF02, AL
+
+; extra character >:)
+mov @0xFF03, 0x21
+
+; test NOT
+mov AL, 0xF5
+not AL
+mov @0xFF04, AL
+
+; write results
+mov AX, 0x0         ; syscall to print to STDOUT
+mov BX, 0xFF00      ; start of bytes to write
+mov CX, 5           ; # of bytes to write
+syscall             ; invoke syscall to print
+
+; stop clock
+hlt

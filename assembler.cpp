@@ -10,8 +10,9 @@
 
 // abstractions from processLine for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
-void parseADDSUB(const std::vector<std::string>&, Memory&, u16&, bool);
+void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
+void parseNOT(const std::vector<std::string>&, Memory&, u16&);
 
 // helper for trimming strings in place
 void ltrimString(std::string& str) {
@@ -191,12 +192,17 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
     } else if (kwd == "mov") {
         checkArgs(args, 2); // check for extra args
         parseMOV(args, memory, instIndex);
-    } else if (kwd == "add" || kwd == "sub") {
+    } else if (kwd == "add" || kwd == "sub" || kwd == "and" || kwd == "or" || kwd == "xor") {
         checkArgs(args, 2); // check for extra args
-        parseADDSUB(args, memory, instIndex, kwd == "add");
+        OPCode code = kwd == "add" ? OPCode::ADD : kwd == "sub" ? OPCode::SUB :
+                      kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : OPCode::XOR;
+        parseADDSUBLogic(args, memory, instIndex, code);
     } else if (kwd == "mul" || kwd == "div") {
         checkArgs(args, 1); // check for extra args
         parseMULDIV(args, memory, instIndex, kwd == "mul");
+    } else if (kwd == "not") {
+        checkArgs(args, 1); // check for extra args
+        parseNOT(args, memory, instIndex);
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);
@@ -282,7 +288,8 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
-void parseADDSUB(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isAdd) {
+// ADD, SUB, AND, OR, and XOR all use the same argument & MOD byte patterns
+void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction) {
     std::vector<u8> bytesToWrite;
     
     // determine target register
@@ -314,11 +321,12 @@ void parseADDSUB(const std::vector<std::string>& args, Memory& memory, u16& inst
     }
 
     // write bytes
-    memory[instIndex++] = isAdd ? OPCode::ADD : OPCode::SUB;
+    memory[instIndex++] = instruction;
     memory[instIndex++] = MOD;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
+// MUL & DIV both use the same argument & MOD byte patterns
 void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isMul) {
     std::vector<u8> bytesToWrite;
 
@@ -347,4 +355,11 @@ void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& inst
     memory[instIndex++] = isMul ? OPCode::MUL : OPCode::DIV;
     memory[instIndex++] = MOD;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
+}
+
+void parseNOT(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    Register reg = getRegisterFromString(args[0]);
+    memory[instIndex++] = OPCode::NOT;
+    memory[instIndex++] = isRegister8Bit(reg) ? 0 : 1; // MOD byte
+    memory[instIndex++] = reg;
 }

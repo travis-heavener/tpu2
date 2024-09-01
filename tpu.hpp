@@ -27,7 +27,8 @@ enum OPCode {
     DIV         = 0x17,
     AND         = 0x20,
     OR          = 0x21,
-    XOR         = 0x22
+    XOR         = 0x22,
+    NOT         = 0x23
 };
 
 // register codes

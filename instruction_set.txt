@@ -52,3 +52,6 @@ xor reg, imm8               0x22 /0         Logical XOR between 8-bit register a
 xor reg, imm16              0x22 /1         Logical XOR between 16-bit register and imm16, stored in first operand.
 xor reg, reg                0x22 /2         Logical XOR between two 8-bit registers, stored in first operand.
 xor reg, reg                0x22 /3         Logical XOR between two 16-bit registers, stored in first operand.
+
+not reg                     0x23 /0         Performs bitwise NOT on an 8-bit register and stores in that register.
+not reg                     0x23 /1         Performs bitwise NOT on an 16-bit register and stores in that register.

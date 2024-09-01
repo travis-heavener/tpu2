@@ -694,4 +694,29 @@ namespace instructions {
             }
         }
     }
+
+    void processNOT(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u8 opA = tpu.readByte(memory).getValue();
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Performs bitwise NOT on an 8-bit register and stores in that register.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), ~A );
+                break;
+            }
+            case 1: { // Performs bitwise NOT on an 16-bit register and stores in that register.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), ~A );
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: not.");
+                break;
+            }
+        }
+    }
 }
