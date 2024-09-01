@@ -98,6 +98,7 @@ void TPU::execute(Memory& memory) {
     // switch on instruction
     unsigned short opCode = instruction.getValue();
     switch (opCode) {
+        case OPCode::NOP: break;
         case OPCode::HLT: {
             this->__hasSuspended = true; // trigger clock suspension
             break;
@@ -106,7 +107,11 @@ void TPU::execute(Memory& memory) {
             this->syscall();
             break;
         }
-        case OPCode::NOP: break;
+        case OPCode::JMP: {
+            instructions::processJMP(*this, memory);
+            this->sleep(); // wait since TPU has just completed an unconditional JMP
+            break;
+        }
         case OPCode::MOV: {
             instructions::processMOV(*this, memory);
             this->sleep(); // wait since TPU has just completed an operation

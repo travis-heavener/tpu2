@@ -95,6 +95,7 @@ class TPU {
         void execute(Memory&);
         void start(Memory&); // for starting/running the clock
         void sleep() const;
+        bool getFlag(u8 flag) const { return (FLAGS.getValue() & (1u << flag)) > 0; };
         void setFlag(u8, bool);
 
         // helpers

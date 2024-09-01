@@ -27,6 +27,36 @@ constexpr bool getParity(u8 n) {
 }
 
 namespace instructions {
+    void processJMP(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Moves the instruction pointer to the specified 16-bit memory address.
+                tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+                break;
+            }
+            case 1: { // Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
+                if (tpu.getFlag(ZERO)) {
+                    tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+                }
+                break;
+            }
+            case 2: { // Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
+                if (!tpu.getFlag(ZERO)) {
+                    tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+                }
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: JMP.");
+                break;
+            }
+        }
+    }
+
     void processMOV(TPU& tpu, Memory& memory) {
         // determine operands from mod byte
         Byte mod = tpu.readByte(memory);

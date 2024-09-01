@@ -61,6 +61,13 @@ int main() {
     memory[index++] = 0x11; // imm16 lower half as imm8 (little endian)
     memory[index++] = 0x84; // imm16 upper half as imm8
     memory[index++] = Register::AL; // register code
+
+    // jmp over the next few instructions to HLT
+    memory[index++] = OPCode::JMP;
+    memory[index++] = 0; // MOD byte
+    memory[index++] = 0; // jmp target address lower half (little endian)
+    memory[index++] = 0; // jmp target address upper half
+    u16 jmpAddr = index-2;
     
     // copy register AH to 0x8412
     memory[index++] = OPCode::MOV; // instruction
@@ -105,6 +112,10 @@ int main() {
 
     // stop the clock
     memory[index++] = HLT;
+
+    // update the index to jump to
+    memory[jmpAddr] = (index-1) & 0xFF; // jmp target address
+    memory[jmpAddr+1] = ((index-1) & 0xFF00) >> 8; // jmp target address
 
     // start the CPU's clock and wait
     tpu.start(memory);
