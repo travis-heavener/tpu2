@@ -6,9 +6,9 @@
 #include "toolbox.hpp"
 
 // shorthand for making exceptions
-#define MAKE_EXCEPTION(name) class T##name : public TException { \
+#define MAKE_EXCEPTION(name) class T##name##Exception : public TException { \
     public: \
-        T##name(ErrInfo err) : TException(err) { msg = #name "Exception " + getTrace(); } \
+        T##name##Exception(ErrInfo err) : TException(err) { msg = #name "Exception " + getTrace(); } \
 };
 
 class TException {
@@ -29,5 +29,8 @@ class TException {
 
 MAKE_EXCEPTION(UnclosedGroup)
 MAKE_EXCEPTION(ZeroDiv)
+MAKE_EXCEPTION(InvalidToken)
+MAKE_EXCEPTION(UnclosedQuote)
+MAKE_EXCEPTION(InvalidEscape)
 
 #endif
