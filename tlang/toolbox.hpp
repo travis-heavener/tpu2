@@ -18,15 +18,6 @@ class ErrInfo {
         line_t col;
 };
 
-// for lexer
-class Token {
-    public:
-        Token(ErrInfo err, std::string raw, TokenType type): err(err), raw(raw), type(type) {};
-        ErrInfo err;
-        const std::string raw;
-        TokenType type;
-};
-
 // token types
 enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
@@ -47,6 +38,15 @@ enum TokenType {
 
     // assignment operators
     ASSIGN
+};
+
+// Token class for for lexer
+class Token {
+    public:
+        Token(ErrInfo err, std::string raw, TokenType type): err(err), raw(raw), type(type) {};
+        ErrInfo err;
+        const std::string raw;
+        TokenType type;
 };
 
 #endif
