@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
     // verify output file doesn't exist
     if (doesFileExist(outPath)) {
         std::cerr << "Output file already exists: " << outPath << std::endl;
+        inHandle.close();
         exit(1);
     }
 
@@ -41,6 +42,7 @@ int main(int argc, char* argv[]) {
     std::ofstream outHandle(outPath);
     if (!outHandle.is_open()) {
         std::cerr << "Failed to open output file: " << outPath << std::endl;
+        inHandle.close();
         exit(1);
     }
 
@@ -50,6 +52,10 @@ int main(int argc, char* argv[]) {
     std::vector<Token> tokens;
     tokenize(inHandle, tokens);
     inHandle.close();
+
+    for (Token t : tokens)
+        std::cout << t.raw << ' ';
+    std::cout << '\n';
 
     // 2. parse to AST
     
