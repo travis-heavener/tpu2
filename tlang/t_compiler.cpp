@@ -53,6 +53,7 @@ int main(int argc, char* argv[]) {
         // 1. tokenize file
         std::vector<Token> tokens;
         tokenize(inHandle, tokens);
+        inHandle.close();
 
         for (Token t : tokens)
             std::cout << t.raw << ' ';
@@ -63,13 +64,19 @@ int main(int argc, char* argv[]) {
         // 3. semantic analysis
 
         // 4. translate AST to TPU assembly code
+
+        // close files
+        outHandle.close();
     } catch (TException& e) {
         std::cerr << e.toString() << '\n';
-    }
 
-    // close files
-    inHandle.close();
-    outHandle.close();
+        // close files
+        inHandle.close();
+        outHandle.close();
+
+        // remove output file
+        std::remove(outPath.c_str());
+    }
 
     return 0;
 }
