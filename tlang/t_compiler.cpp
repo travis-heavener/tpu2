@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "toolbox.hpp"
+#include "t_exception.hpp"
 #include "lexer.hpp"
 
 /**
@@ -48,22 +49,26 @@ int main(int argc, char* argv[]) {
 
     /********* compilation starts below *********/
 
-    // 1. tokenize file
-    std::vector<Token> tokens;
-    tokenize(inHandle, tokens);
-    inHandle.close();
+    try {
+        // 1. tokenize file
+        std::vector<Token> tokens;
+        tokenize(inHandle, tokens);
 
-    for (Token t : tokens)
-        std::cout << t.raw << ' ';
-    std::cout << '\n';
+        for (Token t : tokens)
+            std::cout << t.raw << ' ';
+        std::cout << '\n';
 
-    // 2. parse to AST
-    
-    // 3. semantic analysis
+        // 2. parse to AST
+        
+        // 3. semantic analysis
 
-    // 4. translate AST to TPU assembly code
+        // 4. translate AST to TPU assembly code
+    } catch (TException& e) {
+        std::cerr << e.toString() << '\n';
+    }
 
     // close files
+    inHandle.close();
     outHandle.close();
 
     return 0;
