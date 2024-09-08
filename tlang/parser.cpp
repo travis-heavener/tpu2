@@ -103,7 +103,22 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
                     break;
                 }
                 case TokenType::RETURN: { // parse return expression
+                    // create return
+                    ASTReturn* pReturn = new ASTReturn(tokens[i]);
+                    pHead->push(pReturn);
 
+                    // get expression
+                    size_t endExpr = i;
+                    do {
+                        ++endExpr;
+                    } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
+                    
+                    // verify semicolon is present
+                    if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+
+                    // append expression to pReturn
+                    pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
+                    i = endExpr;
                 }
                 case TokenType::BLOCK_COMMENT_START: { // search for close
                     size_t j = i;
@@ -117,6 +132,20 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
                     // jump to end of comment
                     i = j;
                 }
+                case TokenType::SEMICOLON: break; // erroneous statement
+                default: { // base case, parse as expression
+                    // get expression
+                    size_t endExpr = i;
+                    do {
+                        ++endExpr;
+                    } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
+                    
+                    // verify semicolon is present
+                    if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+                    
+                    pHead->push( parseExpression(tokens, i) )
+                    break;
+                }
             }
         }
     } catch (TException& e) {
@@ -125,5 +154,21 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
     }
 
     // return node ptr
+    return pHead;
+}
+
+ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+    ASTNode* pHead = nullptr;
+
+    // iterate through expression
+    try {
+        // TO-DO implement here
+        throw std::runtime_error("Unimplemented");
+    } catch (TException& e) {
+        // free & rethrow
+        if (pHead != nullptr) delete pHead;
+        throw e;
+    }
+
     return pHead;
 }

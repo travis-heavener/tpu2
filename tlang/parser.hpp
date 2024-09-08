@@ -9,7 +9,9 @@
 // takes in a vector of Tokens and assembles an AST for the document
 AST* parseToAST(const std::vector<Token>&);
 
-// for parsing a specific node
+/************************ FOR PARSING SPECIFIC ASTNodes ************************/
+
 ASTNode* parseFunction(const std::vector<Token>&, size_t, size_t);
+ASTNode* parseExpression(const std::vector<Token>&, size_t, size_t);
 
 #endif
