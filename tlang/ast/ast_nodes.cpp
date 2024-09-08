@@ -33,3 +33,9 @@ ASTWhileLoop::~ASTWhileLoop() {
     // free expression
     if (this->pExpr != nullptr) delete this->pExpr;
 }
+
+ASTVarDeclaration::~ASTVarDeclaration() {
+    // free identifier and expression
+    if (this->pIdentifier != nullptr) delete this->pIdentifier;
+    if (this->pExpr != nullptr) delete this->pExpr;
+}

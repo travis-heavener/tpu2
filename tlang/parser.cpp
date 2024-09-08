@@ -259,6 +259,41 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             }
             case TokenType::SEMICOLON: break; // erroneous statement
             default: { // base case, parse as expression
+                // check for variable assignment
+                if (isTokenPrimitiveType(tokens[i].type)) {
+                    TokenType varType = tokens[i].type;
+                    ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[i]);
+                    pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
+
+                    // get identifier
+                    if (i+1 > endIndex || tokens[++i].type != TokenType::IDENTIFIER)
+                        throw TInvalidTokenException(tokens[i].err);
+
+                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i].raw, tokens[i]);
+
+                    // verify not end of input
+                    if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
+
+                    // if declared but not assigned, leave pExpr as nullptr
+                    if (tokens[++i].type == TokenType::SEMICOLON)
+                        break;
+                    else if (tokens[i].type != TokenType::ASSIGN) // variable must be assigned
+                        throw TInvalidTokenException(tokens[i].err);
+
+                    // get expression
+                    size_t endExpr = i+1; // skip over assignment operator
+                    while (endExpr <= endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
+                        ++endExpr;
+
+                    // verify semicolon is present
+                    if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
+                    
+                    // append expression (*always* returns an ASTExpr* as an ASTNode*)
+                    pVarDec->pExpr = static_cast<ASTExpr*>(parseExpression(tokens, i+1, endExpr-1));
+                    i = endExpr; // update `i` to position of semicolon
+                    break;
+                }
+
                 // get expression
                 size_t endExpr = i;
                 while (endExpr <= endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
