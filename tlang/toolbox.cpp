@@ -43,6 +43,7 @@ bool isTokenTypeName(TokenType type) {
         case TokenType::TYPE_DOUBLE:
         case TokenType::TYPE_CHAR:
         case TokenType::TYPE_BOOL:
+        case TokenType::VOID:
             return true;
         default:
             return false;

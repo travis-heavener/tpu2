@@ -109,7 +109,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
         // literal void
         if (isKwdPresent("void", line, i)) {
             i += 3; // offset by length of keyword - 1
-            tokens.push_back(Token(err, "void", TokenType::LIT_VOID));
+            tokens.push_back(Token(err, "void", TokenType::VOID));
             continue;
         }
 
