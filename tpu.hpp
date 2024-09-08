@@ -3,8 +3,28 @@
 
 #include "memory.hpp"
 
-// define entry point for program counter
-#define INSTRUCTION_PTR_START 0x1000 // reserve first 4 KiB of memory
+
+/**
+ * |------------------------- MEMORY MAP -------------------------|
+ * | 0x0-0x0FFF | 0x1000-0x1FFF |          0x1400-0xFFFF          |
+ * | (RESERVED) |    (STACK)    |             (FREE)              |
+ * |--------------------------------------------------------------|
+*/
+
+// allocate 4KiB for OS
+#define RESERVED_LOWER_ADDR   0x0000
+#define RESERVED_UPPER_ADDR   0x0FFF
+
+// allocate 4KiB for stack
+#define STACK_LOWER_ADDR      0x1000
+#define STACK_UPPER_ADDR      0x1FFF
+
+// set instruction pointer start at end of reserved
+#define INSTRUCTION_PTR_START 0x0FFC // needs 4 bytes (JMP opcode, MOD byte, lower-addr, upper-addr)
+
+// allocate remaining 59KiB for free use
+#define FREE_LOWER_ADDR       0x1400
+#define FREE_UPPER_ADDR       0xFFFF
 
 // flag macros
 // ref: https://www.geeksforgeeks.org/flag-register-8086-microprocessor/?ref=lbp
@@ -24,6 +44,7 @@ enum OPCode {
     MOV         = 0x05,
     PUSH        = 0x06,
     POP         = 0x07,
+    RET         = 0x08,
     ADD         = 0x14,
     SUB         = 0x15,
     MUL         = 0x16,

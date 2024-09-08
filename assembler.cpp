@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -8,11 +9,15 @@
 #include "memory.hpp"
 #include "tpu.hpp"
 
+#define MAIN_LABEL_NAME "main"
+
 // abstractions from processLine for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
+void parsePUSH(const std::vector<std::string>&, Memory&, u16&);
+void parsePOP(const std::vector<std::string>&, Memory&, u16&);
 
 // helper for trimming strings in place
 void ltrimString(std::string& str) {
@@ -144,17 +149,29 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     }
 
     // read each line
-    u16 instIndex = INSTRUCTION_PTR_START;
+    u16 instIndex = FREE_LOWER_ADDR;
     std::string line;
-    while (std::getline(inHandle, line))
-        processLine(line, memory, instIndex); // process the line
+    std::map<std::string, u16> labelMap; // label name, start address
+    while (std::getline(inHandle, line)) {
+        processLine(line, memory, instIndex, labelMap); // process the line
+    }
+
+    // jump to mainEntryAddr
+    if (labelMap.count(MAIN_LABEL_NAME) == 0)
+        throw std::invalid_argument("No main label found in file.");
+
+    u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME);
+    memory[INSTRUCTION_PTR_START] = OPCode::JMP;
+    memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
+    memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
+    memory[INSTRUCTION_PTR_START+3] = (mainEntryAddr & 0xFF00) >> 8; // upper-half of addr
 
     // close file
     inHandle.close();
 }
 
 // process an individual line and load it into memory
-void processLine(std::string& line, Memory& memory, u16& instIndex) {
+void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std::string, u16>& labelMap) {
     stripComments(line); // remove comments
     trimString(line); // ltrim & rtrim string
 
@@ -178,6 +195,17 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
     } else if (kwd == "syscall") {
         checkArgs(args, 0); // check for extra args
         memory[instIndex++] = OPCode::SYSCALL; // add instruction
+    } else if (kwd == "call") {
+        checkArgs(args, 1); // check for extra args
+        memory[instIndex++] = OPCode::CALL;
+
+        // get address of label from map
+        if (labelMap.count(args[0]) == 0)
+            throw std::invalid_argument("Label \"" + args[0] + "\" is not defined or is defined later.");
+        
+        u16 destAddr = labelMap[args[0]];
+        memory[instIndex++] = destAddr & 0x00FF; // lower-half
+        memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
     } else if (kwd == "jmp" || kwd == "jz" || kwd == "jnz") {
         checkArgs(args, 1); // check for extra args
         memory[instIndex++] = OPCode::JMP;
@@ -194,31 +222,13 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
         parseMOV(args, memory, instIndex);
     } else if (kwd == "push") {
         checkArgs(args, 1); // check for extra args
-        memory[instIndex++] = OPCode::PUSH;
-
-        try { // try as register
-            Register reg = getRegisterFromString(args[0]);
-            if (!isRegister8Bit(reg))
-                throw std::invalid_argument("Expected 8-bit register.");
-            memory[instIndex++] = 0; // MOD byte
-            memory[instIndex++] = reg;
-        } catch (std::invalid_argument&) { // try as imm8
-            u16 arg = std::stoul(args[0]);
-            if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-            memory[instIndex++] = 1; // MOD byte
-            memory[instIndex++] = arg;
-        }
+        parsePUSH(args, memory, instIndex);
     } else if (kwd == "pop") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
-        memory[instIndex++] = OPCode::POP;
-        memory[instIndex++] = 1 - args.size(); // MOD byte
-
-        if (args.size() == 1) { // verify argument is reg8
-            Register reg = getRegisterFromString(args[0]);
-            if (!isRegister8Bit(reg))
-                throw std::invalid_argument("Expected 8-bit register.");
-            memory[instIndex++] = reg;
-        }
+        parsePOP(args, memory, instIndex);
+    } else if (kwd == "ret") {
+        checkArgs(args, 0); // check for extra args
+        memory[instIndex++] = OPCode::RET;
     } else if (kwd == "add" || kwd == "sub" || kwd == "and" || kwd == "or" || kwd == "xor") {
         checkArgs(args, 2); // check for extra args
         OPCode code = kwd == "add" ? OPCode::ADD : kwd == "sub" ? OPCode::SUB :
@@ -230,6 +240,14 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
     } else if (kwd == "not") {
         checkArgs(args, 1); // check for extra args
         parseNOT(args, memory, instIndex);
+    } else if (*kwd.rbegin() == ':') { // label name
+        checkArgs(args, 0); // verify rest of line is empty
+        std::string labelName = kwd.substr(0, kwd.size()-1);
+
+        // verify label name is valid
+        if (kwd.size() == 1) throw std::invalid_argument("Invalid label name: " + kwd);
+
+        labelMap[labelName] = instIndex; // store entry point
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);
@@ -389,4 +407,33 @@ void parseNOT(const std::vector<std::string>& args, Memory& memory, u16& instInd
     memory[instIndex++] = OPCode::NOT;
     memory[instIndex++] = isRegister8Bit(reg) ? 0 : 1; // MOD byte
     memory[instIndex++] = reg;
+}
+
+void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    memory[instIndex++] = OPCode::PUSH;
+
+    try { // try as register
+        Register reg = getRegisterFromString(args[0]);
+        if (!isRegister8Bit(reg))
+            throw std::invalid_argument("Expected 8-bit register.");
+        memory[instIndex++] = 0; // MOD byte
+        memory[instIndex++] = reg;
+    } catch (std::invalid_argument&) { // try as imm8
+        u16 arg = std::stoul(args[0]);
+        if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+        memory[instIndex++] = 1; // MOD byte
+        memory[instIndex++] = arg;
+    }
+}
+
+void parsePOP(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    memory[instIndex++] = OPCode::POP;
+    memory[instIndex++] = 1 - args.size(); // MOD byte
+
+    if (args.size() == 1) { // verify argument is reg8
+        Register reg = getRegisterFromString(args[0]);
+        if (!isRegister8Bit(reg))
+            throw std::invalid_argument("Expected 8-bit register.");
+        memory[instIndex++] = reg;
+    }
 }

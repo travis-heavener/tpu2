@@ -102,7 +102,19 @@ namespace instructions {
     }
 
     void processCALL(TPU& tpu, Memory& memory) {
+        // Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
+
+        // get jump destination address (increments IP twice)
+        u16 addr = tpu.readWord(memory).getValue();
+
+        // store current IP in BP
+        tpu.moveToRegister(Register::BP, tpu.readRegister16(Register::IP).getValue());
         
+        // sleep after getting destination address & storing IP in BP
+        tpu.sleep();
+
+        // jump to destination address
+        tpu.moveToRegister(Register::IP, addr);
     }
 
     void processJMP(TPU& tpu, Memory& memory) {
@@ -223,9 +235,9 @@ namespace instructions {
             }
         }
 
-        // move the stack pointer down
+        // move the stack pointer up
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
-        u16 newAddr = oldAddr - 1;
+        u16 newAddr = oldAddr + 1;
         tpu.moveToRegister(Register::SP, newAddr);
 
         // push value onto stack at previous SP address
@@ -239,7 +251,7 @@ namespace instructions {
 
         // get operands
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
-        u16 newAddr = oldAddr + 1;
+        u16 newAddr = oldAddr - 1;
         u16 poppedValue = memory[ newAddr ].getValue();
         switch (mod.getValue() & 0b111) {
             case 0: { // Pops the last byte off the stack to an 8-bit register.
@@ -253,8 +265,13 @@ namespace instructions {
             }
         }
 
-        // move the stack pointer back up
+        // move the stack pointer back down
         tpu.moveToRegister(Register::SP, newAddr);
+    }
+
+    void processRET(TPU& tpu, Memory&) {
+        // Revert the instruction pointer to the previous memory address stored in the base pointer.
+        tpu.moveToRegister(Register::IP, tpu.readRegister16(Register::BP).getValue());
     }
 
     void processADD(TPU& tpu, Memory& memory) {
