@@ -4,6 +4,7 @@
 
 #include "toolbox.hpp"
 #include "t_exception.hpp"
+#include "t_assembler.hpp"
 #include "lexer.hpp"
 #include "parser.hpp"
 
@@ -61,12 +62,11 @@ int main(int argc, char* argv[]) {
         tokenize(inHandle, tokens);
         inHandle.close();
 
-        // 2. parse to AST & preliminary error checking
+        // 2. parse to AST & syntax checking (semantic analysis)
         pAST = parseToAST(tokens);
 
-        // 3. semantic analysis (remaining syntax checking)
-
-        // 4. translate AST to TPU assembly code
+        // 3. translate AST to TPU assembly code
+        generateAssembly(*pAST, outHandle);
 
         // close files and free AST
         outHandle.close();
