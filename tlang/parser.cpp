@@ -94,12 +94,18 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
         for ((void)i; i < endIndex; i++) {
             switch (tokens[i].type) {
                 case TokenType::IF: { // parse conditional
+                    // TO-DO implement here
+                    throw std::runtime_error("Unimplemented");
                     break;
                 }
                 case TokenType::FOR: { // parse for-loop
+                    // TO-DO implement here
+                    throw std::runtime_error("Unimplemented");
                     break;
                 }
                 case TokenType::WHILE: { // parse while-loop
+                    // TO-DO implement here
+                    throw std::runtime_error("Unimplemented");
                     break;
                 }
                 case TokenType::RETURN: { // parse return expression
