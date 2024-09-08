@@ -7,6 +7,12 @@
 // modified from https://stackoverflow.com/a/6296808
 bool doesFileExist(const std::string& file);
 
+// true if a character is valid in an identifier
+bool isCharValidIdentifier(const char);
+
+// true if a character is valid at the start of an identifier
+bool isCharValidIdentifierStart(const char);
+
 // for error handling
 typedef unsigned long long line_t; // for line/col numbering
 
@@ -23,7 +29,7 @@ enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
     LPAREN, RPAREN, LBRACKET, RBRACKET, LBRACE, RBRACE, // (), [], {}
     TYPE_INT, TYPE_DOUBLE, TYPE_CHAR, TYPE_BOOL, // type names
-    LIT_INT, LIT_DOUBLE, LIT_BOOL, LIT_CHAR, // type literals
+    LIT_INT, LIT_DOUBLE, LIT_BOOL, LIT_CHAR, LIT_VOID, // type literals
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
 
@@ -44,6 +50,7 @@ enum TokenType {
 class Token {
     public:
         Token(ErrInfo err, std::string raw, TokenType type): err(err), raw(raw), type(type) {};
+        Token(ErrInfo err, char raw, TokenType type): err(err), raw({raw}), type(type) {};
         ErrInfo err;
         const std::string raw;
         TokenType type;

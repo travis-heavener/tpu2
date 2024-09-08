@@ -10,6 +10,6 @@
 void tokenize(std::ifstream&, std::vector<Token>&);
 
 // tokenize a particular line
-void tokenizeLine(const std::string&, std::vector<Token>&);
+void tokenizeLine(const std::string&, std::vector<Token>&, line_t);
 
 #endif
