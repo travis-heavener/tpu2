@@ -11,3 +11,51 @@ ASTNode* ASTNode::removeChild(size_t i) {
     this->children.erase(this->children.begin()+i);
     return pNode;
 }
+
+ASTConditional::~ASTConditional() {
+    // free branches
+    for (ASTNode* pBranch : this->branches)
+        delete pBranch;
+
+    // free children
+    for (ASTNode* pChild : this->children)
+        delete pChild;
+}
+
+ASTIfCondition::~ASTIfCondition() {
+    // free condition
+    delete this->pExpr;
+
+    // free children
+    for (ASTNode* pChild : this->children)
+        delete pChild;
+}
+
+ASTElseIfCondition::~ASTElseIfCondition() {
+    // free condition
+    delete this->pExpr;
+
+    // free children
+    for (ASTNode* pChild : this->children)
+        delete pChild;
+}
+
+ASTForLoop::~ASTForLoop() {
+    // free expressions
+    delete this->pExprA;
+    delete this->pExprB;
+    delete this->pExprC;
+
+    // free children
+    for (ASTNode* pChild : this->children)
+        delete pChild;
+}
+
+ASTWhileLoop::~ASTWhileLoop() {
+    // free expression
+    delete this->pExpr;
+
+    // free children
+    for (ASTNode* pChild : this->children)
+        delete pChild;
+}

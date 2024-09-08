@@ -9,6 +9,8 @@
 enum class ASTNodeType {
     NODE, // base class
     FUNCTION, VARIABLE, RETURN,
+    CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
+    FOR_LOOP, WHILE_LOOP,
     UNARY_OP, BIN_op,
     LIT_BOOL, LIT_CHAR, LIT_DOUBLE, LIT_INT, LIT_NULL
 };
@@ -39,6 +41,63 @@ class ASTReturn : public ASTNode {
     public:
         ASTReturn(const Token& token) : ASTNode(token) {};
         ASTNodeType nodeType() const { return ASTNodeType::RETURN; };
+};
+
+/************* CONDITIONALS *************/
+
+class ASTConditional : public ASTNode {
+    public:
+        ASTConditional(const Token& token) : ASTNode(token) {};
+        ~ASTConditional();
+        ASTNodeType nodeType() const { return ASTNodeType::CONDITIONAL; };
+
+        void addBranch(ASTNode* pBranch) { branches.push_back(pBranch); };
+        const std::vector<ASTNode*> const getBranches() { return branches; };
+    private:
+        std::vector<ASTNode*> branches;
+};
+
+class ASTIfCondition : public ASTNode {
+    public:
+        ASTIfCondition(const Token& token) : ASTNode(token) {};
+        ~ASTIfCondition();
+        ASTNodeType nodeType() const { return ASTNodeType::IF_CONDITION; };
+        ASTNode* pExpr; // the internal expression for this if-statement
+};
+
+class ASTElseIfCondition : public ASTNode {
+    public:
+        ASTElseIfCondition(const Token& token) : ASTNode(token) {};
+        ~ASTElseIfCondition();
+        ASTNodeType nodeType() const { return ASTNodeType::ELSE_IF_CONDITION; };
+        ASTNode* pExpr; // the internal expression for this else-if-statement
+};
+
+class ASTElseCondition : public ASTNode {
+    public:
+        ASTElseCondition(const Token& token) : ASTNode(token) {};
+        ASTNodeType nodeType() const { return ASTNodeType::ELSE_CONDITION; };
+};
+
+/************* LOOPS *************/
+
+class ASTForLoop : public ASTNode {
+    public:
+        ASTForLoop(const Token& token) : ASTNode(token) {};
+        ~ASTForLoop();
+        ASTNodeType nodeType() const { return ASTNodeType::FOR_LOOP; };
+        
+        ASTNode* pExprA; // the initial expression
+        ASTNode* pExprB; // the condition expression
+        ASTNode* pExprC; // the iterating expression
+};
+
+class ASTWhileLoop : public ASTNode {
+    public:
+        ASTWhileLoop(const Token& token) : ASTNode(token) {};
+        ~ASTWhileLoop();
+        ASTNodeType nodeType() const { return ASTNodeType::WHILE_LOOP; };
+        ASTNode* pExpr; // the condition expression
 };
 
 /************* OPERATIONS *************/
