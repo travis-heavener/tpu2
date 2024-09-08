@@ -12,7 +12,7 @@
 
 int main(int argc, char* argv[]) {
     // format: <executable> <input.t>
-    if (argc != 2) {
+    if (argc < 2) {
         std::cerr << "Invalid usage, expected: <executable> <input.t>" << std::endl;
         exit(1);
     }
@@ -34,9 +34,13 @@ int main(int argc, char* argv[]) {
 
     // verify output file doesn't exist
     if (doesFileExist(outPath)) {
-        std::cerr << "Output file already exists: " << outPath << std::endl;
-        inHandle.close();
-        exit(1);
+        if (argc >= 3 && std::string(argv[2]) == "-f") { // remove by force
+            std::remove(outPath.c_str());
+        } else {
+            std::cerr << "Output file already exists: " << outPath << std::endl;
+            inHandle.close();
+            exit(1);
+        }
     }
 
     // open output file
@@ -49,30 +53,32 @@ int main(int argc, char* argv[]) {
 
     /********* compilation starts below *********/
 
+    AST* pAST = nullptr;
     try {
         // 1. tokenize file
         std::vector<Token> tokens;
         tokenize(inHandle, tokens);
         inHandle.close();
 
-        for (Token t : tokens)
-            std::cout << t.raw << ' ';
-        std::cout << '\n';
+        // 2. parse to AST & preliminary error checking
+        pAST = parseToAST(tokens);
 
-        // 2. parse to AST
-        
-        // 3. semantic analysis
+        // 3. semantic analysis (remaining syntax checking)
 
         // 4. translate AST to TPU assembly code
 
-        // close files
+        // close files and free AST
         outHandle.close();
+        delete pAST;
     } catch (TException& e) {
         std::cerr << e.toString() << '\n';
 
         // close files
         inHandle.close();
         outHandle.close();
+
+        // free AST
+        delete pAST;
 
         // remove output file
         std::remove(outPath.c_str());

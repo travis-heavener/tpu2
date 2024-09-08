@@ -18,3 +18,20 @@ bool isCharValidIdentifier(const char c) {
 bool isCharValidIdentifierStart(const char c) {
     return isCharValidIdentifier(c) && !std::isdigit(c);
 }
+
+// used to expand an escaped character string
+char escapeChar(const std::string& str) {
+    switch (str[1]) {
+        case '\'': return '\'';
+        case '"': return '"';
+        case '\\': return '\\';
+        case 'n': return '\n';
+        case 'r': return '\r';
+        case 't': return '\t';
+        case 'b': return '\b';
+        case 'f': return '\f';
+        case 'v': return '\v';
+        case '0':
+        default: return '\0';
+    }
+}

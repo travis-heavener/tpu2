@@ -13,6 +13,9 @@ bool isCharValidIdentifier(const char);
 // true if a character is valid at the start of an identifier
 bool isCharValidIdentifierStart(const char);
 
+// used to expand an escaped character string
+char escapeChar(const std::string&);
+
 // for error handling
 typedef unsigned long long line_t; // for line/col numbering
 
@@ -20,8 +23,7 @@ typedef unsigned long long line_t; // for line/col numbering
 class ErrInfo {
     public:
         ErrInfo(line_t line, line_t col) : line(line), col(col) {};
-        line_t line;
-        line_t col;
+        line_t line, col;
 };
 
 // token types
@@ -34,8 +36,7 @@ enum TokenType {
     COMMA,
 
     // operators
-    OP_LT, OP_LTE, // <, <=
-    OP_GT, OP_GTE, // >, >=
+    OP_LT, OP_LTE, OP_GT, OP_GTE, // <, <=, >, >=
     OP_LSHIFT, OP_RSHIFT, // <<, >>
     OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_MOD, // +, -, *, /, %
     OP_BIT_OR, OP_BIT_AND, OP_BIT_NOT, OP_BIT_XOR, // |, &, ~, ^
@@ -49,7 +50,7 @@ enum TokenType {
 // Token class for for lexer
 class Token {
     public:
-        Token(ErrInfo err, std::string raw, TokenType type): err(err), raw(raw), type(type) {};
+        Token(ErrInfo err, const std::string& raw, TokenType type): err(err), raw(raw), type(type) {};
         Token(ErrInfo err, char raw, TokenType type): err(err), raw({raw}), type(type) {};
         ErrInfo err;
         const std::string raw;
