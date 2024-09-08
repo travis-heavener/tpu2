@@ -8,7 +8,7 @@
 
 enum class ASTNodeType {
     NODE, // base class
-    FUNCTION, VARIABLE, RETURN,
+    FUNCTION, IDENTIFIER, RETURN,
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP,
@@ -150,10 +150,10 @@ class ASTFunction : public ASTNode {
         std::vector<param_t> params; // parameters {name, type}
 };
 
-class ASTVariable : public ASTNode {
+class ASTIdentifier : public ASTNode {
     public:
-        ASTVariable(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::VARIABLE; };
+        ASTIdentifier(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
+        ASTNodeType nodeType() const { return ASTNodeType::IDENTIFIER; };
     private:
         std::string name; // name of variable
         TokenType type; // type of variable
