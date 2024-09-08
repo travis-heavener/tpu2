@@ -33,6 +33,7 @@ class ASTNode {
         // for error reporting
         ErrInfo err;
         const std::string raw;
+        bool isAssembled = false;
     protected:
         std::vector<ASTNode*> children;
 };
