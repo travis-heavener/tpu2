@@ -1,7 +1,15 @@
 int main(int a) {
-    int myInt = 11;
-    double myDouble = 19.0;
-    char asdf = '\t';
-    bool testBool = false;
-    return 0;
+    if (true) {
+        printf('t');
+        if (a) {
+            g;
+        } else {
+            f;
+        }
+    } else if (false || true) {
+        true;
+    } else {
+        false;
+    }
+    return 1;
 }

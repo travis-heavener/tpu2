@@ -52,7 +52,7 @@ class ASTConditional : public ASTNode {
         ASTNodeType nodeType() const { return ASTNodeType::CONDITIONAL; };
 
         void addBranch(ASTNode* pBranch) { branches.push_back(pBranch); };
-        const std::vector<ASTNode*> const getBranches() { return branches; };
+        const std::vector<ASTNode*> getBranches() const { return branches; };
     private:
         std::vector<ASTNode*> branches;
 };

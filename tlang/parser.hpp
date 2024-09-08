@@ -13,5 +13,6 @@ AST* parseToAST(const std::vector<Token>&);
 
 ASTNode* parseFunction(const std::vector<Token>&, size_t, size_t);
 ASTNode* parseExpression(const std::vector<Token>&, size_t, size_t);
+ASTNode* parseConditional(const std::vector<Token>&, const std::vector<size_t>&, size_t);
 
 #endif
