@@ -17,7 +17,7 @@ int main(int a) {
             }
         */
 
-        for (false; true; false) {
+        for (false; true; false;) {
             asdf;
         }
     } else if (false || true) {

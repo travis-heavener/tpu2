@@ -596,7 +596,6 @@ ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex,
         } while (tokens[i].type != TokenType::LBRACE);
 
         // parse sub-expressions on semicolons
-
         pHead->pExprA = parseExpression( tokens, startIndex+2, semiA-1); // ignore opening parenthesis & semicolon
         pHead->pExprB = parseExpression( tokens, semiA+1, semiB-1); // ignore parenthesis & semicolon
         pHead->pExprC = parseExpression( tokens, semiB+1, i-2); // ignore closing parenthesis
