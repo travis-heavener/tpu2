@@ -32,5 +32,6 @@ MAKE_EXCEPTION(ZeroDiv)
 MAKE_EXCEPTION(InvalidToken)
 MAKE_EXCEPTION(UnclosedQuote)
 MAKE_EXCEPTION(InvalidEscape)
+MAKE_EXCEPTION(UnclosedComment)
 
 #endif

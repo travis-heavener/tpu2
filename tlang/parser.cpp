@@ -70,33 +70,59 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
     // create node
     ASTFunction* pHead = new ASTFunction(name, tokens[startIndex]);
 
-    // append parameters
-    size_t i = startIndex+3;
-    while (tokens[i].type != TokenType::RPAREN) {
-        // verify param type is valid
-        TokenType paramType;
-        switch (tokens[i].type) {
-            case TokenType::TYPE_INT: case TokenType::TYPE_DOUBLE:
-            case TokenType::TYPE_CHAR: case TokenType::TYPE_BOOL:
-                paramType = tokens[i].type;
-                break;
-            default:
+    try {
+        // append parameters
+        size_t i = startIndex+3;
+        while (tokens[i].type != TokenType::RPAREN) {
+            // verify param type is valid
+            TokenType paramType = tokens[i].type;
+            if ( !isTokenTypeName(paramType) )
                 throw TInvalidTokenException(tokens[i].err);
-                break;
+
+            const std::string paramName = tokens[++i].raw; // grab parameter name
+            pHead->appendParam({paramName, paramType}); // append parameter
+
+            if (tokens[i+1].type == TokenType::COMMA) i++; // skip next comma
+            i++; // base increment
         }
 
-        const std::string paramName = tokens[++i].raw; // grab parameter name
-        pHead->appendParam({paramName, paramType}); // append parameter
+        // verify opening brace is next
+        if (tokens[++i].type != TokenType::LBRACE)
+            throw TInvalidTokenException(tokens[i].err);
+        
+        // parse body (up to closing brace)
+        for ((void)i; i < endIndex; i++) {
+            switch (tokens[i].type) {
+                case TokenType::IF: { // parse conditional
+                    break;
+                }
+                case TokenType::FOR: { // parse for-loop
+                    break;
+                }
+                case TokenType::WHILE: { // parse while-loop
+                    break;
+                }
+                case TokenType::RETURN: { // parse return expression
 
-        if (tokens[i+1].type == TokenType::COMMA) i++; // skip next comma
-        i++; // base increment
+                }
+                case TokenType::BLOCK_COMMENT_START: { // search for close
+                    size_t j = i;
+                    do {
+                        j++;
+                    } while (j < endIndex && tokens[j].type != TokenType::BLOCK_COMMENT_END);
+
+                    // handle unclosed comments
+                    if (j == endIndex) throw TUnclosedCommentException(tokens[i].err);
+
+                    // jump to end of comment
+                    i = j;
+                }
+            }
+        }
+    } catch (TException& e) {
+        delete pHead; // free & rethrow
+        throw e;
     }
-
-    // verify opening brace is next
-    if (tokens[++i].type != TokenType::LBRACE)
-        throw TInvalidTokenException(tokens[i].err);
-
-    // append function body
 
     // return node ptr
     return pHead;
