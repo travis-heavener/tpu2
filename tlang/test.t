@@ -10,6 +10,16 @@ int main(int a) {
         while (true || false) {
             12 + 90;
         }
+
+        /*
+            if (asdf) {
+
+            }
+        */
+
+        for (false; true; false) {
+            asdf;
+        }
     } else if (false || true) {
         true;
     } else {

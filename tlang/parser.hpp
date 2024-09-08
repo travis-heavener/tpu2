@@ -16,5 +16,6 @@ ASTNode* parseFunction(const std::vector<Token>&, const size_t, const size_t);
 ASTNode* parseExpression(const std::vector<Token>&, const size_t, const size_t);
 ASTNode* parseConditional(const std::vector<Token>&, const std::vector<size_t>&, const size_t);
 ASTNode* parseWhileLoop(const std::vector<Token>&, const size_t, const size_t);
+ASTNode* parseForLoop(const std::vector<Token>&, const size_t, const size_t);
 
 #endif

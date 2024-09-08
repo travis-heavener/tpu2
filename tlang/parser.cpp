@@ -147,8 +147,43 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 break;
             }
             case TokenType::FOR: { // parse for-loop
-                // TO-DO implement here
-                throw std::runtime_error("Unimplemented");
+                size_t loopStart = i;
+                // verify next token is LPAREN
+                if (i+1 == endIndex || tokens[++i].type != TokenType::LPAREN)
+                    throw TInvalidTokenException(tokens[i].err);
+
+                // find closing RPAREN
+                size_t parenStart = i;
+                size_t parensOpen = 1;
+                do {
+                    ++i;
+                    if (tokens[i].type == TokenType::LPAREN)
+                        parensOpen++;
+                    else if (tokens[i].type == TokenType::RPAREN)
+                        parensOpen--;
+                } while (parensOpen > 0 && i <= endIndex);
+
+                if (i > endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
+
+                // verify next token is LBRACE
+                if (tokens[++i].type != TokenType::LBRACE)
+                    throw TInvalidTokenException(tokens[i].err);
+
+                // find RBRACE
+                size_t braceStart = i;
+                size_t bracesOpen = 1;
+                do {
+                    ++i;
+                    if (tokens[i].type == TokenType::LBRACE)
+                        bracesOpen++;
+                    else if (tokens[i].type == TokenType::RBRACE)
+                        bracesOpen--;
+                } while (bracesOpen > 0 && i <= endIndex);
+
+                if (i > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
+
+                // parse while loop
+                pHead->push( parseForLoop(tokens, loopStart, i) );
                 break;
             }
             case TokenType::WHILE: { // parse while-loop
@@ -526,6 +561,45 @@ ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startInde
 
         // parse expression
         pHead->pExpr = parseExpression( tokens, startIndex+2, i-2); // ignore parenthesis
+
+        // parse body
+        parseBody( pHead, tokens, i+1, endIndex-1 ); // ignore braces
+    } catch (TException& e) {
+        delete pHead;
+        throw e;
+    }
+
+    // return node
+    return pHead;
+}
+
+ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+    // create new node
+    ASTForLoop* pHead = new ASTForLoop(tokens[startIndex]);
+
+    try {
+        // append sub-expressions
+        size_t i = startIndex;
+        long long semiA = -1, semiB =- 1; // only allowed two semicolons in for-loop header (ex. for (...;...;...) )
+
+        // find LBRACE
+        do {
+            ++i;
+            if (tokens[i].type == TokenType::SEMICOLON) {
+                if (semiA == -1)
+                    semiA = i;
+                else if (semiB == -1)
+                    semiB = i;
+                else
+                    throw TInvalidTokenException(tokens[i].err);
+            }
+        } while (tokens[i].type != TokenType::LBRACE);
+
+        // parse sub-expressions on semicolons
+
+        pHead->pExprA = parseExpression( tokens, startIndex+2, semiA-1); // ignore opening parenthesis & semicolon
+        pHead->pExprB = parseExpression( tokens, semiA+1, semiB-1); // ignore parenthesis & semicolon
+        pHead->pExprC = parseExpression( tokens, semiB+1, i-2); // ignore closing parenthesis
 
         // parse body
         parseBody( pHead, tokens, i+1, endIndex-1 ); // ignore braces
