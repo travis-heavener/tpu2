@@ -102,27 +102,20 @@ class ASTExpr : public ASTNode {
         ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
 };
 
-class ASTUnaryOp : public ASTNode {
+class ASTOperator : public ASTNode {
     public:
-        ASTUnaryOp(const Token& token) : ASTNode(token), opType(token.type) {};
-        ASTNodeType getNodeType() const { return ASTNodeType::UNARY_OP; };
+        ASTOperator(const Token& token, bool isUnary) : ASTNode(token), opType(token.type), isUnary(isUnary) {}
+        ASTNodeType getNodeType() const { return isUnary ? ASTNodeType::UNARY_OP : ASTNodeType::BIN_OP; }
         
-        ASTNode* right() { return children[0]; };
-        TokenType getOpTokenType() { return opType; };
+        ASTNode* left() { return children[0]; }
+        ASTNode* right() { return children[1]; }
+        TokenType getOpTokenType() { return opType; }
+
+        void setIsUnary(bool isUnary) { this->isUnary = isUnary; }
+        bool getIsUnary() const { return this->isUnary; }
     private:
         TokenType opType;
-};
-
-class ASTBinOp : public ASTNode {
-    public:
-        ASTBinOp(const Token& token) : ASTNode(token), opType(token.type) {};
-        ASTNodeType getNodeType() const { return ASTNodeType::BIN_OP; };
-
-        ASTNode* left() { return children[0]; };
-        ASTNode* right() { return children[1]; };
-        TokenType getOpTokenType() { return opType; };
-    private:
-        TokenType opType;
+        bool isUnary;
 };
 
 /************* LITERALS & IDENTIFIERS *************/

@@ -291,10 +291,10 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, si
                 pHead->push( new ASTBoolLiteral(tokens[i].raw == "true", tokens[i]) );
             } else if (tokens[i].type == TokenType::VOID) {
                 pHead->push( new ASTVoidLiteral(tokens[i]) );
-            } else if (isTokenUnaryOp(tokens[i].type)) {
-                pHead->push( new ASTUnaryOp(tokens[i]) );
-            } else if (isTokenBinaryOp(tokens[i].type)) {
-                pHead->push( new ASTBinOp(tokens[i]) );
+            } else if (isTokenUnaryOp(tokens[i].type)) { // handle unary operators
+                pHead->push( new ASTOperator(tokens[i], true) );
+            } else if (isTokenBinaryOp(tokens[i].type)) { // handle binary operators
+                pHead->push( new ASTOperator(tokens[i], false) );
             } else if (tokens[i].type == TokenType::IDENTIFIER) {
                 pHead->push( new ASTIdentifier(tokens[i].raw, tokens[i]) );
             } else {
@@ -305,36 +305,113 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, si
         // 2. COMBINE UNARIES
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
 
-            if (currentNode.getNodeType() == ASTNodeType::UNARY_OP) {
-                // ignore + and - if this is a binary math operation
-                ASTUnaryOp& currentUnary = *static_cast<ASTUnaryOp*>(&currentNode);
-                TokenType opType = currentUnary.getOpTokenType();
+            // ignore + and - if this is a binary math operation
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType opType = currentOp.getOpTokenType();
 
-                // basically, unary can only work if it's after A) nothing or B) another operator
-                if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) &&
-                    !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
-                                pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
-                    continue;
-                }
-
-                // confirm there is a token after this
-                if (i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
-
-                // append next node as child of this
-                currentNode.push( pHead->at(i+1) );
-                pHead->removeChild( i+1 );
+            // basically, unary can only work if it's after A) nothing or B) another operator
+            if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) &&
+                !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
+                            pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
+                continue;
             }
+
+            // confirm there is a token after this
+            if (i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+
+            // append next node as child of this
+            currentNode.push( pHead->at(i+1) );
+            pHead->removeChild( i+1 );
         }
 
         // 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is mult/div/mod math operation
+            ASTOperator* currentOp = static_cast<ASTOperator*>(&currentNode);
+            TokenType opType = currentOp->getOpTokenType();
+            if (opType != TokenType::OP_MUL && opType != TokenType::OP_DIV && opType != TokenType::OP_MOD)
+                continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+            
+            // append children
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
 
         // 4. ADD/SUB
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            // + and - are counted as unaries by step 1
+            if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
+
+            // verify this is add/sub math operation
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType opType = currentOp.getOpTokenType();
+            if (opType != TokenType::OP_ADD && opType != TokenType::OP_SUB) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // convert ASTUnaryOp to ASTBinOp
+            currentOp.setIsUnary(false);
+
+            // append children
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
 
         // 5. COMPARISON
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is a comparison operation
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            if (!isTokenCompOp(currentOp.getOpTokenType())) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
 
         // 6. ASSIGNMENT
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+            // verify this is an assignment expression
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            if (!isTokenAssignOp(currentOp.getOpTokenType())) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+            
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
     } catch (TException& e) {
         // free & rethrow
         delete pHead;
