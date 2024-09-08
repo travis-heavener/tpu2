@@ -12,7 +12,7 @@ enum class ASTNodeType {
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP,
-    LIT_BOOL, LIT_CHAR, LIT_DOUBLE, LIT_INT, LIT_NULL
+    LIT_BOOL, LIT_CHAR, LIT_DOUBLE, LIT_INT, LIT_VOID
 };
 
 // base class for all AST node types
@@ -184,6 +184,13 @@ class ASTIntLiteral : public ASTNode {
     public:
         ASTIntLiteral(int val, const Token& token) : ASTNode(token), val(val) {};
         ASTNodeType nodeType() const { return ASTNodeType::LIT_INT; };
+        int val;
+};
+
+class ASTVoidLiteral : public ASTNode {
+    public:
+        ASTVoidLiteral(int val, const Token& token) : ASTNode(token), val(val) {};
+        ASTNodeType nodeType() const { return ASTNodeType::LIT_VOID; };
         int val;
 };
 
