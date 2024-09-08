@@ -125,6 +125,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
                     // append expression to pReturn
                     pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
                     i = endExpr;
+                    break;
                 }
                 case TokenType::BLOCK_COMMENT_START: { // search for close
                     size_t j = i;
@@ -137,6 +138,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
 
                     // jump to end of comment
                     i = j;
+                    break;
                 }
                 case TokenType::SEMICOLON: break; // erroneous statement
                 default: { // base case, parse as expression
