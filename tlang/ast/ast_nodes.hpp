@@ -189,9 +189,8 @@ class ASTIntLiteral : public ASTNode {
 
 class ASTVoidLiteral : public ASTNode {
     public:
-        ASTVoidLiteral(int val, const Token& token) : ASTNode(token), val(val) {};
+        ASTVoidLiteral(const Token& token) : ASTNode(token) {};
         ASTNodeType nodeType() const { return ASTNodeType::LIT_VOID; };
-        int val;
 };
 
 #endif
