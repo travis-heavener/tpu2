@@ -193,7 +193,6 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                     ++endExpr;
 
                 // verify semicolon is present
-                std::cout << tokens[i].raw << '\n';
                 if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
                 
                 pHead->push( parseExpression(tokens, i, endExpr-1) );
@@ -246,8 +245,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, si
     if (startIndex > endIndex) throw TInvalidTokenException(tokens[endIndex].err);
 
     ASTNode* pHead = new ASTExpr(tokens[startIndex]);
-
-    std::cout << tokens[startIndex].raw << ' ' << tokens[endIndex].raw << '\n';
 
     // iterate through expression
     try {

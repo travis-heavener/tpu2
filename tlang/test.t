@@ -1,5 +1,5 @@
 int main(int a) {
-    if (true) {
+    if (3 - 11 + -19) {
         if (a) {
             g;
         } else {
