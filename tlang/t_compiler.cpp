@@ -5,6 +5,7 @@
 #include "toolbox.hpp"
 #include "t_exception.hpp"
 #include "lexer.hpp"
+#include "parser.hpp"
 
 /**
  * Compiles .t files to .tpu assembly files.
