@@ -14,22 +14,22 @@ ASTNode* ASTNode::removeChild(size_t i) {
 
 ASTIfCondition::~ASTIfCondition() {
     // free condition
-    delete this->pExpr;
+    if (this->pExpr != nullptr) delete this->pExpr;
 }
 
 ASTElseIfCondition::~ASTElseIfCondition() {
     // free condition
-    delete this->pExpr;
+    if (this->pExpr != nullptr) delete this->pExpr;
 }
 
 ASTForLoop::~ASTForLoop() {
     // free expressions
-    delete this->pExprA;
-    delete this->pExprB;
-    delete this->pExprC;
+    if (this->pExprA != nullptr) delete this->pExprA;
+    if (this->pExprB != nullptr) delete this->pExprB;
+    if (this->pExprC != nullptr) delete this->pExprC;
 }
 
 ASTWhileLoop::~ASTWhileLoop() {
     // free expression
-    delete this->pExpr;
+    if (this->pExpr != nullptr) delete this->pExpr;
 }

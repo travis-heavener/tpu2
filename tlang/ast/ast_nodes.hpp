@@ -56,7 +56,7 @@ class ASTIfCondition : public ASTNode {
         ASTIfCondition(const Token& token) : ASTNode(token) {};
         ~ASTIfCondition();
         ASTNodeType getNodeType() const { return ASTNodeType::IF_CONDITION; };
-        ASTNode* pExpr; // the internal expression for this if-statement
+        ASTNode* pExpr = nullptr; // the internal expression for this if-statement
 };
 
 class ASTElseIfCondition : public ASTNode {
@@ -64,7 +64,7 @@ class ASTElseIfCondition : public ASTNode {
         ASTElseIfCondition(const Token& token) : ASTNode(token) {};
         ~ASTElseIfCondition();
         ASTNodeType getNodeType() const { return ASTNodeType::ELSE_IF_CONDITION; };
-        ASTNode* pExpr; // the internal expression for this else-if-statement
+        ASTNode* pExpr = nullptr; // the internal expression for this else-if-statement
 };
 
 class ASTElseCondition : public ASTNode {
@@ -81,9 +81,9 @@ class ASTForLoop : public ASTNode {
         ~ASTForLoop();
         ASTNodeType getNodeType() const { return ASTNodeType::FOR_LOOP; };
         
-        ASTNode* pExprA; // the initial expression
-        ASTNode* pExprB; // the condition expression
-        ASTNode* pExprC; // the iterating expression
+        ASTNode* pExprA = nullptr; // the initial expression
+        ASTNode* pExprB = nullptr; // the condition expression
+        ASTNode* pExprC = nullptr; // the iterating expression
 };
 
 class ASTWhileLoop : public ASTNode {
@@ -91,7 +91,7 @@ class ASTWhileLoop : public ASTNode {
         ASTWhileLoop(const Token& token) : ASTNode(token) {};
         ~ASTWhileLoop();
         ASTNodeType getNodeType() const { return ASTNodeType::WHILE_LOOP; };
-        ASTNode* pExpr; // the condition expression
+        ASTNode* pExpr = nullptr; // the condition expression
 };
 
 /************* OPERATIONS *************/
