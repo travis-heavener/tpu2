@@ -382,8 +382,8 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
             } else if (tokens[i].type == TokenType::LIT_INT) {
                 pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
-            } else if (tokens[i].type == TokenType::LIT_DOUBLE) {
-                pHead->push( new ASTDoubleLiteral(std::stod(tokens[i].raw), tokens[i]) );
+            } else if (tokens[i].type == TokenType::LIT_FLOAT) {
+                pHead->push( new ASTFloatLiteral(std::stod(tokens[i].raw), tokens[i]) );
             } else if (tokens[i].type == TokenType::LIT_CHAR) {
                 std::string str = tokens[i].raw.substr(1); // remove leading quote
                 str.pop_back(); // remove trailing quote

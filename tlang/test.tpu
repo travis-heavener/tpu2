@@ -1,0 +1,13 @@
+main:
+    push 175
+    push 1
+    push 137
+    push 46
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    hlt

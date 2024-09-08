@@ -61,7 +61,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
             TokenType tokenType = TokenType::LIT_INT;
             buffer = line[i]; // update buffer
             while (++i < lineLen && (std::isdigit(line[i]) || line[i] == '.')) {
-                if (line[i] == '.') tokenType = TokenType::LIT_DOUBLE; // set as double if encountering a decimal
+                if (line[i] == '.') tokenType = TokenType::LIT_FLOAT; // set as double if encountering a decimal
                 buffer.push_back(line[i]);
             }
 

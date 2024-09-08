@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include <string>
 #include <sys/stat.h>
 
@@ -73,7 +74,7 @@ bool isTokenBinaryOp(const TokenType type) {
 
 // true if the token is a literal
 bool isTokenLiteral(const TokenType type) {
-    return type == LIT_BOOL || type == LIT_CHAR || type == LIT_DOUBLE || type == LIT_INT || type == VOID;
+    return type == LIT_BOOL || type == LIT_CHAR || type == LIT_FLOAT || type == LIT_INT || type == VOID;
 }
 
 // true if the token is a comparison operator
@@ -86,4 +87,15 @@ bool isTokenCompOp(const TokenType type) {
 // true if the token is an assignment operator
 bool isTokenAssignOp(const TokenType type) {
     return type == ASSIGN;
+}
+
+// returns the size of a primitive type in bytes
+unsigned char getSizeOfType(TokenType type) {
+    switch (type) {
+        case TokenType::TYPE_INT: return 2; // 2-byte ints
+        case TokenType::TYPE_DOUBLE: return 4; // 4-byte floats
+        case TokenType::TYPE_CHAR: return 1;
+        case TokenType::TYPE_BOOL: return 1;
+        default: throw std::invalid_argument("Invalid type passed to getSizeOfType.");
+    }
 }

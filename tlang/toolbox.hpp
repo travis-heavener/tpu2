@@ -8,7 +8,7 @@ enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
     LPAREN, RPAREN, LBRACKET, RBRACKET, LBRACE, RBRACE, // (), [], {}
     TYPE_INT, TYPE_DOUBLE, TYPE_CHAR, TYPE_BOOL, // type names
-    LIT_INT, LIT_DOUBLE, LIT_BOOL, LIT_CHAR, VOID, // type literals
+    LIT_INT, LIT_FLOAT, LIT_BOOL, LIT_CHAR, VOID, // type literals
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
 
@@ -47,6 +47,9 @@ bool isTokenBinaryOp(const TokenType);
 bool isTokenLiteral(const TokenType);
 bool isTokenCompOp(const TokenType);
 bool isTokenAssignOp(const TokenType);
+
+// returns the size of a primitive type in bytes
+unsigned char getSizeOfType(TokenType type);
 
 // for error handling
 typedef unsigned long long line_t; // for line/col numbering
