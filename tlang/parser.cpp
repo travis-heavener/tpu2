@@ -77,6 +77,132 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
 /************************ FOR PARSING SPECIFIC ASTNodes ************************/
 
+void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+    // parse body lines and append to pHead
+    for (size_t i = startIndex; i <= endIndex; i++) {
+        switch (tokens[i].type) {
+            case TokenType::IF: { // parse conditional
+                bool isInConditional = true;
+                size_t endCond = i;
+                std::vector<size_t> branchIndices; // the start index for each branch
+
+                while (isInConditional) {
+                    // record this branch token index
+                    branchIndices.push_back(endCond);
+
+                    // only if this token isn't else, get a condition
+                    if (tokens[endCond].type != TokenType::ELSE) {
+                        // verify next token is LPAREN
+                        if (endCond+1 == endIndex || tokens[++endCond].type != TokenType::LPAREN)
+                            throw TInvalidTokenException(tokens[endCond].err);
+
+                        // find closing RPAREN
+                        size_t parenStart = endCond;
+                        size_t parensOpen = 1;
+                        do {
+                            ++endCond;
+                            if (tokens[endCond].type == TokenType::LPAREN)
+                                parensOpen++;
+                            else if (tokens[endCond].type == TokenType::RPAREN)
+                                parensOpen--;
+                        } while (parensOpen > 0 && endCond < endIndex);
+
+                        if (endCond == endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
+                    }
+
+                    // verify next token is LBRACE
+                    if (tokens[++endCond].type != TokenType::LBRACE)
+                        throw TInvalidTokenException(tokens[endCond].err);
+
+                    // find RBRACE
+                    size_t braceStart = endCond;
+                    size_t bracesOpen = 1;
+                    do {
+                        ++endCond;
+                        if (tokens[endCond].type == TokenType::LBRACE)
+                            bracesOpen++;
+                        else if (tokens[endCond].type == TokenType::RBRACE)
+                            bracesOpen--;
+                    } while (bracesOpen > 0 && endCond < endIndex);
+
+                    if (endCond == endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
+
+                    // check for else on the same line
+                    if (endCond+1 == endIndex || (tokens[endCond+1].type != TokenType::ELSE_IF && tokens[endCond+1].type != TokenType::ELSE)) {
+                        // break out of conditional
+                        endCond--;
+                        isInConditional = false;
+                    }
+
+                    // base case, recurse
+                    ++endCond;
+                }
+
+                // parse conditional
+                parseConditional(tokens, branchIndices, endCond);
+                i = endCond; // jump to end of conditional
+                break;
+            }
+            case TokenType::FOR: { // parse for-loop
+                // TO-DO implement here
+                throw std::runtime_error("Unimplemented");
+                break;
+            }
+            case TokenType::WHILE: { // parse while-loop
+                // TO-DO implement here
+                throw std::runtime_error("Unimplemented");
+                break;
+            }
+            case TokenType::RETURN: { // parse return expression
+                // create return
+                ASTReturn* pReturn = new ASTReturn(tokens[i]);
+                pHead->push(pReturn);
+
+                // get expression
+                size_t endExpr = i;
+                do {
+                    ++endExpr;
+                } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
+                
+                // verify semicolon is present
+                if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+
+                // append expression to pReturn
+                pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
+                i = endExpr;
+                break;
+            }
+            case TokenType::BLOCK_COMMENT_START: { // search for close
+                size_t j = i;
+                do {
+                    j++;
+                } while (j < endIndex && tokens[j].type != TokenType::BLOCK_COMMENT_END);
+
+                // handle unclosed comments
+                if (j == endIndex) throw TUnclosedCommentException(tokens[i].err);
+
+                // jump to end of comment
+                i = j;
+                break;
+            }
+            case TokenType::SEMICOLON: break; // erroneous statement
+            default: { // base case, parse as expression
+                // get expression
+                size_t endExpr = i;
+                while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
+                    ++endExpr;
+
+                // verify semicolon is present
+                if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+                
+                pHead->push( parseExpression(tokens, i, endExpr-1) );
+                i = endExpr;
+                break;
+            }
+        }
+    }
+}
+
 ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
     // get function name
     const std::string name = tokens[startIndex+1].raw;
@@ -105,128 +231,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
             throw TInvalidTokenException(tokens[i].err);
         
         // parse body (up to closing brace)
-        for (++i; i < endIndex; i++) {
-            switch (tokens[i].type) {
-                case TokenType::IF: { // parse conditional
-                    bool isInConditional = true;
-                    size_t endCond = i;
-                    std::vector<size_t> branchIndices; // the start index for each branch
-
-                    while (isInConditional) {
-                        // record this branch token index
-                        branchIndices.push_back(endCond);
-
-                        // only if this token isn't else, get a condition
-                        if (tokens[endCond].type != TokenType::ELSE) {
-                            // verify next token is LPAREN
-                            if (endCond+1 == endIndex || tokens[++endCond].type != TokenType::LPAREN)
-                                throw TInvalidTokenException(tokens[endCond].err);
-
-                            // find closing RPAREN
-                            size_t parenStart = endCond;
-                            size_t parensOpen = 1;
-                            do {
-                                ++endCond;
-                                if (tokens[endCond].type == TokenType::LPAREN)
-                                    parensOpen++;
-                                else if (tokens[endCond].type == TokenType::RPAREN)
-                                    parensOpen--;
-                            } while (parensOpen > 0 && endCond < endIndex);
-
-                            if (endCond == endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
-                        }
-
-                        // verify next token is LBRACE
-                        if (tokens[++endCond].type != TokenType::LBRACE)
-                            throw TInvalidTokenException(tokens[endCond].err);
-
-                        // find RBRACE
-                        size_t braceStart = endCond;
-                        size_t bracesOpen = 1;
-                        do {
-                            ++endCond;
-                            if (tokens[endCond].type == TokenType::LBRACE)
-                                bracesOpen++;
-                            else if (tokens[endCond].type == TokenType::RBRACE)
-                                bracesOpen--;
-                        } while (bracesOpen > 0 && endCond < endIndex);
-
-                        if (endCond == endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
-
-                        // check for else on the same line
-                        if (endCond+1 == endIndex || (tokens[endCond+1].type != TokenType::ELSE_IF && tokens[endCond+1].type != TokenType::ELSE)) {
-                            // break out of conditional
-                            endCond--;
-                            isInConditional = false;
-                        }
-
-                        // base case, recurse
-                        ++endCond;
-                    }
-
-                    // parse conditional
-                    parseConditional(tokens, branchIndices, endCond);
-                    i = endCond; // jump to end of conditional
-                    break;
-                }
-                case TokenType::FOR: { // parse for-loop
-                    // TO-DO implement here
-                    throw std::runtime_error("Unimplemented");
-                    break;
-                }
-                case TokenType::WHILE: { // parse while-loop
-                    // TO-DO implement here
-                    throw std::runtime_error("Unimplemented");
-                    break;
-                }
-                case TokenType::RETURN: { // parse return expression
-                    // create return
-                    ASTReturn* pReturn = new ASTReturn(tokens[i]);
-                    pHead->push(pReturn);
-
-                    // get expression
-                    size_t endExpr = i;
-                    do {
-                        ++endExpr;
-                    } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
-                    
-                    // verify semicolon is present
-                    if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
-
-                    // append expression to pReturn
-                    pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
-                    i = endExpr;
-                    break;
-                }
-                case TokenType::BLOCK_COMMENT_START: { // search for close
-                    size_t j = i;
-                    do {
-                        j++;
-                    } while (j < endIndex && tokens[j].type != TokenType::BLOCK_COMMENT_END);
-
-                    // handle unclosed comments
-                    if (j == endIndex) throw TUnclosedCommentException(tokens[i].err);
-
-                    // jump to end of comment
-                    i = j;
-                    break;
-                }
-                case TokenType::SEMICOLON: break; // erroneous statement
-                default: { // base case, parse as expression
-                    // get expression
-                    size_t endExpr = i;
-                    while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
-                        ++endExpr;
-
-                    // verify semicolon is present
-                    if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
-                    
-                    pHead->push( parseExpression(tokens, i, endExpr-1) );
-                    i = endExpr;
-                    break;
-                }
-            }
-        }
+        parseBody(pHead, tokens, i+1, endIndex-1);
     } catch (TException& e) {
         delete pHead; // free & rethrow
         throw e;
@@ -237,8 +242,10 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
 }
 
 ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+    if (startIndex > endIndex) throw TInvalidTokenException(tokens[endIndex].err);
+
     ASTNode* pHead = nullptr;
-    
+
     std::cout << tokens[startIndex].raw << ' ' << tokens[endIndex].raw << '\n';
 
     // iterate through expression
@@ -264,6 +271,36 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
             // determine start and end indices
             size_t startIndex = branchIndices[i];
             size_t endIndex = i+1 == numBranches ? globalEndIndex : branchIndices[i+1]-1;
+
+            // parse condition
+            size_t bodyStart = startIndex + 2; // base case, after LBRACE
+            const Token& startToken = tokens[startIndex];
+            if (startToken.type != TokenType::ELSE) {
+                // append conditional node
+                ASTNode* pNode = startToken.type == TokenType::IF ?
+                                    (ASTNode*) new ASTIfCondition(startToken) : (ASTNode*) new ASTElseIfCondition(startToken);
+                pHead->push( pNode );
+
+                // find closing condition
+                size_t openBrace = startIndex+1;
+                do { openBrace++; } while (tokens[openBrace].type != TokenType::LBRACE);
+
+                // prevent empty expressions
+                if (startIndex+2 > openBrace-2) throw TInvalidTokenException(tokens[startIndex+1].err);
+
+                // append expression
+                if (startToken.type == TokenType::IF) {
+                    static_cast<ASTIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2);
+                } else {
+                    static_cast<ASTElseIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2);
+                }
+
+                // offset the body token position
+                bodyStart = openBrace+1;
+            }
+
+            // parse the body
+            parseBody(pHead, tokens, bodyStart, endIndex);
         }
     } catch (TException& e) {
         // free & rethrow
