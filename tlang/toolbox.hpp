@@ -3,29 +3,6 @@
 
 #include <string>
 
-// helper to check if file exists
-// modified from https://stackoverflow.com/a/6296808
-bool doesFileExist(const std::string& file);
-
-// true if a character is valid in an identifier
-bool isCharValidIdentifier(const char);
-
-// true if a character is valid at the start of an identifier
-bool isCharValidIdentifierStart(const char);
-
-// used to expand an escaped character string
-char escapeChar(const std::string&);
-
-// for error handling
-typedef unsigned long long line_t; // for line/col numbering
-
-// store where a token is from in its original file
-class ErrInfo {
-    public:
-        ErrInfo(line_t line, line_t col) : line(line), col(col) {};
-        line_t line, col;
-};
-
 // token types
 enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
@@ -45,6 +22,32 @@ enum TokenType {
 
     // assignment operators
     ASSIGN
+};
+
+// helper to check if file exists
+// modified from https://stackoverflow.com/a/6296808
+bool doesFileExist(const std::string& file);
+
+// true if a character is valid in an identifier
+bool isCharValidIdentifier(const char);
+
+// true if a character is valid at the start of an identifier
+bool isCharValidIdentifierStart(const char);
+
+// used to expand an escaped character string
+char escapeChar(const std::string&);
+
+// returns true if the given TokenType is that of a type name (ex. TYPE_INT)
+bool isTokenTypeName(TokenType);
+
+// for error handling
+typedef unsigned long long line_t; // for line/col numbering
+
+// store where a token is from in its original file
+class ErrInfo {
+    public:
+        ErrInfo(line_t line, line_t col) : line(line), col(col) {};
+        line_t line, col;
 };
 
 // Token class for for lexer

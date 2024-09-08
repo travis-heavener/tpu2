@@ -35,3 +35,16 @@ char escapeChar(const std::string& str) {
         default: return '\0';
     }
 }
+
+// returns true if the given TokenType is that of a type name (ex. TYPE_INT)
+bool isTokenTypeName(TokenType type) {
+    switch (type) {
+        case TokenType::TYPE_INT:
+        case TokenType::TYPE_DOUBLE:
+        case TokenType::TYPE_CHAR:
+        case TokenType::TYPE_BOOL:
+            return true;
+        default:
+            return false;
+    }
+}
