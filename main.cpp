@@ -22,7 +22,7 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
-#define CLOCK_FREQ_HZ 5000
+#define CLOCK_FREQ_HZ 25
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -39,5 +39,6 @@ int main(int argc, char* argv[]) {
 
     // start the CPU's clock and wait
     tpu.start(memory);
+
     return 0;
 }

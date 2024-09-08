@@ -34,7 +34,7 @@ void TPU::reset() {
 
     // fix instruction ptr and stack ptr
     IP = INSTRUCTION_PTR_START;
-    SP = 0xFFFF; // starts at the end of addressable memory, grows downwards
+    SP = STACK_LOWER_ADDR; // grows upwards (away from reserved pool)
 
     // clear flags
     FLAGS = 0x0;
@@ -132,6 +132,11 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since the TPU has just completed a syscall
             break;
         }
+        case OPCode::CALL: {
+            instructions::processCALL(*this, memory);
+            this->sleep(); // wait since the TPU has just completed a syscall
+            break;
+        }
         case OPCode::JMP: {
             instructions::processJMP(*this, memory);
             this->sleep(); // wait since TPU has just completed JMP/JZ/JNZ
@@ -139,6 +144,21 @@ void TPU::execute(Memory& memory) {
         }
         case OPCode::MOV: {
             instructions::processMOV(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::PUSH: {
+            instructions::processPUSH(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::POP: {
+            instructions::processPOP(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
+        case OPCode::RET: {
+            instructions::processRET(*this, memory);
             this->sleep(); // wait since TPU has just completed an operation
             break;
         }

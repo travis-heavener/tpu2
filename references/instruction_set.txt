@@ -6,6 +6,8 @@ hlt                         0x01            Halts/stops the clock on the CPU.
 
 syscall                     0x02            Triggers a syscall.
 
+call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
+
 jmp @addr                   0x04 /0         Moves the instruction pointer to the specified 16-bit memory address.
 jz @addr                    0x04 /1         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
 jnz @addr                   0x04 /2         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
@@ -17,6 +19,13 @@ mov reg, imm16              0x05 /3         Move imm16 into 16-bit register
 mov reg, @addr              0x05 /4         Move 8-bit value from memory address into 8-bit register.
 mov reg, reg                0x05 /5         Move value between 8-bit registers.
 mov reg, reg                0x05 /6         Move value between 16-bit registers.
+
+push reg                    0x06 /0         Pushes the value of an 8-bit register onto the stack.
+push imm8                   0x06 /1         Pushes an imm8 value onto the stack.
+pop reg                     0x07 /0         Pops the last byte off the stack to an 8-bit register.
+pop                         0x07 /1         Pops the last byte off the stack without storing it.
+
+ret                         0x08            Revert the instruction pointer to the previous memory address stored in the base pointer.
 
 add reg, imm8               0x14 /0         Adds 8-bit register and imm8 and stores in first operand.
 add reg, imm16              0x14 /1         Adds 16-bit register and imm16 and stores in first operand.
