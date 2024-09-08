@@ -11,9 +11,9 @@ The error handling in this project is also atrocious, I could have done better a
 
 TL;DR: I'll greatly improve and extend this project when I get the chance. If this seems half-assed, just know that I have been on a time crunch for this project and have only had <48 hours to work on this.
 
-The full instruction set: [instruction_set.txt](instruction_set.txt)
+The full instruction set: [instruction_set.txt](references/instruction_set.txt)
 
-The full set of syscalls: [syscall_set.txt](syscall_set.txt)
+The full set of syscalls: [syscall_set.txt](references/syscall_set.txt)
 
 ## How to use
 
@@ -25,7 +25,7 @@ Install ncurses (Linux only):
 `sudo apt-get install libncurses-dev`
 
 To compile (Linux only):
-`g++ *.cpp -o main.o -Wall -Wextra -g -lncurses`
+`g++ *.cpp util/*.cpp -o ./bin/main.o -Wall -Wextra -g -lncurses`
 
 ## Disclaimer
 
