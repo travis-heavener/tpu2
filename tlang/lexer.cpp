@@ -39,7 +39,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
 
         // reset buffer & prepare error info object
         buffer.clear();
-        ErrInfo err(lineNumber, i);
+        ErrInfo err(lineNumber, i+1);
 
         // handle the current character
         // break on single line comments
