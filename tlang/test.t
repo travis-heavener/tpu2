@@ -1,6 +1,5 @@
 int main(int a) {
     if (true) {
-        printf('t');
         if (a) {
             g;
         } else {

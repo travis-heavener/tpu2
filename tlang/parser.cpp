@@ -189,11 +189,12 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
             default: { // base case, parse as expression
                 // get expression
                 size_t endExpr = i;
-                while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
+                while (endExpr <= endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
                     ++endExpr;
 
                 // verify semicolon is present
-                if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+                std::cout << tokens[i].raw << '\n';
+                if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
                 
                 pHead->push( parseExpression(tokens, i, endExpr-1) );
                 i = endExpr;
