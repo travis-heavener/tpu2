@@ -136,14 +136,14 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
                 default: { // base case, parse as expression
                     // get expression
                     size_t endExpr = i;
-                    do {
+                    while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
                         ++endExpr;
-                    } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
-                    
+
                     // verify semicolon is present
                     if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
                     
-                    pHead->push( parseExpression(tokens, i) )
+                    pHead->push( parseExpression(tokens, i, endExpr-1) );
+                    i = endExpr;
                     break;
                 }
             }
