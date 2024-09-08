@@ -1,13 +1,13 @@
 main:
-    push 175
-    push 1
-    push 137
-    push 46
+    push 10
+    push 8
+    push 0
+    push 16
     pop BH
     pop BL
     pop AH
     pop AL
-    add AX, BX
+    sub AX, BX
     push AL
     push AH
     hlt

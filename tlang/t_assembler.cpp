@@ -106,6 +106,15 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (maxResultSize > 1) outHandle << TAB << "push AH\n";
                     return maxResultSize;
                 }
+                case TokenType::OP_SUB: {
+                    // sub AX/AL to BX/BL
+                    outHandle << TAB << "sub " << regA << ", " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }
