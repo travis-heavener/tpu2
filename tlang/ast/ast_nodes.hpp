@@ -11,7 +11,7 @@ enum class ASTNodeType {
     FUNCTION, VARIABLE, RETURN,
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
-    UNARY_OP, BIN_op,
+    EXPR, UNARY_OP, BIN_OP,
     LIT_BOOL, LIT_CHAR, LIT_DOUBLE, LIT_INT, LIT_NULL
 };
 
@@ -102,6 +102,12 @@ class ASTWhileLoop : public ASTNode {
 
 /************* OPERATIONS *************/
 
+class ASTExpr : public ASTNode {
+    public:
+        ASTExpr(const Token& token) : ASTNode(token) {};
+        ASTNodeType nodeType() const { return ASTNodeType::EXPR; };
+};
+
 class ASTUnaryOp : public ASTNode {
     public:
         ASTUnaryOp(const Token& token) : ASTNode(token), opType(token.type) {};
@@ -116,7 +122,7 @@ class ASTUnaryOp : public ASTNode {
 class ASTBinOp : public ASTNode {
     public:
         ASTBinOp(const Token& token) : ASTNode(token), opType(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::BIN_op; };
+        ASTNodeType nodeType() const { return ASTNodeType::BIN_OP; };
 
         ASTNode* left() { return children[0]; };
         ASTNode* right() { return children[1]; };
