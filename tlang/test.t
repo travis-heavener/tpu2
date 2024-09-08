@@ -5,6 +5,11 @@ int main(int a) {
         } else {
             f;
         }
+
+        // ignore me please
+        while (true || false) {
+            12 + 90;
+        }
     } else if (false || true) {
         true;
     } else {

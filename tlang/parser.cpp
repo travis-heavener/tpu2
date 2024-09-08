@@ -77,7 +77,7 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
 /************************ FOR PARSING SPECIFIC ASTNodes ************************/
 
-void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
     // parse body lines and append to pHead
     for (size_t i = startIndex; i <= endIndex; i++) {
         switch (tokens[i].type) {
@@ -152,8 +152,43 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                 break;
             }
             case TokenType::WHILE: { // parse while-loop
-                // TO-DO implement here
-                throw std::runtime_error("Unimplemented");
+                size_t loopStart = i;
+                // verify next token is LPAREN
+                if (i+1 == endIndex || tokens[++i].type != TokenType::LPAREN)
+                    throw TInvalidTokenException(tokens[i].err);
+
+                // find closing RPAREN
+                size_t parenStart = i;
+                size_t parensOpen = 1;
+                do {
+                    ++i;
+                    if (tokens[i].type == TokenType::LPAREN)
+                        parensOpen++;
+                    else if (tokens[i].type == TokenType::RPAREN)
+                        parensOpen--;
+                } while (parensOpen > 0 && i <= endIndex);
+
+                if (i > endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
+
+                // verify next token is LBRACE
+                if (tokens[++i].type != TokenType::LBRACE)
+                    throw TInvalidTokenException(tokens[i].err);
+
+                // find RBRACE
+                size_t braceStart = i;
+                size_t bracesOpen = 1;
+                do {
+                    ++i;
+                    if (tokens[i].type == TokenType::LBRACE)
+                        bracesOpen++;
+                    else if (tokens[i].type == TokenType::RBRACE)
+                        bracesOpen--;
+                } while (bracesOpen > 0 && i <= endIndex);
+
+                if (i > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
+
+                // parse while loop
+                pHead->push( parseWhileLoop(tokens, loopStart, i) );
                 break;
             }
             case TokenType::RETURN: { // parse return expression
@@ -206,7 +241,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
     }
 }
 
-ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
     // get function name
     const std::string name = tokens[startIndex+1].raw;
 
@@ -244,7 +279,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
     return pHead;
 }
 
-ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
+ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
     if (startIndex > endIndex) throw TInvalidTokenException(tokens[endIndex].err);
 
     ASTNode* pHead = new ASTExpr(tokens[startIndex]);
@@ -424,7 +459,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, si
     return pHead;
 }
 
-ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, size_t globalEndIndex) {
+ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex) {
     ASTNode* pHead = new ASTConditional(tokens[branchIndices[0]]);
 
     try {
@@ -475,5 +510,30 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
         throw e;
     }
 
+    return pHead;
+}
+
+ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+    // create new node
+    ASTWhileLoop* pHead = new ASTWhileLoop(tokens[startIndex]);
+
+    try {
+        // append expression
+        size_t i = startIndex;
+
+        // find LBRACE
+        do { ++i; } while (tokens[i].type != TokenType::LBRACE);
+
+        // parse expression
+        pHead->pExpr = parseExpression( tokens, startIndex+2, i-2); // ignore parenthesis
+
+        // parse body
+        parseBody( pHead, tokens, i+1, endIndex-1 ); // ignore braces
+    } catch (TException& e) {
+        delete pHead;
+        throw e;
+    }
+
+    // return node
     return pHead;
 }
