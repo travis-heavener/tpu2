@@ -19,8 +19,11 @@ enum OPCode {
     NOP         = 0x00,
     HLT         = 0x01,
     SYSCALL     = 0x02,
+    CALL        = 0x03,
     JMP         = 0x04,
     MOV         = 0x05,
+    PUSH        = 0x06,
+    POP         = 0x07,
     ADD         = 0x14,
     SUB         = 0x15,
     MUL         = 0x16,
@@ -87,7 +90,7 @@ constexpr bool isRegister8Bit(Register reg) {
 
 class TPU {
     public:
-        TPU(int clockFreq) : clockFreq(clockFreq) {};
+        TPU(int clockFreq) : clockFreq(clockFreq) { this->reset(); };
         ~TPU() { this->reset(); };
 
         // general purpose registers

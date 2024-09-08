@@ -36,7 +36,6 @@ constexpr bool getParity(u8 n) {
 namespace instructions {
     // execute a syscall, switching on the value in AX
     void executeSyscall(TPU& tpu, Memory& memory) {
-
         // switch on AX register value
         u16 syscallCode = tpu.readRegister16(Register::AX).getValue();
         switch (syscallCode) {
@@ -100,6 +99,10 @@ namespace instructions {
                 break;
             }
         }
+    }
+
+    void processCALL(TPU& tpu, Memory& memory) {
+        
     }
 
     void processJMP(TPU& tpu, Memory& memory) {
@@ -196,6 +199,62 @@ namespace instructions {
                 break;
             }
         }
+    }
+
+    void processPUSH(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u16 pushedValue;
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Pushes the value of an 8-bit register onto the stack.
+                pushedValue = tpu.readRegister8(getRegister8FromCode(tpu.readByte(memory).getValue())).getValue();
+                break;
+            }
+            case 1: { // Pushes an imm8 value onto the stack.
+                pushedValue = tpu.readByte(memory).getValue();
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: push.");
+                break;
+            }
+        }
+
+        // move the stack pointer down
+        u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+        u16 newAddr = oldAddr - 1;
+        tpu.moveToRegister(Register::SP, newAddr);
+
+        // push value onto stack at previous SP address
+        memory[oldAddr] = pushedValue;
+    }
+
+    void processPOP(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+        u16 newAddr = oldAddr + 1;
+        u16 poppedValue = memory[ newAddr ].getValue();
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Pops the last byte off the stack to an 8-bit register.
+                tpu.moveToRegister(getRegister8FromCode(tpu.readByte(memory).getValue()), poppedValue);
+                break;
+            }
+            case 1: break; // Pops the last byte off the stack without storing it.
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: pop.");
+                break;
+            }
+        }
+
+        // move the stack pointer back up
+        tpu.moveToRegister(Register::SP, newAddr);
     }
 
     void processADD(TPU& tpu, Memory& memory) {

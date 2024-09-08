@@ -30,9 +30,15 @@ int main() {
     Memory memory;
 
     // load test program to memory
-    loadFileToMemory("./tests/logic_test.tpu", memory);
+    loadFileToMemory("./tests/stack_test.tpu", memory);
 
     // start the CPU's clock and wait
     tpu.start(memory);
+
+    std::cout << tpu.readRegister16(Register::SP) << '\n';
+    std::cout << tpu.readRegister8(Register::AL) << '\n';
+    std::cout << tpu.readRegister8(Register::BL) << '\n';
+    std::cout << tpu.readRegister8(Register::CL) << '\n';
+
     return 0;
 }

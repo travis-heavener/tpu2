@@ -1,0 +1,12 @@
+; move bytes onto stack
+mov AL, 0x18
+push AL
+push 0x11
+push 0xFF
+
+; pop values off of stack
+pop AL
+pop BL
+pop CL
+
+hlt                             ; stop the clock

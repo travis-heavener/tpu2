@@ -192,6 +192,33 @@ void processLine(std::string& line, Memory& memory, u16& instIndex) {
     } else if (kwd == "mov") {
         checkArgs(args, 2); // check for extra args
         parseMOV(args, memory, instIndex);
+    } else if (kwd == "push") {
+        checkArgs(args, 1); // check for extra args
+        memory[instIndex++] = OPCode::PUSH;
+
+        try { // try as register
+            Register reg = getRegisterFromString(args[0]);
+            if (!isRegister8Bit(reg))
+                throw std::invalid_argument("Expected 8-bit register.");
+            memory[instIndex++] = 0; // MOD byte
+            memory[instIndex++] = reg;
+        } catch (std::invalid_argument&) { // try as imm8
+            u16 arg = std::stoul(args[0]);
+            if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+            memory[instIndex++] = 1; // MOD byte
+            memory[instIndex++] = arg;
+        }
+    } else if (kwd == "pop") {
+        if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
+        memory[instIndex++] = OPCode::POP;
+        memory[instIndex++] = 1 - args.size(); // MOD byte
+
+        if (args.size() == 1) { // verify argument is reg8
+            Register reg = getRegisterFromString(args[0]);
+            if (!isRegister8Bit(reg))
+                throw std::invalid_argument("Expected 8-bit register.");
+            memory[instIndex++] = reg;
+        }
     } else if (kwd == "add" || kwd == "sub" || kwd == "and" || kwd == "or" || kwd == "xor") {
         checkArgs(args, 2); // check for extra args
         OPCode code = kwd == "add" ? OPCode::ADD : kwd == "sub" ? OPCode::SUB :
