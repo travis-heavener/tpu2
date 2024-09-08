@@ -191,10 +191,10 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
         // switch on more complex operators
         switch (line[i]) {
             case '<': {
-                if (line.find("<<", i)) {
+                if (line.find("<<", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "<<", TokenType::OP_LSHIFT));
-                } else if (line.find("<=", i)) {
+                } else if (line.find("<=", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "<=", TokenType::OP_LTE));
                 } else {
@@ -203,10 +203,10 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
                 continue;
             }
             case '>': {
-                if (line.find(">>", i)) {
+                if (line.find(">>", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, ">>", TokenType::OP_RSHIFT));
-                } else if (line.find(">=", i)) {
+                } else if (line.find(">=", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, ">=", TokenType::OP_GTE));
                 } else {
@@ -215,7 +215,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
                 continue;
             }
             case '&': {
-                if (line.find("&&", i)) {
+                if (line.find("&&", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "&&", TokenType::OP_BOOL_AND));
                 } else {
@@ -224,7 +224,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
                 continue;
             }
             case '|': {
-                if (line.find("||", i)) {
+                if (line.find("||", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "||", TokenType::OP_BOOL_OR));
                 } else {
@@ -233,7 +233,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
                 continue;
             }
             case '!': {
-                if (line.find("!=", i)) {
+                if (line.find("!=", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "!=", TokenType::OP_NEQ));
                 } else {
@@ -242,7 +242,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
                 continue;
             }
             case '=': {
-                if (line.find("==", i)) {
+                if (line.find("==", i) == i) {
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "==", TokenType::OP_EQ));
                 } else {
