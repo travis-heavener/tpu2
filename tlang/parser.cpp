@@ -105,9 +105,9 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                                 parensOpen++;
                             else if (tokens[endCond].type == TokenType::RPAREN)
                                 parensOpen--;
-                        } while (parensOpen > 0 && endCond < endIndex);
+                        } while (parensOpen > 0 && endCond <= endIndex);
 
-                        if (endCond == endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
+                        if (endCond > endIndex) throw TUnclosedGroupException(tokens[parenStart].err);
                     }
 
                     // verify next token is LBRACE
@@ -123,9 +123,9 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                             bracesOpen++;
                         else if (tokens[endCond].type == TokenType::RBRACE)
                             bracesOpen--;
-                    } while (bracesOpen > 0 && endCond < endIndex);
+                    } while (bracesOpen > 0 && endCond <= endIndex);
 
-                    if (endCond == endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
+                    if (endCond > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
 
                     // check for else on the same line
                     if (endCond+1 == endIndex || (tokens[endCond+1].type != TokenType::ELSE_IF && tokens[endCond+1].type != TokenType::ELSE)) {
@@ -139,7 +139,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                 }
 
                 // parse conditional
-                parseConditional(tokens, branchIndices, endCond);
+                pHead->push( parseConditional(tokens, branchIndices, endCond) );
                 i = endCond; // jump to end of conditional
                 break;
             }
@@ -162,10 +162,10 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                 size_t endExpr = i;
                 do {
                     ++endExpr;
-                } while (endExpr < endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
+                } while (endExpr <= endIndex && tokens[endExpr].type != TokenType::SEMICOLON);
                 
                 // verify semicolon is present
-                if (endExpr == endIndex) throw TInvalidTokenException(tokens[i].err);
+                if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
 
                 // append expression to pReturn
                 pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
@@ -176,10 +176,10 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, size_t startInd
                 size_t j = i;
                 do {
                     j++;
-                } while (j < endIndex && tokens[j].type != TokenType::BLOCK_COMMENT_END);
+                } while (j <= endIndex && tokens[j].type != TokenType::BLOCK_COMMENT_END);
 
                 // handle unclosed comments
-                if (j == endIndex) throw TUnclosedCommentException(tokens[i].err);
+                if (j > endIndex) throw TUnclosedCommentException(tokens[i].err);
 
                 // jump to end of comment
                 i = j;
@@ -230,7 +230,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
         if (tokens[++i].type != TokenType::LBRACE)
             throw TInvalidTokenException(tokens[i].err);
         
-        // parse body (up to closing brace)
+        // parse body (up to but not including closing brace)
         parseBody(pHead, tokens, i+1, endIndex-1);
     } catch (TException& e) {
         delete pHead; // free & rethrow
@@ -244,17 +244,102 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, size_t startIndex, size
 ASTNode* parseExpression(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex) {
     if (startIndex > endIndex) throw TInvalidTokenException(tokens[endIndex].err);
 
-    ASTNode* pHead = nullptr;
+    ASTNode* pHead = new ASTExpr(tokens[startIndex]);
 
     std::cout << tokens[startIndex].raw << ' ' << tokens[endIndex].raw << '\n';
 
     // iterate through expression
     try {
-        // TO-DO implement here
-        throw std::runtime_error("Unimplemented");
+        // order of operations for expression parsing
+        // (bottom)     -->     -->     -->     -->     -->     -->     -->     (top)
+        // PARENTHESIS, UNARIES, MULT/DIV/MOD, ADD/SUB & INC/DEC, COMPARISON, ASSIGNMENT
+        /**
+         * 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
+         * 2. COMBINE UNARIES
+         * 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
+         * 4. ADD/SUB
+         * 5. COMPARISON
+         * 6. ASSIGNMENT
+        */
+
+        // 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
+        for (size_t i = startIndex; i <= endIndex; i++) {
+            if (tokens[i].type == TokenType::LPAREN) { // find closing parenthesis
+                size_t start = i, parensOpen = 1;
+                while (++i <= endIndex && parensOpen > 0) {
+                    if (tokens[i].type == TokenType::RPAREN)
+                        parensOpen--;
+                    else if (tokens[i].type == TokenType::LPAREN)
+                        parensOpen++;
+                }
+                if (i-- > endIndex) throw TUnclosedGroupException(tokens[start].err);
+
+                pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
+            } else if (tokens[i].type == TokenType::LIT_INT) {
+                pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
+            } else if (tokens[i].type == TokenType::LIT_DOUBLE) {
+                pHead->push( new ASTDoubleLiteral(std::stod(tokens[i].raw), tokens[i]) );
+            } else if (tokens[i].type == TokenType::LIT_CHAR) {
+                std::string str = tokens[i].raw.substr(1); // remove leading quote
+                str.pop_back(); // remove trailing quote
+
+                // prevent char literals that are more than one char
+                if ((str.size() > 1 && str[0] != '\\') || (str.size() > 2))
+                    throw TInvalidTokenException(tokens[i].err);
+
+                char c = str[0] == '\\' ? escapeChar( str ) : str[0]; // escape if needed
+                pHead->push( new ASTCharLiteral(c, tokens[i]) );
+            } else if (tokens[i].type == TokenType::LIT_BOOL) {
+                pHead->push( new ASTBoolLiteral(tokens[i].raw == "true", tokens[i]) );
+            } else if (tokens[i].type == TokenType::VOID) {
+                pHead->push( new ASTVoidLiteral(tokens[i]) );
+            } else if (isTokenUnaryOp(tokens[i].type)) {
+                pHead->push( new ASTUnaryOp(tokens[i]) );
+            } else if (isTokenBinaryOp(tokens[i].type)) {
+                pHead->push( new ASTBinOp(tokens[i]) );
+            } else if (tokens[i].type == TokenType::IDENTIFIER) {
+                pHead->push( new ASTIdentifier(tokens[i].raw, tokens[i]) );
+            } else {
+                throw TInvalidTokenException(tokens[i].err);
+            }
+        }
+
+        // 2. COMBINE UNARIES
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+
+            if (currentNode.getNodeType() == ASTNodeType::UNARY_OP) {
+                // ignore + and - if this is a binary math operation
+                ASTUnaryOp& currentUnary = *static_cast<ASTUnaryOp*>(&currentNode);
+                TokenType opType = currentUnary.getOpTokenType();
+
+                // basically, unary can only work if it's after A) nothing or B) another operator
+                if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) &&
+                    !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
+                                pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
+                    continue;
+                }
+
+                // confirm there is a token after this
+                if (i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+
+                // append next node as child of this
+                currentNode.push( pHead->at(i+1) );
+                pHead->removeChild( i+1 );
+            }
+        }
+
+        // 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
+
+        // 4. ADD/SUB
+
+        // 5. COMPARISON
+
+        // 6. ASSIGNMENT
+
     } catch (TException& e) {
         // free & rethrow
-        if (pHead != nullptr) delete pHead;
+        delete pHead;
         throw e;
     }
 
@@ -275,9 +360,10 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
             // parse condition
             size_t bodyStart = startIndex + 2; // base case, after LBRACE
             const Token& startToken = tokens[startIndex];
+            ASTNode* pNode;
             if (startToken.type != TokenType::ELSE) {
                 // append conditional node
-                ASTNode* pNode = startToken.type == TokenType::IF ?
+                pNode = startToken.type == TokenType::IF ?
                                     (ASTNode*) new ASTIfCondition(startToken) : (ASTNode*) new ASTElseIfCondition(startToken);
                 pHead->push( pNode );
 
@@ -297,14 +383,17 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
 
                 // offset the body token position
                 bodyStart = openBrace+1;
+            } else {
+                pNode = new ASTElseCondition(startToken);
+                pHead->push( pNode );
             }
 
-            // parse the body
-            parseBody(pHead, tokens, bodyStart, endIndex);
+            // parse the body (up to but not including closing brace)
+            parseBody(pNode, tokens, bodyStart, endIndex-1);
         }
     } catch (TException& e) {
         // free & rethrow
-        if (pHead != nullptr) delete pHead;
+        delete pHead;
         throw e;
     }
 

@@ -40,7 +40,7 @@ class ASTNode {
 class ASTReturn : public ASTNode {
     public:
         ASTReturn(const Token& token) : ASTNode(token) {};
-        ASTNodeType nodeType() const { return ASTNodeType::RETURN; };
+        ASTNodeType getNodeType() const { return ASTNodeType::RETURN; };
 };
 
 /************* CONDITIONALS *************/
@@ -48,20 +48,14 @@ class ASTReturn : public ASTNode {
 class ASTConditional : public ASTNode {
     public:
         ASTConditional(const Token& token) : ASTNode(token) {};
-        ~ASTConditional();
-        ASTNodeType nodeType() const { return ASTNodeType::CONDITIONAL; };
-
-        void addBranch(ASTNode* pBranch) { branches.push_back(pBranch); };
-        const std::vector<ASTNode*> getBranches() const { return branches; };
-    private:
-        std::vector<ASTNode*> branches;
+        ASTNodeType getNodeType() const { return ASTNodeType::CONDITIONAL; };
 };
 
 class ASTIfCondition : public ASTNode {
     public:
         ASTIfCondition(const Token& token) : ASTNode(token) {};
         ~ASTIfCondition();
-        ASTNodeType nodeType() const { return ASTNodeType::IF_CONDITION; };
+        ASTNodeType getNodeType() const { return ASTNodeType::IF_CONDITION; };
         ASTNode* pExpr; // the internal expression for this if-statement
 };
 
@@ -69,14 +63,14 @@ class ASTElseIfCondition : public ASTNode {
     public:
         ASTElseIfCondition(const Token& token) : ASTNode(token) {};
         ~ASTElseIfCondition();
-        ASTNodeType nodeType() const { return ASTNodeType::ELSE_IF_CONDITION; };
+        ASTNodeType getNodeType() const { return ASTNodeType::ELSE_IF_CONDITION; };
         ASTNode* pExpr; // the internal expression for this else-if-statement
 };
 
 class ASTElseCondition : public ASTNode {
     public:
         ASTElseCondition(const Token& token) : ASTNode(token) {};
-        ASTNodeType nodeType() const { return ASTNodeType::ELSE_CONDITION; };
+        ASTNodeType getNodeType() const { return ASTNodeType::ELSE_CONDITION; };
 };
 
 /************* LOOPS *************/
@@ -85,7 +79,7 @@ class ASTForLoop : public ASTNode {
     public:
         ASTForLoop(const Token& token) : ASTNode(token) {};
         ~ASTForLoop();
-        ASTNodeType nodeType() const { return ASTNodeType::FOR_LOOP; };
+        ASTNodeType getNodeType() const { return ASTNodeType::FOR_LOOP; };
         
         ASTNode* pExprA; // the initial expression
         ASTNode* pExprB; // the condition expression
@@ -96,7 +90,7 @@ class ASTWhileLoop : public ASTNode {
     public:
         ASTWhileLoop(const Token& token) : ASTNode(token) {};
         ~ASTWhileLoop();
-        ASTNodeType nodeType() const { return ASTNodeType::WHILE_LOOP; };
+        ASTNodeType getNodeType() const { return ASTNodeType::WHILE_LOOP; };
         ASTNode* pExpr; // the condition expression
 };
 
@@ -105,16 +99,16 @@ class ASTWhileLoop : public ASTNode {
 class ASTExpr : public ASTNode {
     public:
         ASTExpr(const Token& token) : ASTNode(token) {};
-        ASTNodeType nodeType() const { return ASTNodeType::EXPR; };
+        ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
 };
 
 class ASTUnaryOp : public ASTNode {
     public:
         ASTUnaryOp(const Token& token) : ASTNode(token), opType(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::UNARY_OP; };
+        ASTNodeType getNodeType() const { return ASTNodeType::UNARY_OP; };
         
         ASTNode* right() { return children[0]; };
-        TokenType opTokenType() { return opType; };
+        TokenType getOpTokenType() { return opType; };
     private:
         TokenType opType;
 };
@@ -122,11 +116,11 @@ class ASTUnaryOp : public ASTNode {
 class ASTBinOp : public ASTNode {
     public:
         ASTBinOp(const Token& token) : ASTNode(token), opType(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::BIN_OP; };
+        ASTNodeType getNodeType() const { return ASTNodeType::BIN_OP; };
 
         ASTNode* left() { return children[0]; };
         ASTNode* right() { return children[1]; };
-        TokenType opTokenType() { return opType; };
+        TokenType getOpTokenType() { return opType; };
     private:
         TokenType opType;
 };
@@ -137,7 +131,7 @@ typedef std::pair<std::string, TokenType> param_t;
 class ASTFunction : public ASTNode {
     public:
         ASTFunction(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::FUNCTION; };
+        ASTNodeType getNodeType() const { return ASTNodeType::FUNCTION; };
         void appendParam(const param_t p) {  params.push_back(p);  };
 
         const std::string& getName() const { return name; };
@@ -153,7 +147,7 @@ class ASTFunction : public ASTNode {
 class ASTIdentifier : public ASTNode {
     public:
         ASTIdentifier(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
-        ASTNodeType nodeType() const { return ASTNodeType::IDENTIFIER; };
+        ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
     private:
         std::string name; // name of variable
         TokenType type; // type of variable
@@ -162,35 +156,35 @@ class ASTIdentifier : public ASTNode {
 class ASTBoolLiteral : public ASTNode {
     public:
         ASTBoolLiteral(bool val, const Token& token) : ASTNode(token), val(val) {};
-        ASTNodeType nodeType() const { return ASTNodeType::LIT_BOOL; };
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_BOOL; };
         bool val;
 };
 
 class ASTCharLiteral : public ASTNode {
     public:
         ASTCharLiteral(char val, const Token& token) : ASTNode(token), val(val) {};
-        ASTNodeType nodeType() const { return ASTNodeType::LIT_CHAR; };
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_CHAR; };
         char val;
 };
 
 class ASTDoubleLiteral : public ASTNode {
     public:
         ASTDoubleLiteral(double val, const Token& token) : ASTNode(token), val(val) {};
-        ASTNodeType nodeType() const { return ASTNodeType::LIT_DOUBLE; };
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_DOUBLE; };
         double val;
 };
 
 class ASTIntLiteral : public ASTNode {
     public:
         ASTIntLiteral(int val, const Token& token) : ASTNode(token), val(val) {};
-        ASTNodeType nodeType() const { return ASTNodeType::LIT_INT; };
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_INT; };
         int val;
 };
 
 class ASTVoidLiteral : public ASTNode {
     public:
         ASTVoidLiteral(const Token& token) : ASTNode(token) {};
-        ASTNodeType nodeType() const { return ASTNodeType::LIT_VOID; };
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_VOID; };
 };
 
 #endif

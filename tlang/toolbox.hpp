@@ -40,6 +40,14 @@ char escapeChar(const std::string&);
 // returns true if the given TokenType is that of a type name (ex. TYPE_INT)
 bool isTokenTypeName(TokenType);
 
+// token helpers
+bool isTokenPrimitiveType(const TokenType);
+bool isTokenUnaryOp(const TokenType);
+bool isTokenBinaryOp(const TokenType);
+bool isTokenLiteral(const TokenType);
+bool isTokenCompOp(const TokenType);
+bool isTokenAssignOp(const TokenType);
+
 // for error handling
 typedef unsigned long long line_t; // for line/col numbering
 

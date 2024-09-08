@@ -12,16 +12,6 @@ ASTNode* ASTNode::removeChild(size_t i) {
     return pNode;
 }
 
-ASTConditional::~ASTConditional() {
-    // free branches
-    for (ASTNode* pBranch : this->branches)
-        delete pBranch;
-
-    // free children
-    for (ASTNode* pChild : this->children)
-        delete pChild;
-}
-
 ASTIfCondition::~ASTIfCondition() {
     // free condition
     delete this->pExpr;
