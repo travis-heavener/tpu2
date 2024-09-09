@@ -1,18 +1,9 @@
 main:
-    push 99
-    push 0
-    push 19
+    push 1
     push 0
     pop AH
     pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop BH
-    pop BL
-    pop AH
-    pop AL
-    add AX, BX
+    not AX
     push AL
     push AH
     hlt

@@ -111,6 +111,15 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (resultSize > 1) outHandle << TAB << "push AH\n";
                     return resultSize;
                 }
+                case TokenType::OP_BIT_NOT: {
+                    // flip all bits
+                    outHandle << TAB << "not " << regA << '\n';
+                    
+                    // push values to stack
+                    outHandle << TAB << "push AL\n";
+                    if (resultSize > 1) outHandle << TAB << "push AH\n";
+                    return resultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }
