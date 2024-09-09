@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
     // start the CPU's clock and wait
     tpu.start(memory);
 
-    std::cout << tpu.readRegister16(Register::AX) << '\n';
+    std::cout << tpu.readRegister16(Register::DX) << ' ' << tpu.readRegister16(Register::AX) << '\n';
 
     return 0;
 }

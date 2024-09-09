@@ -1,13 +1,13 @@
 main:
-    push 10
-    push 8
+    push 149
+    push 41
+    push 38
     push 0
-    push 16
     pop BH
     pop BL
     pop AH
     pop AL
-    sub AX, BX
+    div BX
     push AL
     push AH
     hlt

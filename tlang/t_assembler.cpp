@@ -115,6 +115,37 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (maxResultSize > 1) outHandle << TAB << "push AH\n";
                     return maxResultSize;
                 }
+                case TokenType::OP_MUL: {
+                    // mul by BX/BL
+                    outHandle << TAB << "mul " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n" << TAB << "push AH\n";
+                    if (maxResultSize > 1) // uses AX as lower and DX as upper
+                        outHandle << TAB << "push DL\n" << TAB << "push DH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_DIV: {
+                    // div by BX/BL
+                    outHandle << TAB << "div " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) // uses AX as result and DX as remainder in 16-bit mode
+                        outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_MOD: {
+                    // get mod from div by BX/BL
+                    outHandle << TAB << "div " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    if (maxResultSize > 1) // uses AX as result and DX as remainder in 16-bit mode
+                        outHandle << TAB << "push DL\n" << TAB << "push DH\n";
+                    else
+                        outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }
@@ -164,7 +195,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
             return resultSizes[0];
         }
         default: {
-            throw std::invalid_argument("Invalid node type in assembleExpression!\n" + std::to_string((int)bodyNode.getNodeType()));
+            throw std::invalid_argument("Invalid node type in assembleExpression!");
         }
     }
 }
