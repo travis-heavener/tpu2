@@ -217,6 +217,40 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (maxResultSize > 1) outHandle << TAB << "push AH\n";
                     return maxResultSize;
                 }
+                case TokenType::OP_EQ: {
+                    // if A ^ B is zero, equal
+                    const std::string labelEQ = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
+
+                    outHandle << TAB << "jz " << labelEQ << '\n';
+                    outHandle << TAB << "mov " << regA << ", 0\n"; // non-zero becomes 0
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
+
+                    outHandle << TAB << labelEQ << ":\n";
+                    outHandle << TAB << "mov " << regA << ", 1\n"; // zero becomes 1
+                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_NEQ: {
+                    // if A ^ B is zero, equal (keep as 0)
+                    const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
+                    outHandle << TAB << "jz " << labelMerger << '\n';
+                    outHandle << TAB << "mov " << regA << ", 1\n"; // non-zero becomes 1
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }

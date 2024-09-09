@@ -1,23 +1,17 @@
 main:
     push 28
     push 16
-    push 1
-    push 0
+    push 28
+    push 16
     pop BH
     pop BL
     pop AH
     pop AL
-    or AX, 0
+    xor AX, BX
     jz __J0
     mov AX, 1
     jmp __J0
     __J0:
-    or BX, 0
-    jz __J1
-    mov BX, 1
-    jmp __J1
-    __J1:
-    and AX, BX
     push AL
     push AH
     hlt
