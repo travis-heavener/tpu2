@@ -34,5 +34,6 @@ MAKE_EXCEPTION(UnclosedQuote)
 MAKE_EXCEPTION(InvalidEscape)
 MAKE_EXCEPTION(UnclosedComment)
 MAKE_EXCEPTION(UnknownIdentifier)
+MAKE_EXCEPTION(IdentifierInUse)
 
 #endif

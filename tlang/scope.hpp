@@ -26,7 +26,7 @@ class Scope {
         ~Scope() { for (ScopeVariable* pVar : children) delete pVar; }
 
         bool doesVarExist(const std::string&) const;
-        size_t declareVariable(TokenType, const std::string&);
+        size_t declareVariable(TokenType, const std::string&, ErrInfo);
         size_t pop();
         size_t size() const { return children.size(); }
         size_t getOffset(const std::string&, ErrInfo) const;

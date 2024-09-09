@@ -9,7 +9,9 @@ bool Scope::doesVarExist(const std::string& name) const {
     return false;
 }
 
-size_t Scope::declareVariable(TokenType type, const std::string& name) {
+size_t Scope::declareVariable(TokenType type, const std::string& name, ErrInfo err) {
+    if (this->doesVarExist(name))
+        throw TIdentifierInUseException(err);
     ScopeVariable* pVar = new ScopeVariable(type, name);
     this->children.push_back(pVar);
     return getSizeOfType(type);
