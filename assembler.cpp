@@ -13,6 +13,7 @@
 
 // abstractions from processLine for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
+void parseRMOV(const std::vector<std::string>&, Memory&, u16&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
@@ -253,6 +254,9 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
     } else if (kwd == "ret") {
         checkArgs(args, 0); // check for extra args
         memory[instIndex++] = OPCode::RET;
+    } else if (kwd == "rmov") {
+        checkArgs(args, 2); // check for extra args
+        parseRMOV(args, memory, instIndex);
     } else if (kwd == "add" || kwd == "sub" || kwd == "and" || kwd == "or" || kwd == "xor") {
         checkArgs(args, 2); // check for extra args
         OPCode code = kwd == "add" ? OPCode::ADD : kwd == "sub" ? OPCode::SUB :
@@ -358,6 +362,58 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
     memory[instIndex++] = OPCode::MOV;
     memory[instIndex++] = MOD;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
+}
+
+void parseRMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    memory[instIndex++] = OPCode::RMOV;
+
+    // determine MOD byte
+    if (args[0][0] == '$') {
+        // verify address
+        if (args[0].size() == 1 || args[0][1] != '-')
+            throw std::invalid_argument("Malformed relative address ($-n) for RMOV.");
+        
+        // extract relative address
+        u32 relativeAddress = std::stoul(args[0].substr(2));
+        if (relativeAddress > 0xFFFF) throw std::invalid_argument("Expected 16-bit offset.");
+
+        try { // try as register (1)
+            Register srcReg = getRegisterFromString(args[1]);
+            if (!isRegister8Bit(srcReg)) throw std::invalid_argument("Expected 8-bit register.");
+
+            memory[instIndex++] = 0; // MOD byte
+            memory[instIndex++] = relativeAddress & 0x00FF;
+            memory[instIndex++] = (relativeAddress & 0xFF00) >> 8;
+            memory[instIndex++] = srcReg;
+        } catch (std::invalid_argument&) { // try as imm8
+            memory[instIndex++] = 1; // MOD byte
+            memory[instIndex++] = relativeAddress & 0x00FF;
+            memory[instIndex++] = (relativeAddress & 0xFF00) >> 8;
+
+            // get imm8 value
+            u16 value = std::stoul(args[1]);
+            if (value > 0xFF) throw std::invalid_argument("Expected 8-bit value.");
+            memory[instIndex++] = value & 0xFF;
+        }
+    } else if (args[1][0] == '$') {
+        Register destReg = getRegisterFromString(args[0]);
+        if (!isRegister8Bit(destReg)) throw std::invalid_argument("Expected 8-bit register.");
+
+        memory[instIndex++] = 2; // MOD byte
+        memory[instIndex++] = destReg;
+
+        // verify address
+        if (args[1].size() == 1 || args[1][1] != '-')
+            throw std::invalid_argument("Malformed relative address ($-n) for RMOV.");
+        
+        // extract relative address
+        u32 relativeAddress = std::stoul(args[1].substr(2));
+        if (relativeAddress > 0xFFFF) throw std::invalid_argument("Expected 16-bit offset.");
+        memory[instIndex++] = relativeAddress & 0x00FF;
+        memory[instIndex++] = (relativeAddress & 0xFF00) >> 8;
+    } else {
+        throw std::invalid_argument("Expected relative address ($-n) for RMOV, got none.");
+    }
 }
 
 // ADD, SUB, AND, OR, and XOR all use the same argument & MOD byte patterns

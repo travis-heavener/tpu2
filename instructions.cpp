@@ -287,6 +287,38 @@ namespace instructions {
         tpu.moveToRegister(Register::IP, tpu.readRegister16(Register::BP).getValue());
     }
 
+    void processRMOV(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Performs a relative move of imm8 to an address based off the stack pointer's offset.
+                // extract address
+                u16 destAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
+                memory[destAddr] = tpu.readByte(memory);
+                break;
+            }
+            case 1: { // Performs a relative move of 8-bit register value to an address based off the stack pointer's offset.
+                // extract address
+                u16 destAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
+                memory[destAddr] = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) );
+                break;
+            }
+            case 2: { // Performs a relative move into an 8-bit register from an address based off the stack pointer's offset.
+                Register destReg = getRegister8FromCode( tpu.readByte(memory).getValue() );
+                u16 srcAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
+                tpu.moveToRegister( destReg, memory[srcAddr].getValue() );
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: rmov.");
+                break;
+            }
+        }
+    }
+
     void processADD(TPU& tpu, Memory& memory) {
         // determine operands from mod byte
         Byte mod = tpu.readByte(memory);

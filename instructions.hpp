@@ -13,6 +13,7 @@ namespace instructions {
     void processPUSH(TPU& tpu, Memory& memory);
     void processPOP(TPU& tpu, Memory& memory);
     void processRET(TPU& tpu, Memory& memory);
+    void processRMOV(TPU& tpu, Memory& memory);
     void processADD(TPU& tpu, Memory& memory);
     void processSUB(TPU& tpu, Memory& memory);
     void processMUL(TPU& tpu, Memory& memory);

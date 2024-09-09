@@ -29,6 +29,10 @@ pop                         0x07 /1         Pops the last byte off the stack wit
 
 ret                         0x08            Revert the instruction pointer to the previous memory address stored in the base pointer.
 
+rmov $-offset, imm8         0x09 /0         Performs a relative move of imm8 to an address based off the stack pointer's offset.
+rmov $-offset, reg          0x09 /1         Performs a relative move of 8-bit register value to an address based off the stack pointer's offset.
+rmov reg, $-offset          0x09 /2         Performs a relative move into an 8-bit register from an address based off the stack pointer's offset.
+
 add reg, imm8               0x14 /0         Adds 8-bit register and imm8 and stores in first operand.
 add reg, imm16              0x14 /1         Adds 16-bit register and imm16 and stores in first operand.
 add reg, reg                0x14 /2         Adds two 8-bit registers and stores in first operand.

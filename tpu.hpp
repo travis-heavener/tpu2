@@ -45,6 +45,7 @@ enum OPCode {
     PUSH        = 0x06,
     POP         = 0x07,
     RET         = 0x08,
+    RMOV        = 0x09,
     ADD         = 0x14,
     SUB         = 0x15,
     MUL         = 0x16,

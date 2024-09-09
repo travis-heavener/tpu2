@@ -162,6 +162,11 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since TPU has just completed an operation
             break;
         }
+        case OPCode::RMOV: {
+            instructions::processRMOV(*this, memory);
+            this->sleep(); // wait since TPU has just completed an operation
+            break;
+        }
         case OPCode::ADD: {
             instructions::processADD(*this, memory);
             this->sleep(); // wait since TPU has just completed an operation
