@@ -374,7 +374,7 @@ void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16&
     try { // try second operand as register
         Register regB = getRegisterFromString(args[1]);
         bool isRegB8 = isRegister8Bit(regB); // prevent register mismatch
-        if (isRegA8 != isRegB8) throw std::invalid_argument("8-bit and 16-bit register mismatch.");
+        if (isRegA8 != isRegB8) throw std::runtime_error("8-bit and 16-bit register mismatch.");
         MOD = isRegA8 ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
         bytesToWrite.push_back(regB); // src
     } catch (std::invalid_argument&) { // try as imm8/16
@@ -442,7 +442,7 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
     try { // try as register
         Register reg = getRegisterFromString(args[0]);
         if (!isRegister8Bit(reg))
-            throw std::invalid_argument("Expected 8-bit register.");
+            throw std::runtime_error("Expected 8-bit register.");
         memory[instIndex++] = 0; // MOD byte
         memory[instIndex++] = reg;
     } catch (std::invalid_argument&) { // try as imm8
@@ -470,11 +470,20 @@ void parseBitShifts(const std::vector<std::string>& args, Memory& memory, u16& i
 
     // get register
     Register reg = getRegisterFromString(args[0]);
-    memory[instIndex++] = !isRegister8Bit(reg); // MOD byte
+    size_t modByteAddr = instIndex++;
+    memory[modByteAddr] = !isRegister8Bit(reg); // MOD byte
     memory[instIndex++] = reg;
 
-    // get imm8
-    u16 arg = std::stoul(args[1]);
-    if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-    memory[instIndex++] = (u8)arg;
+    // try as register
+    try {
+        Register regB = getRegisterFromString(args[1]);
+        memory[modByteAddr] = memory[modByteAddr].getValue() + 2; // update MOD byte
+        if (!isRegister8Bit(regB))
+            throw std::runtime_error("Expected 8-bit register.");
+        memory[instIndex++] = regB;
+    } catch (std::invalid_argument&) { // get imm8
+        u16 arg = std::stoul(args[1]);
+        if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+        memory[instIndex++] = (u8)arg;
+    }
 }

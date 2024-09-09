@@ -825,7 +825,19 @@ namespace instructions {
             }
             case 1: { // Shifts the value in the given 16-bit register left imm8 times in place.
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 8) );
+                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 16) );
+                break;
+            }
+            case 2: { // Shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), A << std::min((int)numShifts, 8) );
+                break;
+            }
+            case 3: { // Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 16) );
                 break;
             }
             default: {
@@ -851,7 +863,19 @@ namespace instructions {
             }
             case 1: { // Shifts the value in the given 16-bit register right imm8 times in place.
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 8) );
+                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 16) );
+                break;
+            }
+            case 2: { // Shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), A >> std::min((int)numShifts, 8) );
+                break;
+            }
+            case 3: { // Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 16) );
                 break;
             }
             default: {

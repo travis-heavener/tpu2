@@ -1,5 +1,6 @@
 main:
     ; move value into AX and shift it
     mov AX, 0x100
-    shr AX, 4
+    mov BX, 1
+    shr AX, BL
     hlt
