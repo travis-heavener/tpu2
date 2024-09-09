@@ -8,7 +8,10 @@
 
 #define FUNC_MAIN_LABEL "main"
 #define FUNC_LABEL_PREFIX "__UF" // for "user function"
+#define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
 #define TAB "    "
+
+static size_t nextJMPLabelID = 0;
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
@@ -23,7 +26,7 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
         ASTFunction& funcNode = *static_cast<ASTFunction*>(pFunc);
         const std::string funcName = funcNode.getName();
         const std::string labelName = funcName == FUNC_MAIN_LABEL ?
-            FUNC_MAIN_LABEL : FUNC_LABEL_PREFIX + nextFunctionID++;
+            FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFunctionID++));
 
         // record function name
         labelMap[funcName] = labelName;
@@ -164,6 +167,50 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                 }
                 case TokenType::OP_BIT_XOR: {
                     outHandle << TAB << "xor " << regA << ", " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_BOOL_OR: {
+                    outHandle << TAB << "or " << regA << ", " << regB << '\n';
+
+                    // if ZF is cleared, expression is true (set to 1)
+                    const std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
+                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
+                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_BOOL_AND: {
+                    // if either one is zero, boolean and is false
+
+                    // put 0 into regA if zero, 1 otherwise
+                    // if ZF is set, set regA (non-zero -> 1)
+                    std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "or " << regA << ", 0\n"; // sets ZF if 0
+                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
+                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
+                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+
+                    // put 0 into regB if zero, 1 otherwise
+                    // if ZF is set, set regB (non-zero -> 1)
+                    labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "or " << regB << ", 0\n"; // sets ZF if 0
+                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
+                    outHandle << TAB << "mov " << regB << ", 1\n";
+                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
+                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+
+                    // push regA & regB (0b0 & 0b1 or some combination)
+                    outHandle << TAB << "and " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
