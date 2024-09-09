@@ -1,0 +1,38 @@
+main:
+    ; print if two numbers are equal or not
+    mov AX, 0x1459          ; number A
+    mov BX, 0x1459          ; number B
+
+    sub AX, BX              ; compare (if equal, ZF is set)
+    mov BX, SP              ; store stack ptr (start of output)
+    jz true
+    
+    ; not equal
+    push 'N'
+    push 'o'
+    push 't'
+    push ' '
+    push 'e'
+    push 'q'
+    push 'u'
+    push 'a'
+    push 'l'
+    push '!'
+    jmp next                ; continue on
+    
+    true:                   ; equal
+    push 'E'
+    push 'q'
+    push 'u'
+    push 'a'
+    push 'l'
+    push '!'
+    jmp next                ; continue on
+
+    next:
+    push '\n'
+    mov CX, SP              ; get length of output string
+    sub CX, BX
+    mov AX, 0               ; type of syscall
+    syscall
+    hlt

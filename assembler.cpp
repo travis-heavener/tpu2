@@ -152,13 +152,28 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     u16 instIndex = FREE_LOWER_ADDR;
     std::string line;
     std::map<std::string, u16> labelMap; // label name, start address
+    
+    // for labels that come after instIndex
+    std::vector<std::pair<std::string, u16>> labelsToReplace; // [ label name, replacement start address ]
+    
     while (std::getline(inHandle, line)) {
-        processLine(line, memory, instIndex, labelMap); // process the line
+        processLine(line, memory, instIndex, labelMap, labelsToReplace); // process the line
     }
 
     // jump to mainEntryAddr
     if (labelMap.count(MAIN_LABEL_NAME) == 0)
         throw std::invalid_argument("No main label found in file.");
+
+    // fill in any labels with addresses
+    for (auto labelPair : labelsToReplace) {
+        if (labelMap.count(labelPair.first) == 0)
+            throw std::invalid_argument("Could not find label: " + labelPair.first);
+        
+        u16 destAddr = labelMap[labelPair.first];
+        u16 addr = labelPair.second;
+        memory[ addr ] = destAddr & 0x00FF;
+        memory[addr+1] = (destAddr & 0xFF00) >> 8;
+    }
 
     u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME);
     memory[INSTRUCTION_PTR_START] = OPCode::JMP;
@@ -171,7 +186,8 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
 }
 
 // process an individual line and load it into memory
-void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std::string, u16>& labelMap) {
+void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std::string, u16>& labelMap,
+                 std::vector<std::pair<std::string, u16>>& labelsToReplace) {
     stripComments(line); // remove comments
     trimString(line); // ltrim & rtrim string
 
@@ -200,23 +216,30 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
         memory[instIndex++] = OPCode::CALL;
 
         // get address of label from map
-        if (labelMap.count(args[0]) == 0)
-            throw std::invalid_argument("Label \"" + args[0] + "\" is not defined or is defined later.");
-        
-        u16 destAddr = labelMap[args[0]];
-        memory[instIndex++] = destAddr & 0x00FF; // lower-half
-        memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
-    } else if (kwd == "jmp" || kwd == "jz" || kwd == "jnz") {
+        if (labelMap.count(args[0]) == 0) {
+            u16 startAddr = instIndex;
+            instIndex += 2; // make space for address
+            labelsToReplace.push_back({args[0], startAddr});
+        } else {
+            u16 destAddr = labelMap[args[0]];
+            memory[instIndex++] = destAddr & 0x00FF; // lower-half
+            memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
+        }
+    } else if (kwd == "jmp" || kwd == "jz" || kwd == "jnz" || kwd == "jc" || kwd == "jnc") {
         checkArgs(args, 1); // check for extra args
         memory[instIndex++] = OPCode::JMP;
-        memory[instIndex++] = kwd == "jmp" ? 0 : kwd == "jz" ? 1 : 2; // MOD byte
+        memory[instIndex++] = kwd == "jmp" ? 0 : kwd == "jz" ? 1 : kwd == "jnz" ? 2 : kwd == "jc" ? 3 : 4; // MOD byte
 
-        // verify address argument
-        if (args[0][0] != '@') throw std::invalid_argument("Expected memory address.");
-
-        u16 addr = std::stoul(args[0]);
-        memory[instIndex++] = addr & 0x00FF; // lower half
-        memory[instIndex++] = (addr & 0xFF00) >> 8; // upper half
+        // get address of label from map
+        if (labelMap.count(args[0]) == 0) {
+            u16 startAddr = instIndex;
+            instIndex += 2; // make space for address
+            labelsToReplace.push_back({args[0], startAddr});
+        } else {
+            u16 destAddr = labelMap[args[0]];
+            memory[instIndex++] = destAddr & 0x00FF; // lower-half
+            memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
+        }
     } else if (kwd == "mov") {
         checkArgs(args, 2); // check for extra args
         parseMOV(args, memory, instIndex);
