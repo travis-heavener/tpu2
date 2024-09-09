@@ -251,6 +251,46 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (maxResultSize > 1) outHandle << TAB << "push AH\n";
                     return maxResultSize;
                 }
+                case TokenType::OP_LT: {
+                    // if A < B, B-A will have carry and zero cleared
+                    outHandle << TAB << "sub " << regB << ", " << regA << '\n';
+
+                    const std::string labelGTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "jz " << labelGTE << '\n'; // zero is set, A == B
+                    outHandle << TAB << "jc " << labelGTE << '\n'; // carry is set, A > B
+                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // carry is set, A > B
+                    outHandle << TAB << labelGTE << ":\n"; // set regA to 0
+                    outHandle << TAB << "mov " << regA << ", 0\n"; // set regA to 1
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // carry is set, A > B
+                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_GT: {
+                    // if A > B, A-B will have carry and zero cleared
+                    outHandle << TAB << "sub " << regA << ", " << regB << '\n';
+
+                    const std::string labelGTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    outHandle << TAB << "jz " << labelGTE << '\n'; // zero is set, A == B
+                    outHandle << TAB << "jc " << labelGTE << '\n'; // carry is set, A > B
+                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // carry is set, A > B
+                    outHandle << TAB << labelGTE << ":\n"; // set regA to 0
+                    outHandle << TAB << "mov " << regA << ", 0\n"; // set regA to 1
+                    outHandle << TAB << "jmp " << labelMerger << '\n'; // carry is set, A > B
+                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }
