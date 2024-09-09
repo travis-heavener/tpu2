@@ -86,7 +86,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 }
                 
                 // add variable to scope
-                scope.declareVariable(varType, varChild.pIdentifier->raw, varChild.err);
+                scope.declareVariable(varType, varChild.pIdentifier->raw, varChild.pIdentifier->err);
                 break;
             }
             case ASTNodeType::EXPR: {
