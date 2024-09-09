@@ -808,4 +808,56 @@ namespace instructions {
             }
         }
     }
+
+    void processSHL(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u8 opA = tpu.readByte(memory).getValue();
+        u8 numShifts = tpu.readByte(memory).getValue();
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Shifts the value in the given 8-bit register left imm8 times in place.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), A << std::min((int)numShifts, 8) );
+                break;
+            }
+            case 1: { // Shifts the value in the given 16-bit register left imm8 times in place.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 8) );
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: shl.");
+                break;
+            }
+        }
+    }
+
+    void processSHR(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u8 opA = tpu.readByte(memory).getValue();
+        u8 numShifts = tpu.readByte(memory).getValue();
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Shifts the value in the given 8-bit register right imm8 times in place.
+                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister8FromCode(opA), A >> std::min((int)numShifts, 8) );
+                break;
+            }
+            case 1: { // Shifts the value in the given 16-bit register right imm8 times in place.
+                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 8) );
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: shr.");
+                break;
+            }
+        }
+    }
 }
