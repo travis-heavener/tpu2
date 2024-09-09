@@ -371,14 +371,17 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         // 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
         for (size_t i = startIndex; i <= endIndex; i++) {
             if (tokens[i].type == TokenType::LPAREN) { // find closing parenthesis
+                if (i+1 > endIndex) throw TUnclosedGroupException(tokens[i].err);
+
                 size_t start = i, parensOpen = 1;
-                while (++i <= endIndex && parensOpen > 0) {
-                    if (tokens[i].type == TokenType::RPAREN)
+                do {
+                    if (tokens[++i].type == TokenType::RPAREN)
                         parensOpen--;
                     else if (tokens[i].type == TokenType::LPAREN)
                         parensOpen++;
-                }
-                if (i-- > endIndex) throw TUnclosedGroupException(tokens[start].err);
+                } while (i <= endIndex && parensOpen > 0);
+
+                if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
                 pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
             } else if (tokens[i].type == TokenType::LIT_INT) {

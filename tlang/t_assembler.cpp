@@ -126,10 +126,9 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     outHandle << TAB << "mul " << regB << '\n';
 
                     // push result to stack (lowest-first)
+                    // max size is 16-bit so just ignore overflow
                     outHandle << TAB << "push AL\n" << TAB << "push AH\n";
-                    if (maxResultSize > 1) // uses AX as lower and DX as upper
-                        outHandle << TAB << "push DL\n" << TAB << "push DH\n";
-                    return maxResultSize;
+                    return 2;
                 }
                 case TokenType::OP_DIV: {
                     // div by BX/BL

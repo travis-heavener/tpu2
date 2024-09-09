@@ -1,8 +1,26 @@
 main:
     push 164
     push 0
+    push 1
+    push 0
     push 2
     push 0
+    push 1
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    mul BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
     pop BH
     pop BL
     pop AH
