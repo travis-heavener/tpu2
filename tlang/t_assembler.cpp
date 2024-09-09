@@ -120,6 +120,26 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     if (resultSize > 1) outHandle << TAB << "push AH\n";
                     return resultSize;
                 }
+                case TokenType::OP_BOOL_NOT: {
+                    // set non-zero to zero, zero to 1
+                    const std::string labelZero = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelMerge = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                    outHandle << TAB << "add " << regA << ", 0\n";
+                    outHandle << TAB << "jz " << labelZero << '\n'; // zero, set to 1
+                    outHandle << TAB << "mov " << regA << ", 0\n"; // currently non-zero, set to 0
+                    outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
+
+                    outHandle << TAB << labelZero << ":\n"; // currently zero, set to 1
+                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
+                    outHandle << TAB << labelMerge << ":\n"; // reconvene branches
+
+                    // push values to stack
+                    outHandle << TAB << "push AL\n";
+                    if (resultSize > 1) outHandle << TAB << "push AH\n";
+                    return resultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }

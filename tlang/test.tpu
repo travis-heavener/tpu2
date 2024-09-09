@@ -3,7 +3,17 @@ main:
     push 0
     pop AH
     pop AL
-    not AX
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
     push AL
     push AH
     hlt

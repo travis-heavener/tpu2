@@ -414,7 +414,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         }
 
         // 2. COMBINE UNARIES
-        for (size_t i = 0; i < pHead->size(); i++) {
+        for (long long i = pHead->size()-1; i >= 0; i--) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
 
@@ -463,7 +463,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             // + and - are counted as unaries by step 1
-            if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
+            if (currentNode.getNodeType() != ASTNodeType::UNARY_OP || currentNode.size() > 0) continue;
 
             // verify this is add/sub math operation
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
