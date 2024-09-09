@@ -261,7 +261,6 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             default: { // base case, parse as expression
                 // check for variable assignment
                 if (isTokenPrimitiveType(tokens[i].type)) {
-                    TokenType varType = tokens[i].type;
                     ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[i]);
                     pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
 
@@ -269,7 +268,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     if (i+1 > endIndex || tokens[++i].type != TokenType::IDENTIFIER)
                         throw TInvalidTokenException(tokens[i].err);
 
-                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i].raw, tokens[i]);
+                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i]);
 
                     // verify not end of input
                     if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
@@ -407,7 +406,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             } else if (isTokenBinaryOp(tokens[i].type)) { // handle binary operators
                 pHead->push( new ASTOperator(tokens[i], false) );
             } else if (tokens[i].type == TokenType::IDENTIFIER) {
-                pHead->push( new ASTIdentifier(tokens[i].raw, tokens[i]) );
+                pHead->push( new ASTIdentifier(tokens[i]) );
             } else {
                 throw TInvalidTokenException(tokens[i].err);
             }
@@ -430,7 +429,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             }
 
             // confirm there is a token after this
-            if (i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+            if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
             // append next node as child of this
             currentNode.push( pHead->at(i+1) );

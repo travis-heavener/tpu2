@@ -1,7 +1,13 @@
 main:
-    push 11
+    mov BP, SP
     push 0
-    push 3
+    push 1
+    push 0
+    rmov DL, $-2
+    push DL
+    rmov DL, $-2
+    push DL
+    push 99
     push 0
     push 11
     push 0
@@ -12,15 +18,6 @@ main:
     mul BX
     push AL
     push AH
-    push 9
-    push 0
-    pop BH
-    pop BL
-    pop AH
-    pop AL
-    sub AX, BX
-    push AL
-    push AH
     pop BH
     pop BL
     pop AH
@@ -28,18 +25,16 @@ main:
     add AX, BX
     push AL
     push AH
-    push 2
-    push 0
-    pop BH
+    rmov DL, $-5
+    push DL
+    xor BH, BH
     pop BL
     pop AH
     pop AL
-    shl AX, BL
+    sub AX, BX
     push AL
     push AH
-    pop AH
-    pop AL
-    not AX
-    push AL
-    push AH
+    pop
+    pop
+    mov SP, BP
     hlt

@@ -33,5 +33,6 @@ MAKE_EXCEPTION(InvalidToken)
 MAKE_EXCEPTION(UnclosedQuote)
 MAKE_EXCEPTION(InvalidEscape)
 MAKE_EXCEPTION(UnclosedComment)
+MAKE_EXCEPTION(UnknownIdentifier)
 
 #endif

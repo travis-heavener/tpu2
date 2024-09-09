@@ -140,21 +140,22 @@ class ASTFunction : public ASTNode {
 
 class ASTIdentifier : public ASTNode {
     public:
-        ASTIdentifier(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
+        ASTIdentifier(const Token& token) : ASTNode(token), name(token.raw) {};
         ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
     private:
         std::string name; // name of variable
-        TokenType type; // type of variable
 };
 
 class ASTVarDeclaration : public ASTNode {
     public:
-        ASTVarDeclaration(const Token& token) : ASTNode(token) {};
+        ASTVarDeclaration(const Token& token) : ASTNode(token), type(token.type) {};
         ~ASTVarDeclaration();
         ASTNodeType getNodeType() const { return ASTNodeType::VAR_DECLARATION; };
-        
+        TokenType getPrimitiveType() const { return type; }
+
         ASTIdentifier* pIdentifier = nullptr;
         ASTExpr* pExpr = nullptr;
+        TokenType type; // type of variable
 };
 
 class ASTBoolLiteral : public ASTNode {

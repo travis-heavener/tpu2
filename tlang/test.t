@@ -1,3 +1,5 @@
 int main(int a) {
-    ~(11 + (3 * 11 - 9) << 2);
+    char f;
+    int x = 1;
+    x + 99 * 11 - f;
 }
