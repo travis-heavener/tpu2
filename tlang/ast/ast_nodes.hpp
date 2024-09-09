@@ -140,10 +140,9 @@ class ASTFunction : public ASTNode {
 
 class ASTIdentifier : public ASTNode {
     public:
-        ASTIdentifier(const Token& token) : ASTNode(token), name(token.raw) {};
+        ASTIdentifier(const Token& token, bool inAssign) : ASTNode(token), isInAssignExpr(inAssign) {};
         ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
-    private:
-        std::string name; // name of variable
+        bool isInAssignExpr; // whether the identifier is being referenced (ex. x + 1) or assigned (x = 1)
 };
 
 class ASTVarDeclaration : public ASTNode {

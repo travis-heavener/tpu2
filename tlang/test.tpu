@@ -1,0 +1,60 @@
+main:
+    mov BP, SP
+    push 1
+    push 0
+    push 9
+    push 0
+    pop BH
+    pop BL
+    rmov $-2, BL
+    rmov $-1, BH
+    push BL
+    push BH
+    pop
+    pop
+    push 0
+    push 0
+    rmov DL, $-4
+    push DL
+    rmov DL, $-4
+    push DL
+    push 3
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    mul BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    rmov $-4, BL
+    rmov $-3, BH
+    push BL
+    push BH
+    pop BH
+    pop BL
+    rmov $-2, BL
+    rmov $-1, BH
+    push BL
+    push BH
+    pop
+    pop
+    rmov DL, $-2
+    push DL
+    rmov DL, $-2
+    push DL
+    push 0
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    pop
+    pop
+    mov SP, BP
+    hlt

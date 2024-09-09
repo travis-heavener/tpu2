@@ -268,10 +268,11 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     if (i+1 > endIndex || tokens[++i].type != TokenType::IDENTIFIER)
                         throw TInvalidTokenException(tokens[i].err);
 
-                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i]);
-
                     // verify not end of input
                     if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
+
+                    // create identifier node (always an assignment operator)
+                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i], true);
 
                     // if declared but not assigned, leave pExpr as nullptr
                     if (tokens[++i].type == TokenType::SEMICOLON)
@@ -406,7 +407,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             } else if (isTokenBinaryOp(tokens[i].type)) { // handle binary operators
                 pHead->push( new ASTOperator(tokens[i], false) );
             } else if (tokens[i].type == TokenType::IDENTIFIER) {
-                pHead->push( new ASTIdentifier(tokens[i]) );
+                // if there's a next token and it's an assignment operator
+                bool isAssignExpr = i+1 <= endIndex && isTokenAssignOp(tokens[i+1].type);
+                pHead->push( new ASTIdentifier(tokens[i], isAssignExpr) );
             } else {
                 throw TInvalidTokenException(tokens[i].err);
             }
@@ -524,16 +527,15 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         }
 
         // 7. ASSIGNMENT
-        for (size_t i = 0; i < pHead->size(); i++) {
+        for (long long i = pHead->size()-1; i >= 0; i--) {
             ASTNode& currentNode = *pHead->at(i);
-            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
             // verify this is an assignment expression
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             if (!isTokenAssignOp(currentOp.getOpTokenType())) continue;
 
             // check for following expression
-            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+            if (i == 0 || (size_t)i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
             
             // append previous and next nodes as children of bin expr
             currentNode.push(pHead->at(i-1));

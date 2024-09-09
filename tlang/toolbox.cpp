@@ -69,7 +69,8 @@ bool isTokenBinaryOp(const TokenType type) {
            type == OP_LSHIFT || type == OP_RSHIFT || type == OP_ADD ||
            type == OP_SUB || type == OP_MUL || type == OP_DIV || type == OP_MOD ||
            type == OP_BIT_OR || type == OP_BIT_AND || type == OP_BIT_XOR ||
-           type == OP_BOOL_OR || type == OP_BOOL_AND || type == OP_EQ || type == OP_NEQ;
+           type == OP_BOOL_OR || type == OP_BOOL_AND || type == OP_EQ || type == OP_NEQ ||
+           type == ASSIGN;
 }
 
 // true if the token is a literal

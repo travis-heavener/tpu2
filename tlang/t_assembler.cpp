@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "t_assembler.hpp"
+#include "t_exception.hpp"
 #include "scope.hpp"
 #include "ast/ast.hpp"
 
@@ -196,7 +197,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     return resultSize;
                 }
                 default:
-                    throw std::invalid_argument("Invalid binOp type in assembleExpression!");
+                    throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
             }
             break;
         }
@@ -217,13 +218,16 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
             }
             outHandle << TAB << "pop BL\n";
 
-            if (maxResultSize == 2) {
-                if (resultSizes[0] == 2) // there's a value here
-                    outHandle << TAB << "pop AH\n";
-                else // no value, but zero the top half of the register to prevent miscalculations
-                    outHandle << TAB << "xor AH, AH\n";
+            // ignore popping to the AL/AX register if nothing was pushed from the stack (for assignments)
+            if (resultSizes[0] > 0) {
+                if (maxResultSize == 2) {
+                    if (resultSizes[0] == 2) // there's a value here
+                        outHandle << TAB << "pop AH\n";
+                    else // no value, but zero the top half of the register to prevent miscalculations
+                        outHandle << TAB << "xor AH, AH\n";
+                }
+                outHandle << TAB << "pop AL\n";
             }
-            outHandle << TAB << "pop AL\n";
 
             numPushes -= resultSizes[0] + resultSizes[1];
 
@@ -495,6 +499,31 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     numPushes += maxResultSize;
                     return maxResultSize;
                 }
+                case TokenType::ASSIGN: {
+                    // get the stack offset of the variable
+                    if (bodyNode.at(0)->getNodeType() != ASTNodeType::IDENTIFIER)
+                        // throw TInvalidTokenException(bodyNode.at(0)->err);
+                        throw std::runtime_error(bodyNode.at(0)->raw + "\n" + bodyNode.raw);
+
+                    ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(bodyNode.at(0));
+                    ScopeVariable* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
+                    size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
+                    size_t typeSize = getSizeOfType(pScopeVar->getType());
+
+                    // factor in additional pushes/pops that aren't scope variables (ex. pushes for expressions)
+                    stackOffset += numPushes - scope.sizeBytes();
+
+                    // move the rvalue to the identifier on the left
+                    outHandle << TAB << "rmov $-" << stackOffset << ", BL" << '\n';
+                    if (resultSizes[1] == 2)
+                        outHandle << TAB << "rmov $-" << stackOffset-1 << ", BH" << '\n';
+                    
+                    // push the value of the variable onto the stack (lowest-first)
+                    outHandle << TAB << "push BL\n";
+                    if (typeSize == 2) outHandle << TAB << "push BH\n";
+                    numPushes += typeSize;
+                    return typeSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }
@@ -550,16 +579,21 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
             size_t typeSize = getSizeOfType(pScopeVar->getType());
 
             // factor in additional pushes/pops that aren't scope variables (ex. pushes for expressions)
-            stackOffset += numPushes - scope.size() - 1;
+            stackOffset += numPushes - scope.sizeBytes();
 
-            // push the value of the identifier onto the stack
-            for (size_t i = 0; i < typeSize; i++) {
-                // move to DL to buffer pushing value in memory to stack
-                outHandle << TAB << "rmov DL, $-" << stackOffset << '\n'; // don't do stackOffset-i because as things are pushed, this offset changes
-                outHandle << TAB << "push DL\n";
+            // handle assignment operations vs read operations
+            if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
+                for (size_t i = 0; i < typeSize; i++) {
+                    // move to DL to buffer pushing value in memory to stack
+                    outHandle << TAB << "rmov DL, $-" << stackOffset << '\n'; // don't do stackOffset-i because as things are pushed, this offset changes
+                    outHandle << TAB << "push DL\n";
+                }
+                numPushes += typeSize;
+                return typeSize;
             }
-            numPushes += typeSize;
-            return typeSize;
+
+            // base case, assignment operation, push nothing to the stack
+            return 0;
         }
         case ASTNodeType::EXPR: {
             // this is the top-most expression, so just pass through

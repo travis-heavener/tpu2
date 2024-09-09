@@ -29,6 +29,7 @@ class Scope {
         size_t declareVariable(TokenType, const std::string&, ErrInfo);
         size_t pop();
         size_t size() const { return children.size(); }
+        size_t sizeBytes() const;
         size_t getOffset(const std::string&, ErrInfo) const;
         ScopeVariable* getVariable(const std::string&, ErrInfo) const;
     private:

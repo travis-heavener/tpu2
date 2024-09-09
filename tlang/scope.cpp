@@ -25,6 +25,16 @@ size_t Scope::pop() {
     return getSizeOfType(type);
 }
 
+// returns the size of all variables in the scope
+size_t Scope::sizeBytes() const {
+    size_t size = 0;
+
+    for (size_t i = 0; i < children.size(); i++)
+        size += getSizeOfType(children[i]->getType());
+    
+    return size;
+}
+
 // gets the offset address from the end with respect to the rest of the variables below it of a certain variable
 size_t Scope::getOffset(const std::string& name, ErrInfo err) const {
     size_t offset = 0;

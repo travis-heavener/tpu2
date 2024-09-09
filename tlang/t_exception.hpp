@@ -13,7 +13,7 @@
 
 class TException {
     public:
-        TException(ErrInfo err) : err(err), msg("Base TException.") {};
+        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 1;};
 
         // virtual toString method
         virtual const std::string& toString() const { return msg; };
