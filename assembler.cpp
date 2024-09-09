@@ -381,12 +381,12 @@ void parseRMOV(const std::vector<std::string>& args, Memory& memory, u16& instIn
             Register srcReg = getRegisterFromString(args[1]);
             if (!isRegister8Bit(srcReg)) throw std::invalid_argument("Expected 8-bit register.");
 
-            memory[instIndex++] = 0; // MOD byte
+            memory[instIndex++] = 1; // MOD byte
             memory[instIndex++] = relativeAddress & 0x00FF;
             memory[instIndex++] = (relativeAddress & 0xFF00) >> 8;
             memory[instIndex++] = srcReg;
         } catch (std::invalid_argument&) { // try as imm8
-            memory[instIndex++] = 1; // MOD byte
+            memory[instIndex++] = 0; // MOD byte
             memory[instIndex++] = relativeAddress & 0x00FF;
             memory[instIndex++] = (relativeAddress & 0xFF00) >> 8;
 
