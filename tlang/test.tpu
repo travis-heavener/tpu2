@@ -1,42 +1,45 @@
 main:
+    push 11
     push 0
-    pop AL
-    add AL, 0
-    jz __J0
-    mov AL, 0
-    jmp __J1
-    __J0:
-    mov AL, 1
-    jmp __J1
-    __J1:
-    push AL
-    pop AL
-    add AL, 0
-    jz __J2
-    mov AL, 0
-    jmp __J3
-    __J2:
-    mov AL, 1
-    jmp __J3
-    __J3:
-    push AL
-    push 1
-    pop AL
-    add AL, 0
-    jz __J4
-    mov AL, 0
-    jmp __J5
-    __J4:
-    mov AL, 1
-    jmp __J5
-    __J5:
-    push AL
+    push 3
+    push 0
+    push 11
+    push 0
+    pop BH
     pop BL
+    pop AH
     pop AL
-    or AL, BL
-    jz __J6
-    mov AL, 1
-    jmp __J6
-    __J6:
+    mul BX
     push AL
+    push AH
+    push 9
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    sub AX, BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    push 2
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    shl AX, BL
+    push AL
+    push AH
+    pop AH
+    pop AL
+    not AX
+    push AL
+    push AH
     hlt

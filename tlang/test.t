@@ -1,3 +1,3 @@
 int main(int a) {
-    !!false || !true;
+    ~(11 + (3 * 11 - 9) << 2);
 }
