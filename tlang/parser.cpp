@@ -384,12 +384,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
                 // recurse
-                ASTExpr* pExpr = (ASTExpr*)parseExpression(tokens, start+1, i-1);
-                pHead->push( pExpr->at(0) ); // strip outer ASTExpr and get lone child
-                
-                // free wrapper (prevent deleting children)
-                while (pExpr->size() > 0) pExpr->removeChild(0);
-                delete pExpr;
+                pHead->push( parseExpression(tokens, start+1, i-1) );
             } else if (tokens[i].type == TokenType::LIT_INT) {
                 pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
             } else if (tokens[i].type == TokenType::LIT_FLOAT) {
@@ -550,6 +545,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         // 7. ASSIGNMENT
         for (long long i = pHead->size()-1; i >= 0; i--) {
             ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
             // verify this is an assignment expression
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
