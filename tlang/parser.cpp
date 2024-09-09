@@ -363,8 +363,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
          * 2. COMBINE UNARIES
          * 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
          * 4. ADD/SUB
-         * 5. COMPARISON
-         * 6. ASSIGNMENT
+         * 5. SHIFTS
+         * 6. COMPARISON
+         * 7. ASSIGNMENT
         */
 
         // 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
@@ -480,7 +481,27 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 5. COMPARISON
+        // 5. SHIFTS
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is a comparison operation
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            if (currentOp.getOpTokenType() != TokenType::OP_LSHIFT && currentOp.getOpTokenType() != TokenType::OP_RSHIFT) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // 6. COMPARISON
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
@@ -500,7 +521,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 6. ASSIGNMENT
+        // 7. ASSIGNMENT
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;

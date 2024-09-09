@@ -1,20 +1,13 @@
 main:
-    push 2
+    push 164
     push 0
-    push 3
+    push 2
     push 0
     pop BH
     pop BL
     pop AH
     pop AL
-    sub AX, BX
-    jc __J0
-    mov AX, 1
-    jmp __J1
-    __J0:
-    mov AX, 0
-    jmp __J1
-    __J1:
+    shr AX, BL
     push AL
     push AH
     hlt

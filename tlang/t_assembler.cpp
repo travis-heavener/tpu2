@@ -82,11 +82,14 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
     }
 
     // assemble this node
+    bodyNode.isAssembled = true;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::BIN_OP: {
             ASTOperator& binOp = *static_cast<ASTOperator*>(&bodyNode);
 
             // move both arguments into AX & BX
+            if (resultSizes.size() != 2)
+                throw std::runtime_error("Invalid number of resultSizes, expected 2 for binary operation.");
             unsigned char maxResultSize = std::max(resultSizes[0], resultSizes[1]);
 
             // pop in reverse (higher first, later first)
@@ -323,6 +326,24 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     outHandle << TAB << "mov " << regA << ", 0\n";
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_LSHIFT: {
+                    // can only use 8-bit register for shift count
+                    outHandle << TAB << "shl " << regA << ", BL\n";
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_RSHIFT: {
+                    // can only use 8-bit register for shift count
+                    outHandle << TAB << "shr " << regA << ", BL\n";
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
