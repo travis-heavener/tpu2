@@ -22,7 +22,7 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
-#define CLOCK_FREQ_HZ 25
+#define CLOCK_FREQ_HZ 5000
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

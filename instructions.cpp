@@ -123,20 +123,33 @@ namespace instructions {
         tpu.sleep(); // wait since TPU has to process mod byte
 
         // get operands
+        u16 destAddr = tpu.readWord(memory).getValue();
         switch (mod.getValue() & 0b111) {
-            case 0: { // Moves the instruction pointer to the specified 16-bit memory address.
-                tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+            case 0: { // Moves the instruction pointer to the specified label.
+                tpu.moveToRegister(Register::IP, destAddr);
                 break;
             }
-            case 1: { // Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
+            case 1: { // Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
                 if (tpu.getFlag(ZERO)) {
-                    tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+                    tpu.moveToRegister(Register::IP, destAddr);
                 }
                 break;
             }
-            case 2: { // Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
+            case 2: { // Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
                 if (!tpu.getFlag(ZERO)) {
-                    tpu.moveToRegister(Register::IP, tpu.readWord(memory).getValue());
+                    tpu.moveToRegister(Register::IP, destAddr);
+                }
+                break;
+            }
+            case 3: { // Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
+                if (tpu.getFlag(CARRY)) {
+                    tpu.moveToRegister(Register::IP, destAddr);
+                }
+                break;
+            }
+            case 4: { // Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
+                if (!tpu.getFlag(CARRY)) {
+                    tpu.moveToRegister(Register::IP, destAddr);
                 }
                 break;
             }

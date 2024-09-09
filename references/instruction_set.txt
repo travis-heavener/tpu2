@@ -8,9 +8,11 @@ syscall                     0x02            Triggers a syscall.
 
 call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
 
-jmp @addr                   0x04 /0         Moves the instruction pointer to the specified 16-bit memory address.
-jz @addr                    0x04 /1         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is set.
-jnz @addr                   0x04 /2         Moves the instruction pointer to the specified 16-bit memory address, if the zero flag (ZF) is cleared.
+jmp @addr                   0x04 /0         Moves the instruction pointer to the specified label.
+jz @addr                    0x04 /1         Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
+jnz @addr                   0x04 /2         Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
+jc label                    0x04 /3         Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
+jnc label                   0x04 /4         Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
 
 mov @addr, imm8             0x05 /0         Move imm8 into address in memory
 mov @addr, reg              0x05 /1         Move value in 8-bit register to memory address.
