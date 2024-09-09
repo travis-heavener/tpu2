@@ -18,6 +18,7 @@ void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
 void parsePUSH(const std::vector<std::string>&, Memory&, u16&);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&);
+void parseBitShifts(const std::vector<std::string>&, Memory&, u16&, bool);
 
 // helper for trimming strings in place
 void ltrimString(std::string& str) {
@@ -271,6 +272,9 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
         if (kwd.size() == 1) throw std::invalid_argument("Invalid label name: " + kwd);
 
         labelMap[labelName] = instIndex; // store entry point
+    } else if (kwd == "shl" || kwd == "shr") {
+        checkArgs(args, 2); // check for extra args
+        parseBitShifts(args, memory, instIndex, kwd == "shl");
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);
@@ -459,4 +463,18 @@ void parsePOP(const std::vector<std::string>& args, Memory& memory, u16& instInd
             throw std::invalid_argument("Expected 8-bit register.");
         memory[instIndex++] = reg;
     }
+}
+
+void parseBitShifts(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isLeftShift) {
+    memory[instIndex++] = isLeftShift ? OPCode::SHL : OPCode::SHR;
+
+    // get register
+    Register reg = getRegisterFromString(args[0]);
+    memory[instIndex++] = !isRegister8Bit(reg); // MOD byte
+    memory[instIndex++] = reg;
+
+    // get imm8
+    u16 arg = std::stoul(args[1]);
+    if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+    memory[instIndex++] = (u8)arg;
 }

@@ -21,6 +21,8 @@ namespace instructions {
     void processOR(TPU& tpu, Memory& memory);
     void processXOR(TPU& tpu, Memory& memory);
     void processNOT(TPU& tpu, Memory& memory);
+    void processSHL(TPU& tpu, Memory& memory);
+    void processSHR(TPU& tpu, Memory& memory);
 };
 
 #endif

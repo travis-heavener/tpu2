@@ -66,3 +66,9 @@ xor reg, reg                0x22 /3         Logical XOR between two 16-bit regis
 
 not reg                     0x23 /0         Performs bitwise NOT on an 8-bit register and stores in that register.
 not reg                     0x23 /1         Performs bitwise NOT on an 16-bit register and stores in that register.
+
+shl reg, imm8               0x24 /0         Shifts the value in the given 8-bit register left imm8 times in place.
+shl reg, imm8               0x24 /1         Shifts the value in the given 16-bit register left imm8 times in place.
+
+shr reg, imm8               0x25 /0         Shifts the value in the given 8-bit register right imm8 times in place.
+shr reg, imm8               0x25 /1         Shifts the value in the given 16-bit register right imm8 times in place.

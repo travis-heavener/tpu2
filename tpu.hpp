@@ -52,7 +52,9 @@ enum OPCode {
     AND         = 0x20,
     OR          = 0x21,
     XOR         = 0x22,
-    NOT         = 0x23
+    NOT         = 0x23,
+    SHL         = 0x24,
+    SHR         = 0x25
 };
 
 // register codes
