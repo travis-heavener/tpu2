@@ -32,8 +32,12 @@ class Scope {
         size_t sizeBytes() const;
         size_t getOffset(const std::string&, ErrInfo) const;
         ScopeVariable* getVariable(const std::string&, ErrInfo) const;
+
+        void incPtr(size_t i) { stackPtr += i; }
+        void decPtr(size_t i) { stackPtr -= i; }
     private:
         std::vector<ScopeVariable*> children;
+        size_t stackPtr = 0; // stores the value of the current stack pointer
 };
 
 #endif

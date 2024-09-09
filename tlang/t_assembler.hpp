@@ -18,6 +18,6 @@ void generateAssembly(AST&, std::ofstream&);
 void assembleBody(ASTNode*, std::ofstream&, label_map_t&, Scope&);
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode&, std::ofstream&, label_map_t&, Scope&, size_t&);
+size_t assembleExpression(ASTNode&, std::ofstream&, label_map_t&, Scope&);
 
 #endif

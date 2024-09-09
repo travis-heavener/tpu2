@@ -37,7 +37,8 @@ size_t Scope::sizeBytes() const {
 
 // gets the offset address from the end with respect to the rest of the variables below it of a certain variable
 size_t Scope::getOffset(const std::string& name, ErrInfo err) const {
-    size_t offset = 0;
+    // factor in additional pushes/pops that aren't scope variables (ex. pushes for expressions)
+    size_t offset = this->stackPtr - this->sizeBytes();
 
     for (long i = children.size()-1; i >= 0; i--) {
         ScopeVariable* pVar = children[i];
