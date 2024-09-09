@@ -29,17 +29,119 @@ main:
     push BL
     push BH
     mov BP, SP
-    push 13
+    push 3
     push 0
-    push 91
+    push 2
     push 0
     pop BH
+    pop BL
+    pop AH
+    pop AL
+    sub AX, BX
+    jc __J6
+    mov AX, 1
+    jmp __J7
+    __J6:
+    mov AX, 0
+    jmp __J7
+    __J7:
+    push AL
+    xor AH, AH
+    pop AL
+    add AX, 0
+    jz __J5
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    push 1
+    push 0
+    pop BH
+    pop BL
+    rmov $-8, BL
+    rmov $-7, BH
+    push BL
+    push BH
+    pop
+    pop
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp __J4
+    __J5:
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    push 3
+    push 0
+    pop BH
+    pop BL
+    rmov $-8, BL
+    rmov $-7, BH
+    push BL
+    push BH
+    pop
+    pop
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp __J4
+    __J4:
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp __J0
+    __J1:
+    push 8
+    push 0
+    push 7
+    push 0
+    push 1
+    push 0
+    pop AH
+    pop AL
+    add AX, 0
+    jz __J9
+    mov AX, 0
+    jmp __J10
+    __J9:
+    mov AX, 1
+    jmp __J10
+    __J10:
+    push AL
+    xor BH, BH
     pop BL
     pop AH
     pop AL
     add AX, BX
     push AL
     push AH
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    xor AX, BX
+    jz __J11
+    mov AX, 0
+    jmp __J12
+    __J11:
+    mov AX, 1
+    __J12:
+    push AL
+    xor AH, AH
+    pop AL
+    add AX, 0
+    jz __J8
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    push 2
+    push 0
     pop BH
     pop BL
     rmov $-6, BL
@@ -53,22 +155,13 @@ main:
     pop BL
     mov BP, BX
     jmp __J0
-    __J1:
+    __J8:
     mov BX, BP
     push BL
     push BH
     mov BP, SP
+    push 4
     push 0
-    push 0
-    push 11
-    push 0
-    pop BH
-    pop BL
-    pop AH
-    pop AL
-    add AX, BX
-    push AL
-    push AH
     pop BH
     pop BL
     rmov $-6, BL
@@ -94,6 +187,60 @@ main:
     pop AH
     pop AL
     add AX, BX
+    push AL
+    push AH
+    pop
+    pop
+    push 4
+    push 0
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
+    push AL
+    push AH
+    pop AH
+    pop AL
+    xor AX, 0x8000
     push AL
     push AH
     pop

@@ -1,11 +1,15 @@
 int main(int a) {
     int k;
     if (true && (((((false)))))) {
-        k = 13 + 91; // stored in AX if true
+        if (3 >= 2) {
+            k = 1;
+        } else {
+            k = 3;
+        }
+    } else if (8 == 7 + !1) {
+        k = 2;
     } else {
-        k = 0 + 11; // stored in AX if false
+        k = 4;
     }
-    // k = k | ((1 << 16) - 1);
-    // k = 19 * 11 + 3 << 7 / 4;
     k + 0;
 }
