@@ -192,9 +192,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push values to stack
                     outHandle << TAB << "push AL\n";
-                    if (resultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += resultSize;
-                    return resultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 default:
                     throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
@@ -327,9 +326,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_BOOL_AND: {
                     // if either one is zero, boolean and is false
@@ -357,9 +355,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_EQ: {
                     // if A ^ B is zero, equal
@@ -377,9 +374,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_NEQ: {
                     // if A ^ B is zero, equal (keep as 0)
@@ -393,9 +389,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_LT: {
                     // if A < B, B-A will have carry and zero cleared
@@ -412,11 +407,10 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
-                    // push result to stack (lowest-first)
+                    /// push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_GT: {
                     // if A > B, A-B will have carry and zero cleared
@@ -435,9 +429,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_LTE: {
                     // if A <= B, B-A will have carry cleared
@@ -455,9 +448,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_GTE: {
                     // if A >= B, A-B will have carry cleared
@@ -475,9 +467,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
 
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
-                    if (maxResultSize == 2) outHandle << TAB << "push AH\n";
-                    numPushes += maxResultSize;
-                    return maxResultSize;
+                    numPushes++;
+                    return 1; // always returns an 8-bit bool
                 }
                 case TokenType::OP_LSHIFT: {
                     // can only use 8-bit register for shift count
