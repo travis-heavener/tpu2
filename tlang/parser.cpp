@@ -383,7 +383,13 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
 
                 if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
-                pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
+                // recurse
+                ASTExpr* pExpr = (ASTExpr*)parseExpression(tokens, start+1, i-1);
+                pHead->push( pExpr->at(0) ); // strip outer ASTExpr and get lone child
+                
+                // free wrapper (prevent deleting children)
+                while (pExpr->size() > 0) pExpr->removeChild(0);
+                delete pExpr;
             } else if (tokens[i].type == TokenType::LIT_INT) {
                 pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
             } else if (tokens[i].type == TokenType::LIT_FLOAT) {
@@ -431,6 +437,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 continue;
             }
 
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
+
             // confirm there is a token after this
             if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
@@ -445,10 +454,13 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
             // verify this is mult/div/mod math operation
-            ASTOperator* currentOp = static_cast<ASTOperator*>(&currentNode);
-            TokenType opType = currentOp->getOpTokenType();
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType opType = currentOp.getOpTokenType();
             if (opType != TokenType::OP_MUL && opType != TokenType::OP_DIV && opType != TokenType::OP_MOD)
                 continue;
+            
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
 
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
@@ -471,6 +483,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             TokenType opType = currentOp.getOpTokenType();
             if (opType != TokenType::OP_ADD && opType != TokenType::OP_SUB) continue;
+
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
 
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
@@ -495,6 +510,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             if (currentOp.getOpTokenType() != TokenType::OP_LSHIFT && currentOp.getOpTokenType() != TokenType::OP_RSHIFT) continue;
 
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
+
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
 
@@ -515,6 +533,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             if (!isTokenCompOp(currentOp.getOpTokenType())) continue;
 
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
+
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
 
@@ -533,6 +554,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             // verify this is an assignment expression
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             if (!isTokenAssignOp(currentOp.getOpTokenType())) continue;
+
+            // skip if already parsed
+            if (currentOp.size() > 0) continue;
 
             // check for following expression
             if (i == 0 || (size_t)i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
