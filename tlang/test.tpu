@@ -1,17 +1,11 @@
 main:
-    push 164
+    push 99
     push 0
-    push 1
+    push 19
     push 0
-    push 2
-    push 0
-    push 1
-    push 0
-    pop BH
-    pop BL
     pop AH
     pop AL
-    mul BX
+    xor AX, 0x8000
     push AL
     push AH
     pop BH
@@ -19,13 +13,6 @@ main:
     pop AH
     pop AL
     add AX, BX
-    push AL
-    push AH
-    pop BH
-    pop BL
-    pop AH
-    pop AL
-    shr AX, BL
     push AL
     push AH
     hlt

@@ -84,6 +84,38 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
     // assemble this node
     bodyNode.isAssembled = true;
     switch (bodyNode.getNodeType()) {
+        case ASTNodeType::UNARY_OP: {
+            ASTOperator& unaryOp = *static_cast<ASTOperator*>(&bodyNode);
+
+            // move argument into AX
+            if (resultSizes.size() != 1)
+                throw std::runtime_error("Invalid number of resultSizes, expected 1 for unary operation.");
+
+            // ignore OP_ADD since it's really a buffer (passthrough)
+            if (unaryOp.getOpTokenType() == TokenType::OP_ADD) return resultSizes[0];
+
+            // pop in reverse (higher first, later first)
+            const size_t resultSize = resultSizes[0];
+            if (resultSize == 2) outHandle << TAB << "pop AH\n";
+            outHandle << TAB << "pop AL\n";
+
+            const std::string regA = resultSize == 1 ? "AL" : "AX";
+
+            switch (unaryOp.getOpTokenType()) {
+                case TokenType::OP_SUB: {
+                    // negate AX (A ^ 0b10000000 flips sign bit)
+                    outHandle << TAB << "xor " << regA << ", " << (resultSize > 1 ? "0x8000" : "0x80") << '\n';
+                    
+                    // push values to stack
+                    outHandle << TAB << "push AL\n";
+                    if (resultSize > 1) outHandle << TAB << "push AH\n";
+                    return resultSize;
+                }
+                default:
+                    throw std::invalid_argument("Invalid binOp type in assembleExpression!");
+            }
+            break;
+        }
         case ASTNodeType::BIN_OP: {
             ASTOperator& binOp = *static_cast<ASTOperator*>(&bodyNode);
 
