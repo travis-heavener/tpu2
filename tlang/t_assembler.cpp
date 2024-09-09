@@ -146,6 +146,30 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
                         outHandle << TAB << "push AH\n";
                     return maxResultSize;
                 }
+                case TokenType::OP_BIT_OR: {
+                    outHandle << TAB << "or " << regA << ", " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_BIT_AND: {
+                    outHandle << TAB << "and " << regA << ", " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
+                case TokenType::OP_BIT_XOR: {
+                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
+
+                    // push result to stack (lowest-first)
+                    outHandle << TAB << "push AL\n";
+                    if (maxResultSize > 1) outHandle << TAB << "push AH\n";
+                    return maxResultSize;
+                }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
             }

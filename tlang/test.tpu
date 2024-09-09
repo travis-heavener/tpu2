@@ -7,7 +7,7 @@ main:
     pop BL
     pop AH
     pop AL
-    div BX
+    or AX, BX
     push AL
     push AH
     hlt
