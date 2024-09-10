@@ -67,6 +67,44 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
 
         // switch on node type
         switch (child.getNodeType()) {
+            case ASTNodeType::WHILE_LOOP: {
+                ASTWhileLoop& loop = *static_cast<ASTWhileLoop*>(&child);
+
+                // create label for the start of the loop body (here)
+                const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                // determine the label where all branches merge
+                const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                // append loopStartLabel
+                outHandle << TAB << loopStartLabel << ":\n";
+
+                // check condition
+                size_t resultSize = assembleExpression(*loop.pExpr, outHandle, labelMap, scope);
+
+                // load result to AL/AX
+                if (resultSize > 1) {
+                    outHandle << TAB << "pop AH\n"; // load value to AH
+                } else {
+                    outHandle << TAB << "xor AH, AH\n"; // clear AH if no value is there
+                }
+                outHandle << TAB << "pop AL\n";
+                scope.decPtr(resultSize);
+                outHandle << TAB << "add AX, 0\n"; // test ZF flag
+
+                // if the result sets the ZF flag, it's false so jmp to mergeLabel
+                outHandle << TAB << "jz " << mergeLabel << "\n";
+
+                // assemble the body here in new scope
+                assembleBody(&loop, outHandle, labelMap, scope, true);
+
+                // jump back to the loopStartLabel
+                outHandle << TAB << "jmp " << loopStartLabel << '\n';
+
+                // add merge label
+                outHandle << TAB << mergeLabel << ":\n";
+                break;
+            }
             case ASTNodeType::FOR_LOOP: {
                 ASTForLoop& loop = *static_cast<ASTForLoop*>(&child);
 
