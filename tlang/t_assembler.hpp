@@ -15,7 +15,7 @@ typedef std::map<std::string, std::string> label_map_t;
 void generateAssembly(AST&, std::ofstream&);
 
 // abstractions from generateAssembly for visual bliss
-void assembleBody(ASTNode*, std::ofstream&, label_map_t&, Scope&, const bool);
+void assembleBody(ASTNode*, std::ofstream&, label_map_t&, Scope&, const std::string&, const bool);
 
 // assembles an expression, returning the number of bytes the result uses on the stack
 size_t assembleExpression(ASTNode&, std::ofstream&, label_map_t&, Scope&);

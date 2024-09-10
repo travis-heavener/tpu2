@@ -9,6 +9,7 @@
 
 #define FUNC_MAIN_LABEL "main"
 #define FUNC_LABEL_PREFIX "__UF" // for "user function"
+#define FUNC_END_LABEL_SUFFIX "E" // added to the end of a function label to mark where a function ends
 #define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
 #define TAB "    "
 
@@ -35,19 +36,48 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
         // assemble this function into the file
         outHandle << labelName << ":\n";
 
+        // push the value of the IP & SP to the stack
+        outHandle << TAB << "mov BX, IP\n";
+        outHandle << TAB << "push BL\n";
+        outHandle << TAB << "push BH\n";
+        
+        outHandle << TAB << "mov BX, SP\n";
+        outHandle << TAB << "push BL\n";
+        outHandle << TAB << "push BH\n";
+
         // create a scope for this body
         Scope scope;
 
         // assemble body content
-        assembleBody(pFunc, outHandle, labelMap, scope, true);
+        assembleBody(pFunc, outHandle, labelMap, scope, labelName + FUNC_END_LABEL_SUFFIX, true);
 
-        // stop clock after execution is done
-        outHandle << TAB << "hlt\n";
+        // jmp to end of function if not returned yet
+        outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
+
+        // mark the end of the function with a label
+        outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
+
+        // pop the old SP and then IP to BP
+        outHandle << TAB << "pop BH\n";
+        outHandle << TAB << "pop BL\n";
+        outHandle << TAB << "mov SP, BX\n";
+
+        outHandle << TAB << "pop BH\n";
+        outHandle << TAB << "pop BL\n";
+        outHandle << TAB << "mov BP, BX\n";
+
+        // stop clock after execution is done IF MAIN or return to previous label
+        if (funcName == FUNC_MAIN_LABEL) {
+            outHandle << TAB << "hlt\n";
+        } else {
+            // return to previous label specified by BP
+            outHandle << TAB << "ret\n";
+        }
     }
 }
 
 // for assembling body content that has its own scope
-void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope, const bool isNewScope=true) {
+void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope, const std::string& returnLabelName, const bool isNewScope=true) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
     if (isNewScope) {
         // push BP to stack to store current SP
@@ -61,6 +91,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
     }
 
     // iterate over children of this node
+    bool hasReturned = false;
     size_t numChildren = pHead->size();
     for (size_t i = 0; i < numChildren; i++) {
         ASTNode& child = *pHead->at(i);
@@ -96,7 +127,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, labelMap, scope, true);
+                assembleBody(&loop, outHandle, labelMap, scope, returnLabelName, true);
 
                 // jump back to the loopStartLabel
                 outHandle << TAB << "jmp " << loopStartLabel << '\n';
@@ -141,7 +172,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, labelMap, scope, true);
+                assembleBody(&loop, outHandle, labelMap, scope, returnLabelName, true);
 
                 // assemble third expression
                 resultSize = assembleExpression(*loop.pExprC, outHandle, labelMap, scope);
@@ -194,7 +225,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body (don't make new scope)
-                    assembleBody(conditional.at(j), outHandle, labelMap, scope, false);
+                    assembleBody(conditional.at(j), outHandle, labelMap, scope, returnLabelName, false);
 
                     // jump to merge label
                     outHandle << TAB << "jmp " << mergeLabel << '\n';
@@ -234,6 +265,27 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 scope.declareVariable(varType, varChild.pIdentifier->raw, varChild.pIdentifier->err);
                 break;
             }
+            case ASTNodeType::RETURN: {
+                // assemble expression
+                ASTReturn& retNode = *static_cast<ASTReturn*>(&child);
+                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, labelMap, scope);
+
+                // move the result bytes to DX register
+                if (resultSize > 1) {
+                    outHandle << TAB << "pop DH\n";
+                } else {
+                    outHandle << TAB << "xor DH, DH\n"; // zero the register
+                }
+                outHandle << TAB << "pop DL\n";
+                scope.decPtr(resultSize);
+
+                // jmp to the end label to finish closing the function
+                hasReturned = true;
+
+                // break out of this loop since any code after return is skipped
+                i = numChildren;
+                break;
+            }
             case ASTNodeType::EXPR: {
                 // assemble expression
                 size_t resultSize = assembleExpression(child, outHandle, labelMap, scope);
@@ -262,6 +314,11 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
 
         // remove extra scope variables after the scope closes
         while (scope.size() > startingScopeSize) scope.pop();
+    }
+
+    // if returning, jmp to the return label
+    if (hasReturned) {
+        outHandle << TAB << "jmp " << returnLabelName << '\n';
     }
 }
 

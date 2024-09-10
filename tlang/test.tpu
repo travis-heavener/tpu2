@@ -1,0 +1,235 @@
+main:
+    mov BX, IP
+    push BL
+    push BH
+    mov BX, SP
+    push BL
+    push BH
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    push 0
+    push 0
+    push 0
+    push 0
+    push 0
+    push 0
+    __J0:
+    rmov DL, $-8
+    push DL
+    rmov DL, $-8
+    push DL
+    push 15
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    sub BX, AX
+    jz __J2
+    jc __J2
+    mov AX, 1
+    jmp __J3
+    __J2:
+    mov AX, 0
+    jmp __J3
+    __J3:
+    push AL
+    xor AH, AH
+    pop AL
+    add AX, 0
+    jz __J1
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    __J4:
+    rmov DL, $-8
+    push DL
+    rmov DL, $-8
+    push DL
+    rmov DL, $-12
+    push DL
+    rmov DL, $-12
+    push DL
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    sub BX, AX
+    jz __J6
+    jc __J6
+    mov AX, 1
+    jmp __J7
+    __J6:
+    mov AX, 0
+    jmp __J7
+    __J7:
+    push AL
+    xor AH, AH
+    pop AL
+    add AX, 0
+    jz __J5
+    mov BX, BP
+    push BL
+    push BH
+    mov BP, SP
+    rmov DL, $-8
+    push DL
+    rmov DL, $-8
+    push DL
+    rmov DL, $-12
+    push DL
+    rmov DL, $-12
+    push DL
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    rmov $-8, BL
+    rmov $-7, BH
+    push BL
+    push BH
+    pop
+    pop
+    rmov DL, $-10
+    push DL
+    rmov DL, $-10
+    push DL
+    push 1
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    rmov $-10, BL
+    rmov $-9, BH
+    push BL
+    push BH
+    pop
+    pop
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp __J4
+    __J5:
+    rmov DL, $-6
+    push DL
+    rmov DL, $-6
+    push DL
+    rmov DL, $-12
+    push DL
+    rmov DL, $-12
+    push DL
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    rmov $-6, BL
+    rmov $-5, BH
+    push BL
+    push BH
+    pop
+    pop
+    rmov DL, $-10
+    push DL
+    rmov DL, $-10
+    push DL
+    push 1
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    add AX, BX
+    push AL
+    push AH
+    pop BH
+    pop BL
+    rmov $-10, BL
+    rmov $-9, BH
+    push BL
+    push BH
+    pop
+    pop
+    rmov DL, $-6
+    push DL
+    rmov DL, $-6
+    push DL
+    push 2
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    div BX
+    push DL
+    push DH
+    push 3
+    push 0
+    pop BH
+    pop BL
+    pop AH
+    pop AL
+    xor AX, BX
+    jz __J9
+    mov AX, 0
+    jmp __J10
+    __J9:
+    mov AX, 1
+    __J10:
+    push AL
+    xor AH, AH
+    pop AL
+    add AX, 0
+    jz __J8
+    rmov DL, $-6
+    push DL
+    rmov DL, $-6
+    push DL
+    pop DH
+    pop DL
+    jmp mainE
+    jmp __J8
+    __J8:
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp __J0
+    __J1:
+    push 10
+    push 0
+    pop DH
+    pop DL
+    mov SP, BP
+    pop BH
+    pop BL
+    mov BP, BX
+    jmp mainE
+    jmp mainE
+    mainE:
+    pop BH
+    pop BL
+    mov SP, BX
+    pop BH
+    pop BL
+    mov BP, BX
+    hlt

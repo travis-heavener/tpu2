@@ -10,7 +10,14 @@ int main(int a) {
         }
         k = k + i;
         i = i + 1;
+
+        if (k % 2 == 3) {
+            return k;
+        }
     }
+
+    return 10;
+    k = 11;
 
     // quick lil cheat bc result is in AX and that's currently printed to STDOUT
     k + 0;
