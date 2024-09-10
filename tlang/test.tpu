@@ -191,60 +191,6 @@ main:
     push AH
     pop
     pop
-    push 4
-    push 0
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop AH
-    pop AL
-    xor AX, 0x8000
-    push AL
-    push AH
-    pop
-    pop
     mov SP, BP
     pop BH
     pop BL

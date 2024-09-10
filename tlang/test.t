@@ -11,5 +11,5 @@ int main(int a) {
     } else {
         k = 4;
     }
-    k + 0;
+    k + 0; // quick lil cheat bc result is in AX and that's currently printed to STDOUT
 }
