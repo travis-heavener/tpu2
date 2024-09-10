@@ -48,6 +48,7 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
 
 // for assembling body content that has its own scope
 void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope, const bool isNewScope=true) {
+    size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
     if (isNewScope) {
         // push BP to stack to store current SP
         outHandle << TAB << "mov BX, BP\n";
@@ -168,6 +169,9 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
         outHandle << TAB << "pop BL\n";
         outHandle << TAB << "mov BP, BX\n";
         scope.decPtr(2);
+
+        // remove extra scope variables after the scope closes
+        while (scope.size() > startingScopeSize) scope.pop();
     }
 }
 

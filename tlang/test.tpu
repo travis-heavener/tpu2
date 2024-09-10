@@ -25,10 +25,6 @@ main:
     pop AL
     add AX, 0
     jz __J1
-    mov BX, BP
-    push BL
-    push BH
-    mov BP, SP
     push 3
     push 0
     push 2
@@ -50,50 +46,30 @@ main:
     pop AL
     add AX, 0
     jz __J5
-    mov BX, BP
-    push BL
-    push BH
-    mov BP, SP
     push 1
     push 0
     pop BH
     pop BL
-    rmov $-8, BL
-    rmov $-7, BH
+    rmov $-4, BL
+    rmov $-3, BH
     push BL
     push BH
     pop
     pop
-    mov SP, BP
-    pop BH
-    pop BL
-    mov BP, BX
     jmp __J4
     __J5:
-    mov BX, BP
-    push BL
-    push BH
-    mov BP, SP
     push 3
     push 0
     pop BH
     pop BL
-    rmov $-8, BL
-    rmov $-7, BH
+    rmov $-4, BL
+    rmov $-3, BH
     push BL
     push BH
     pop
     pop
-    mov SP, BP
-    pop BH
-    pop BL
-    mov BP, BX
     jmp __J4
     __J4:
-    mov SP, BP
-    pop BH
-    pop BL
-    mov BP, BX
     jmp __J0
     __J1:
     push 8
@@ -136,44 +112,28 @@ main:
     pop AL
     add AX, 0
     jz __J8
-    mov BX, BP
-    push BL
-    push BH
-    mov BP, SP
     push 2
     push 0
     pop BH
     pop BL
-    rmov $-6, BL
-    rmov $-5, BH
+    rmov $-4, BL
+    rmov $-3, BH
     push BL
     push BH
     pop
     pop
-    mov SP, BP
-    pop BH
-    pop BL
-    mov BP, BX
     jmp __J0
     __J8:
-    mov BX, BP
-    push BL
-    push BH
-    mov BP, SP
     push 4
     push 0
     pop BH
     pop BL
-    rmov $-6, BL
-    rmov $-5, BH
+    rmov $-4, BL
+    rmov $-3, BH
     push BL
     push BH
     pop
     pop
-    mov SP, BP
-    pop BH
-    pop BL
-    mov BP, BX
     jmp __J0
     __J0:
     rmov DL, $-4
