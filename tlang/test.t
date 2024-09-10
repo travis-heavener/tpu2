@@ -1,15 +1,21 @@
 int main(int a) {
-    int k;
-    if (true && (((((false)))))) {
-        if (3 >= 2) {
-            k = 1;
-        } else {
-            k = 3;
+    int i; // initialized to 0
+    int j; // initialized to 0
+    int k; // initialized to 0
+
+    for (i = 0; i < 10; i = i + 2) {
+        for (j = 1; j <= 3; j = j + 1) {
+            k = k + i * j;
+
+            // force break out of the loop
+            if (k > 30) {
+                k = 9999;
+                j = 4;
+                i = 10;
+            }
         }
-    } else if (8 == 7 + !1) {
-        k = 2;
-    } else {
-        k = 4;
     }
-    k + 0; // quick lil cheat bc result is in AX and that's currently printed to STDOUT
+
+    // quick lil cheat bc result is in AX and that's currently printed to STDOUT
+    k + 0;
 }

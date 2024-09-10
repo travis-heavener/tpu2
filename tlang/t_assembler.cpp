@@ -67,6 +67,58 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
 
         // switch on node type
         switch (child.getNodeType()) {
+            case ASTNodeType::FOR_LOOP: {
+                ASTForLoop& loop = *static_cast<ASTForLoop*>(&child);
+
+                // assemble first expression in current scope
+                size_t resultSize = assembleExpression(*loop.pExprA, outHandle, labelMap, scope);
+
+                // nothing from the expression is handled so pop the result off the stack
+                for (size_t j = 0; j < resultSize; j++) outHandle << TAB << "pop\n";
+                scope.decPtr(resultSize);
+
+                // create label for the start of the loop body (here)
+                const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                // determine the label where all branches merge
+                const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+
+                // append loopStartLabel
+                outHandle << TAB << loopStartLabel << ":\n";
+
+                // check condition
+                resultSize = assembleExpression(*loop.pExprB, outHandle, labelMap, scope);
+
+                // load result to AL/AX
+                if (resultSize > 1) {
+                    outHandle << TAB << "pop AH\n"; // load value to AH
+                } else {
+                    outHandle << TAB << "xor AH, AH\n"; // clear AH if no value is there
+                }
+                outHandle << TAB << "pop AL\n";
+                scope.decPtr(resultSize);
+                outHandle << TAB << "add AX, 0\n"; // test ZF flag
+
+                // if the result sets the ZF flag, it's false so jmp to mergeLabel
+                outHandle << TAB << "jz " << mergeLabel << "\n";
+
+                // assemble the body here in new scope
+                assembleBody(&loop, outHandle, labelMap, scope, true);
+
+                // assemble third expression
+                resultSize = assembleExpression(*loop.pExprC, outHandle, labelMap, scope);
+
+                // nothing from the expression is handled so pop the result off the stack
+                for (size_t j = 0; j < resultSize; j++) outHandle << TAB << "pop\n";
+                scope.decPtr(resultSize);
+
+                // jump back to the loopStartLabel
+                outHandle << TAB << "jmp " << loopStartLabel << '\n';
+
+                // add merge label
+                outHandle << TAB << mergeLabel << ":\n";
+                break;
+            }
             case ASTNodeType::CONDITIONAL: {
                 ASTConditional& conditional = *static_cast<ASTConditional*>(&child);
 
