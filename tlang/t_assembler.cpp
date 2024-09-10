@@ -39,7 +39,7 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
         Scope scope;
 
         // assemble body content
-        assembleBody(pFunc, outHandle, labelMap, scope);
+        assembleBody(pFunc, outHandle, labelMap, scope, true);
 
         // stop clock after execution is done
         outHandle << TAB << "hlt\n";
@@ -47,15 +47,17 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
 }
 
 // for assembling body content that has its own scope
-void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope) {
-    // push BP to stack to store current SP
-    outHandle << TAB << "mov BX, BP\n";
-    outHandle << TAB << "push BL\n";
-    outHandle << TAB << "push BH\n";
-    scope.incPtr(2);
+void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope, const bool isNewScope=true) {
+    if (isNewScope) {
+        // push BP to stack to store current SP
+        outHandle << TAB << "mov BX, BP\n";
+        outHandle << TAB << "push BL\n";
+        outHandle << TAB << "push BH\n";
+        scope.incPtr(2);
 
-    // store the current stack pointer value in the base pointer for this scope
-    outHandle << TAB << "mov BP, SP\n";
+        // store the current stack pointer value in the base pointer for this scope
+        outHandle << TAB << "mov BP, SP\n";
+    }
 
     // iterate over children of this node
     size_t numChildren = pHead->size();
@@ -100,8 +102,8 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                     }
 
                     // this is executed when not jumping anywhere (else branch or false condition)
-                    // process the body
-                    assembleBody(conditional.at(j), outHandle, labelMap, scope);
+                    // process the body (don't make new scope)
+                    assembleBody(conditional.at(j), outHandle, labelMap, scope, false);
 
                     // jump to merge label
                     outHandle << TAB << "jmp " << mergeLabel << '\n';
@@ -157,14 +159,16 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
         }
     }
 
-    // reset the stack pointer to the base pointer
-    outHandle << TAB << "mov SP, BP\n";
+    if (isNewScope) {
+        // reset the stack pointer to the base pointer
+        outHandle << TAB << "mov SP, BP\n";
 
-    // pop the previous BP back to the BP
-    outHandle << TAB << "pop BH\n";
-    outHandle << TAB << "pop BL\n";
-    outHandle << TAB << "mov BP, BX\n";
-    scope.decPtr(2);
+        // pop the previous BP back to the BP
+        outHandle << TAB << "pop BH\n";
+        outHandle << TAB << "pop BL\n";
+        outHandle << TAB << "mov BP, BX\n";
+        scope.decPtr(2);
+    }
 }
 
 // assembles an expression, returning the number of bytes the result uses on the stack
