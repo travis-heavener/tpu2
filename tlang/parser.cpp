@@ -426,6 +426,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             } else if (isTokenBinaryOp(tokens[i].type)) { // handle binary operators
                 pHead->push( new ASTOperator(tokens[i], false) );
             } else if (tokens[i].type == TokenType::IDENTIFIER) {
+                // skip if this is actually a function call
+                if (i+1 <= endIndex && tokens[i+1].type == TokenType::LPAREN) continue;
+                
                 // if there's a next token and it's an assignment operator
                 bool isAssignExpr = i+1 <= endIndex && isTokenAssignOp(tokens[i+1].type);
                 pHead->push( new ASTIdentifier(tokens[i], isAssignExpr) );
