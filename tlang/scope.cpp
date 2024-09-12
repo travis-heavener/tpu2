@@ -26,7 +26,7 @@ size_t Scope::pop() {
 }
 
 // returns the size of all variables in the scope
-size_t Scope::sizeBytes() const {
+size_t Scope::getSizeBytes() const {
     size_t size = 0;
 
     for (size_t i = 0; i < children.size(); i++)
@@ -38,7 +38,7 @@ size_t Scope::sizeBytes() const {
 // gets the offset address from the end with respect to the rest of the variables below it of a certain variable
 size_t Scope::getOffset(const std::string& name, ErrInfo err) const {
     // factor in additional pushes/pops that aren't scope variables (ex. pushes for expressions)
-    size_t offset = this->stackPtr - this->sizeBytes();
+    size_t offset = this->stackPtr - this->getSizeBytes();
 
     for (long i = children.size()-1; i >= 0; i--) {
         ScopeVariable* pVar = children[i];
