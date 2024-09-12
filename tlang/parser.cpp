@@ -1,3 +1,4 @@
+#include <stack>
 #include <vector>
 
 #include "parser.hpp"
@@ -294,7 +295,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     break;
                 }
 
-                // get expression
+                // base case, parse as an expression
                 size_t endExpr = i;
                 while (endExpr <= endIndex && tokens[endExpr].type != TokenType::SEMICOLON)
                     ++endExpr;
@@ -356,35 +357,52 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
     // iterate through expression
     try {
         // order of operations for expression parsing
-        // (bottom)     -->     -->     -->     -->     -->     -->     -->     (top)
-        // PARENTHESIS, UNARIES, MULT/DIV/MOD, ADD/SUB & INC/DEC, COMPARISON, ASSIGNMENT
-        /**
-         * 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
-         * 2. COMBINE UNARIES
-         * 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
-         * 4. ADD/SUB
-         * 5. SHIFTS
-         * 6. COMPARISON
-         * 7. ASSIGNMENT
-        */
+        // operator precedence for C: https://en.cppreference.com/w/c/language/operator_precedence
 
-        // 1. PARSE ALL TOKENS (W/ PARENTHESIS RECURSIVELY) SO NODE IS FLAT EXCEPT FOR PARENTHETICALS
+        // start by parsing all tokens directly (parsing sub expressions recursively)
+        // precedence 1 (L -> R)
         for (size_t i = startIndex; i <= endIndex; i++) {
-            if (tokens[i].type == TokenType::LPAREN) { // find closing parenthesis
+            if (tokens[i].type == TokenType::LPAREN) {
+                // find closing parenthesis
                 if (i+1 > endIndex) throw TUnclosedGroupException(tokens[i].err);
 
                 size_t start = i, parensOpen = 1;
                 do {
-                    if (tokens[++i].type == TokenType::RPAREN)
-                        parensOpen--;
-                    else if (tokens[i].type == TokenType::LPAREN)
-                        parensOpen++;
+                    parensOpen += (tokens[++i].type == TokenType::RPAREN) ? -1 :
+                                (tokens[i].type == TokenType::LPAREN) ? 1 : 0;
                 } while (i <= endIndex && parensOpen > 0);
 
                 if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
-                // recurse
-                pHead->push( parseExpression(tokens, start+1, i-1) );
+                // check for function call
+                if (start - 1 >= startIndex && tokens[start-1].type == TokenType::IDENTIFIER) {
+                    // create function call node
+                    ASTFunctionCall* pCall = new ASTFunctionCall(tokens[start-1]);
+                    pHead->push( pCall ); // append function call node
+
+                    // append sub expressions separated by a comma
+                    size_t end = i; // ends ON the closing parenthesis
+                    size_t subExprStart = start+1;
+                    std::stack<size_t> parensIndices; // only break subexprs that aren't inside parentheticals
+                    for (size_t j = start+1; j < end; j++) {
+                        if (tokens[j].type == TokenType::LPAREN) {
+                            parensIndices.push(j);
+                        } else if (tokens[j].type == TokenType::RPAREN) {
+                            parensIndices.pop();
+                        } else if (parensIndices.size() == 0 && tokens[j].type == TokenType::COMMA) { // append subexpr
+                            pCall->push( parseExpression(tokens, subExprStart, j-1) );
+                            subExprStart = j+1;
+                        } else if (parensIndices.size() == 0 && j+1 == end) { // append subexpr
+                            pCall->push( parseExpression(tokens, subExprStart, j) );
+                        }
+                    }
+
+                    // verify parenthesis are closed appropriately
+                    if (parensIndices.size() > 0)
+                        throw TUnclosedGroupException(tokens[parensIndices.top()].err);
+                } else { // found a subexpression
+                    pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
+                }
             } else if (tokens[i].type == TokenType::LIT_INT) {
                 pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
             } else if (tokens[i].type == TokenType::LIT_FLOAT) {
@@ -416,7 +434,8 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             }
         }
 
-        // 2. COMBINE UNARIES
+        // combine unaries
+        // precedence 2 (R -> L)
         for (long long i = pHead->size()-1; i >= 0; i--) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
@@ -432,9 +451,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 continue;
             }
 
-            // skip if already parsed
-            if (currentOp.size() > 0) continue;
-
             // confirm there is a token after this
             if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
@@ -443,7 +459,8 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             pHead->removeChild( i+1 );
         }
 
-        // 3. COMBINE MULT/DIV/MOD ARGS ON EITHER SIDE
+        // combine mult/div/mod
+        // precedence 3 (L -> R)
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
@@ -454,9 +471,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             if (opType != TokenType::OP_MUL && opType != TokenType::OP_DIV && opType != TokenType::OP_MOD)
                 continue;
             
-            // skip if already parsed
-            if (currentOp.size() > 0) continue;
-
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
             
@@ -468,7 +482,8 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 4. ADD/SUB
+        // combine add/sub
+        // precedence 4 (L -> R)
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             // + and - are counted as unaries by step 1
@@ -478,9 +493,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             TokenType opType = currentOp.getOpTokenType();
             if (opType != TokenType::OP_ADD && opType != TokenType::OP_SUB) continue;
-
-            // skip if already parsed
-            if (currentOp.size() > 0) continue;
 
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
@@ -496,7 +508,8 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 5. SHIFTS
+        // combine bitshifts
+        // precedence 5 (L -> R)
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
@@ -505,9 +518,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
             if (currentOp.getOpTokenType() != TokenType::OP_LSHIFT && currentOp.getOpTokenType() != TokenType::OP_RSHIFT) continue;
 
-            // skip if already parsed
-            if (currentOp.size() > 0) continue;
-
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
 
@@ -519,17 +529,18 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 6. COMPARISON
+        // combine comparison GT/LT/GTE/LTE operators
+        // precedence 6 (L -> R)
         for (size_t i = 0; i < pHead->size(); i++) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
-            // verify this is a comparison operation
+            // verify this is either GT, GTE, LT<, or LTE
             ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
-            if (!isTokenCompOp(currentOp.getOpTokenType())) continue;
-
-            // skip if already parsed
-            if (currentOp.size() > 0) continue;
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_GT && tokenType != TokenType::OP_GTE &&
+                tokenType != TokenType::OP_LT && tokenType != TokenType::OP_LTE)
+                continue;
 
             // check for following expression
             if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
@@ -542,7 +553,140 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // 7. ASSIGNMENT
+        // combine equality comparison operators
+        // precedence 7 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is an equality comparison
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_EQ && tokenType != TokenType::OP_NEQ)
+                continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // combine bitwise and
+        // precedence 8 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is bitwise and
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_BIT_AND) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // combine bitwise xor
+        // precedence 9 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is bitwise xor
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_BIT_XOR) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // combine bitwise or
+        // precedence 10 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is bitwise xor
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_BIT_OR) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // combine logical and
+        // precedence 11 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is bitwise xor
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_BOOL_AND) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // combine logical or
+        // precedence 12 (L -> R)
+        for (size_t i = 0; i < pHead->size(); i++) {
+            ASTNode& currentNode = *pHead->at(i);
+            if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+            // verify this is bitwise xor
+            ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
+            TokenType tokenType = currentOp.getOpTokenType();
+            if (tokenType != TokenType::OP_BOOL_OR) continue;
+
+            // check for following expression
+            if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);
+
+            // append previous and next nodes as children of bin expr
+            currentNode.push(pHead->at(i-1));
+            currentNode.push(pHead->at(i+1));
+            pHead->removeChild(i+1); // remove last, first to prevent adjusting indexing
+            pHead->removeChild(i-1);
+            i--; // skip back once since removing previous node
+        }
+
+        // precedence 14 (R -> L)
         for (long long i = pHead->size()-1; i >= 0; i--) {
             ASTNode& currentNode = *pHead->at(i);
             if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
