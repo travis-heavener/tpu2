@@ -9,7 +9,11 @@
 #include "ast/ast.hpp"
 #include "ast/ast_nodes.hpp"
 
-typedef std::map<std::string, std::string> label_map_t;
+typedef struct assembled_func_t {
+    std::string labelName;
+    TokenType returnType;
+} assembled_func_t;
+typedef std::map<std::string, assembled_func_t> label_map_t;
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST&, std::ofstream&);

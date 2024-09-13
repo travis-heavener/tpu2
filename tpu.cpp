@@ -79,6 +79,7 @@ void TPU::moveToRegister(Register reg, unsigned short value) {
         case Register::SI: SI = value; break;
         case Register::DI: DI = value; break;
         case Register::IP: IP = value; break;
+        case Register::CP: CP = value; break;
         case Register::FLAGS: FLAGS = value; break;
         default: throw std::invalid_argument("Invalid register for move: " + reg);
     }
@@ -95,6 +96,7 @@ Word& TPU::readRegister16(Register reg) {
         case Register::SI: return SI;
         case Register::DI: return DI;
         case Register::IP: return IP;
+        case Register::CP: return CP;
         case Register::FLAGS: return FLAGS;
         default: throw std::invalid_argument("Invalid 16-bit register for get: " + reg);
     }

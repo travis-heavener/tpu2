@@ -42,7 +42,6 @@ int main(int argc, char* argv[]) {
 
     std::cout << tpu.readRegister16(Register::DX) << ' ' << tpu.readRegister16(Register::AX) << '\n';
     std::cout << memory[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
-    std::cout << tpu.readRegister16(Register::FLAGS) << '\n';
 
     return 0;
 }

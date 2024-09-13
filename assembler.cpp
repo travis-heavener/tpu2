@@ -254,7 +254,7 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
         parseMOVW(args, memory, instIndex);
     } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
-        parsePUSH(args, memory, instIndex, kwd == "push");
+        parsePUSH(args, memory, instIndex, kwd == "pushw");
     } else if (kwd == "pop") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOP(args, memory, instIndex);
@@ -544,16 +544,9 @@ void parseNOTBUF(const std::vector<std::string>& args, Memory& memory, u16& inst
 void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW) {
     memory[instIndex++] = OPCode::PUSH;
 
+    Register reg;
     try { // try as register (0-1)
-        Register reg = getRegisterFromString(args[0]);
-        if (isPUSHW) { // try as 1
-            if (isRegister8Bit(reg)) throw std::invalid_argument("Expected 16-bit register.");
-            memory[instIndex++] = 1; // MOD byte
-        } else { // try as 0
-            if (!isRegister8Bit(reg)) throw std::invalid_argument("Expected 8-bit register.");
-            memory[instIndex++] = 0; // MOD byte
-        }
-        memory[instIndex++] = reg;
+        reg = getRegisterFromString(args[0]);
     } catch (std::invalid_argument&) { // try as addr/offset/imm8/imm16
         switch (args[0][0]) {
             case '@': { // try as addr (4)
@@ -561,7 +554,7 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
                 memory[instIndex++] = 4; // MOD byte
                 memory[instIndex++] = addr & 0x00FF;
                 memory[instIndex++] = (addr & 0xFF00) >> 8;
-                break;
+                return;
             }
             case '[': { // try as offset (5)
                 // check for open and close bracket
@@ -584,7 +577,7 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
                 memory[instIndex++] = refReg;
                 memory[instIndex++] = (u8)(offset & 0x00FF);
                 memory[instIndex++] = (u8)((offset & 0xFF00) >> 8);
-                break;
+                return;
             }
             default: { // try as imm8/16 (2-3)
                 if (isPUSHW) { // try as imm16 (3)
@@ -599,10 +592,20 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
                     memory[instIndex++] = 2; // MOD byte
                     memory[instIndex++] = arg;
                 }
-                break;
+                return;
             }
         }
     }
+
+    // base case, push from register
+    if (isPUSHW) { // try as 1
+        if (isRegister8Bit(reg)) throw std::invalid_argument("Expected 16-bit register.");
+        memory[instIndex++] = 1; // MOD byte
+    } else { // try as 0
+        if (!isRegister8Bit(reg)) throw std::invalid_argument("Expected 8-bit register.");
+        memory[instIndex++] = 0; // MOD byte
+    }
+    memory[instIndex++] = reg;
 }
 
 void parsePOP(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
