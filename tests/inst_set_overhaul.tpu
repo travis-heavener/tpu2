@@ -1,0 +1,20 @@
+main:
+    ; test movw
+    movw AX, 0x0FC1
+
+    ; test offset
+    push AX
+
+    ; test popw
+    popw DX
+
+    push 0x88AA
+    mov AL, [SP-1]
+    movw AX, 0xBBBB
+    mov [SP-1], AH
+    movw AX, BX
+
+    push [SP-1]
+    popw DX
+
+    hlt

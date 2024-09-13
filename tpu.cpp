@@ -23,8 +23,9 @@ Register getRegisterFromString(const std::string& str) {
     else if (str == "BP") return Register::BP;
     else if (str == "SI") return Register::SI;
     else if (str == "DI") return Register::DI;
-    else if (str == "IP") return Register::IP;
-    else if (str == "FLAGS") return Register::FLAGS;
+    // else if (str == "IP") return Register::IP; // IGNORE THESE TO PREVENT USER INPUTTING THEM
+    else if (str == "CP") return Register::CP;
+    // else if (str == "FLAGS") return Register::FLAGS; // IGNORE THESE TO PREVENT USER INPUTTING THEM
     else throw std::invalid_argument("Invalid register name: " + str);
 }
 
@@ -35,6 +36,7 @@ void TPU::reset() {
     // fix instruction ptr and stack ptr
     IP = INSTRUCTION_PTR_START;
     SP = STACK_LOWER_ADDR; // grows upwards (away from reserved pool)
+    CP = CALLSTACK_LOWER_ADDR; // grows upwards (in reserved pool)
 
     // clear flags
     FLAGS = 0x0;
@@ -119,6 +121,12 @@ void TPU::execute(Memory& memory) {
     // wait cycle since TPU has to process the instruction
     this->sleep();
 
+    #define caseInstruction(INST) case OPCode::INST: { \
+        instructions::process##INST(*this, memory); \
+        this->sleep(); \
+        break; \
+    }
+
     // switch on instruction
     unsigned short opCode = instruction.getValue();
     switch (opCode) {
@@ -132,91 +140,25 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since the TPU has just completed a syscall
             break;
         }
-        case OPCode::CALL: {
-            instructions::processCALL(*this, memory);
-            this->sleep(); // wait since the TPU has just completed a syscall
-            break;
-        }
-        case OPCode::JMP: {
-            instructions::processJMP(*this, memory);
-            this->sleep(); // wait since TPU has just completed JMP/JZ/JNZ
-            break;
-        }
-        case OPCode::MOV: {
-            instructions::processMOV(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::PUSH: {
-            instructions::processPUSH(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::POP: {
-            instructions::processPOP(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::RET: {
-            instructions::processRET(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::RMOV: {
-            instructions::processRMOV(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::ADD: {
-            instructions::processADD(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::SUB: {
-            instructions::processSUB(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::MUL: {
-            instructions::processMUL(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::DIV: {
-            instructions::processDIV(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::AND: {
-            instructions::processAND(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::OR: {
-            instructions::processOR(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::XOR: {
-            instructions::processXOR(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::NOT: {
-            instructions::processNOT(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::SHL: {
-            instructions::processSHL(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
-        case OPCode::SHR: {
-            instructions::processSHR(*this, memory);
-            this->sleep(); // wait since TPU has just completed an operation
-            break;
-        }
+        caseInstruction(CALL)
+        caseInstruction(RET)
+        caseInstruction(JMP)
+        caseInstruction(MOV)
+        caseInstruction(MOVW)
+        caseInstruction(PUSH)
+        caseInstruction(POP)
+        caseInstruction(POPW)
+        caseInstruction(ADD)
+        caseInstruction(SUB)
+        caseInstruction(MUL)
+        caseInstruction(DIV)
+        caseInstruction(BUF)
+        caseInstruction(AND)
+        caseInstruction(OR)
+        caseInstruction(XOR)
+        caseInstruction(NOT)
+        caseInstruction(SHL)
+        caseInstruction(SHR)
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
     }

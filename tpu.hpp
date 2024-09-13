@@ -5,25 +5,29 @@
 
 
 /**
- * |------------------------- MEMORY MAP -------------------------|
- * | 0x0-0x0FFF | 0x1000-0x1FFF |          0x1400-0xFFFF          |
- * | (RESERVED) |    (STACK)    |             (FREE)              |
- * |--------------------------------------------------------------|
+ * |------------------------------------ MEMORY MAP ------------------------------------|
+ * | 0x0-0x07FF | 0x0800-0x0FFF | 0x1000-0x1FFF |             0x1400-0xFFFF             |
+ * | (RESERVED) |  (CALLSTACK)  |    (STACK)    |                (FREE)                 |
+ * |------------------------------------------------------------------------------------|
 */
 
-// allocate 4KiB for OS
+// allocate 2KiB for OS (-4 bytes for instruction ptr start)
 #define RESERVED_LOWER_ADDR   0x0000
-#define RESERVED_UPPER_ADDR   0x0FFF
+#define RESERVED_UPPER_ADDR   0x07FB
+
+// allocate 2KiB for callstack
+#define CALLSTACK_LOWER_ADDR  0x0800
+#define CALLSTACK_UPPER_ADDR  0x0FFF
 
 // allocate 4KiB for stack
 #define STACK_LOWER_ADDR      0x1000
 #define STACK_UPPER_ADDR      0x1FFF
 
 // set instruction pointer start at end of reserved
-#define INSTRUCTION_PTR_START 0x0FFC // needs 4 bytes (JMP opcode, MOD byte, lower-addr, upper-addr)
+#define INSTRUCTION_PTR_START RESERVED_UPPER_ADDR+1 // needs 4 bytes (JMP opcode, MOD byte, lower-addr, upper-addr)
 
-// allocate remaining 59KiB for free use
-#define FREE_LOWER_ADDR       0x1400
+// allocate remaining 56KiB for free use
+#define FREE_LOWER_ADDR       0x2000
 #define FREE_UPPER_ADDR       0xFFFF
 
 // flag macros
@@ -40,16 +44,18 @@ enum OPCode {
     HLT         = 0x01,
     SYSCALL     = 0x02,
     CALL        = 0x03,
-    JMP         = 0x04,
-    MOV         = 0x05,
-    PUSH        = 0x06,
-    POP         = 0x07,
-    RET         = 0x08,
-    RMOV        = 0x09,
+    RET         = 0x04,
+    JMP         = 0x05,
+    MOV         = 0x06,
+    MOVW        = 0x07,
+    PUSH        = 0x08,
+    POP         = 0x09,
+    POPW        = 0x0A,
     ADD         = 0x14,
     SUB         = 0x15,
     MUL         = 0x16,
     DIV         = 0x17,
+    BUF         = 0x1F,
     AND         = 0x20,
     OR          = 0x21,
     XOR         = 0x22,
@@ -69,7 +75,8 @@ enum Register {
     SI      = 0x0E,
     DI      = 0x0F,
     IP      = 0x10,
-    FLAGS   = 0x11
+    CP      = 0x11,
+    FLAGS   = 0x12
 };
 
 // syscall codes
@@ -88,6 +95,7 @@ constexpr Register getRegister16FromCode(unsigned short code) {
         case SI: return SI;
         case DI: return DI;
         case IP: return IP;
+        case CP: return CP;
         case FLAGS: return FLAGS;
         default: throw std::invalid_argument("OPCode does not belong to a 16-bit register: " + code);
     }
@@ -125,6 +133,7 @@ class TPU {
         Word DX; // data
         Word SP; // stack pointer
         Word BP; // base pointer
+        Word CP; // call stack pointer
         Word SI; // source index
         Word DI; // destination index
         Word IP; // instruction pointer/program counter

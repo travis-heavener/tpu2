@@ -117,6 +117,11 @@ namespace instructions {
         tpu.moveToRegister(Register::IP, addr);
     }
 
+    void processRET(TPU& tpu, Memory&) {
+        // Revert the instruction pointer to the previous memory address stored in the base pointer.
+        tpu.moveToRegister(Register::IP, tpu.readRegister16(Register::BP).getValue());
+    }
+
     void processJMP(TPU& tpu, Memory& memory) {
         // determine operands from mod byte
         Byte mod = tpu.readByte(memory);
@@ -167,7 +172,7 @@ namespace instructions {
 
         // get operands
         switch (mod.getValue() & 0b111) {
-            case 0: { // Move imm8 into address in memory
+            case 0: { // Move imm8 into address in memory.
                 u16 opA = tpu.readWord(memory).getValue();
                 memory[opA] = tpu.readByte(memory).getValue();
                 break;
@@ -179,21 +184,14 @@ namespace instructions {
                 memory[opA] = tpu.readRegister8(reg);
                 break;
             }
-            case 2: { // Move imm8 into 8-bit register
+            case 2: { // Move imm8 into 8-bit register.
                 u8 opA = tpu.readByte(memory).getValue();
                 tpu.moveToRegister(
                     getRegister8FromCode(opA), tpu.readByte(memory).getValue()
                 );
                 break;
             }
-            case 3: { // Move imm16 into 16-bit register
-                u8 opA = tpu.readByte(memory).getValue();
-                tpu.moveToRegister(
-                    getRegister16FromCode(opA), tpu.readWord(memory).getValue()
-                );
-                break;
-            }
-            case 4: { // Move 8-bit value from memory address into 8-bit register.
+            case 3: { // Move 8-bit value from memory address into 8-bit register.
                 u8 opA = tpu.readByte(memory).getValue();
                 u16 addr = tpu.readWord(memory).getValue();
                 tpu.moveToRegister(
@@ -201,7 +199,7 @@ namespace instructions {
                 );
                 break;
             }
-            case 5: { // Move value between 8-bit registers.
+            case 4: { // Move value between 8-bit registers.
                 u8 opA = tpu.readByte(memory).getValue();
                 u8 opB = tpu.readByte(memory).getValue();
                 tpu.moveToRegister(
@@ -210,7 +208,46 @@ namespace instructions {
                 );
                 break;
             }
-            case 6: { // Move value between 16-bit registers.
+            case 5: { // Move value from a memory address at an offset to a pointer register (SP, BP, CP) to an 8-bit register.
+                Register refReg = getRegister16FromCode(tpu.readByte(memory).getValue());
+                int offsetU16 = tpu.readWord(memory).getValue();
+                int offset = (short)offsetU16;
+                u16 memAddr = (int)tpu.readRegister16(refReg).getValue() + offset;
+                Register regA = getRegister8FromCode(tpu.readByte(memory).getValue());
+                memory[memAddr] = tpu.readRegister8( regA );
+                break;
+            }
+            case 6: { // Move value from an 8-bit register to the memory address at an offset from a pointer register (SP, BP, CP).
+                Register regB = getRegister8FromCode(tpu.readByte(memory).getValue());
+                Register refReg = getRegister16FromCode(tpu.readByte(memory).getValue());
+                int offsetU16 = tpu.readWord(memory).getValue();
+                int offset = (short)offsetU16;
+                u16 memAddr = (int)tpu.readRegister16(refReg).getValue() + offset;
+                tpu.moveToRegister(regB, memory[memAddr].getValue());
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+                break;
+            }
+        }
+    }
+
+    void processMOVW(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Move imm16 into 16-bit register.
+                u8 opA = tpu.readByte(memory).getValue();
+                tpu.moveToRegister(
+                    getRegister16FromCode(opA), tpu.readWord(memory).getValue()
+                );
+                break;
+            }
+            case 1: { // Move value between 16-bit registers.
                 u8 opA = tpu.readByte(memory).getValue();
                 u8 opB = tpu.readByte(memory).getValue();
                 tpu.moveToRegister(
@@ -220,7 +257,7 @@ namespace instructions {
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+                throw std::invalid_argument("Invalid MOD byte for operation: movw.");
                 break;
             }
         }
@@ -236,10 +273,82 @@ namespace instructions {
         switch (mod.getValue() & 0b111) {
             case 0: { // Pushes the value of an 8-bit register onto the stack.
                 pushedValue = tpu.readRegister8(getRegister8FromCode(tpu.readByte(memory).getValue())).getValue();
+
+                // move the stack pointer up
+                u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 newAddr = oldAddr + 1;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[oldAddr] = pushedValue & 0xFF;
                 break;
             }
-            case 1: { // Pushes an imm8 value onto the stack.
+            case 1: { // Pushes the value of a 16-bit register onto the stack, lowest byte first.
+                pushedValue = tpu.readRegister16(getRegister16FromCode(tpu.readByte(memory).getValue())).getValue();
+
+                // move the stack pointer up
+                u16 lowerAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 upperAddr = lowerAddr + 1;
+                u16 newAddr = lowerAddr + 2;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[lowerAddr] = pushedValue & 0x00FF;
+                memory[upperAddr] = (pushedValue & 0xFF00) >> 8;
+                break;
+            }
+            case 2: { // Pushes an imm8 value onto the stack.
                 pushedValue = tpu.readByte(memory).getValue();
+
+                // move the stack pointer up
+                u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 newAddr = oldAddr + 1;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[oldAddr] = pushedValue & 0xFF;
+                break;
+            }
+            case 3: { // Pushes an imm16 value onto the stack, lowest byte first.
+                pushedValue = tpu.readWord(memory).getValue();
+
+                // move the stack pointer up
+                u16 lowerAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 upperAddr = lowerAddr + 1;
+                u16 newAddr = lowerAddr + 2;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[lowerAddr] = pushedValue & 0x00FF;
+                memory[upperAddr] = (pushedValue & 0xFF00) >> 8;
+                break;
+            }
+            case 4: { // Pushes an 8-bit value from an address in memory onto the stack.
+                pushedValue = memory[ tpu.readWord(memory) ].getValue();
+
+                // move the stack pointer up
+                u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 newAddr = oldAddr + 1;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[oldAddr] = pushedValue & 0xFF;
+                break;
+            }
+            case 5: { // Pushes an 8-bit value from a relative address below the stack pointer onto the stack.
+                // get memory address
+                Register regA = getRegister16FromCode(tpu.readByte(memory).getValue());
+                int offset = (int)tpu.readWord(memory).getValue();
+                u16 memAddr = tpu.readRegister16( regA ).getValue() + offset;
+                pushedValue = memory[memAddr].getValue();
+
+                // move the stack pointer up
+                u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+                u16 newAddr = oldAddr + 1;
+                tpu.moveToRegister(Register::SP, newAddr);
+
+                // push value onto stack at previous SP address
+                memory[oldAddr] = pushedValue & 0xFF;
                 break;
             }
             default: {
@@ -247,14 +356,6 @@ namespace instructions {
                 break;
             }
         }
-
-        // move the stack pointer up
-        u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
-        u16 newAddr = oldAddr + 1;
-        tpu.moveToRegister(Register::SP, newAddr);
-
-        // push value onto stack at previous SP address
-        memory[oldAddr] = pushedValue;
     }
 
     void processPOP(TPU& tpu, Memory& memory) {
@@ -282,41 +383,33 @@ namespace instructions {
         tpu.moveToRegister(Register::SP, newAddr);
     }
 
-    void processRET(TPU& tpu, Memory&) {
-        // Revert the instruction pointer to the previous memory address stored in the base pointer.
-        tpu.moveToRegister(Register::IP, tpu.readRegister16(Register::BP).getValue());
-    }
-
-    void processRMOV(TPU& tpu, Memory& memory) {
+    void processPOPW(TPU& tpu, Memory& memory) {
         // determine operands from mod byte
         Byte mod = tpu.readByte(memory);
         tpu.sleep(); // wait since TPU has to process mod byte
 
         // get operands
+        u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
+        u16 upperAddr = oldAddr - 1;
+        u16 lowerAddr = oldAddr - 2;
+        u16 poppedValue = memory[ upperAddr ].getValue();
+        poppedValue <<= 8;
+        poppedValue |= memory[ lowerAddr ].getValue();
+
         switch (mod.getValue() & 0b111) {
-            case 0: { // Performs a relative move of imm8 to an address based off the stack pointer's offset.
-                // extract address
-                u16 destAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
-                memory[destAddr] = tpu.readByte(memory);
+            case 0: { // Pops the top two bytes off the stack to a 16-bit register, the top byte into the upper half.
+                tpu.moveToRegister(getRegister16FromCode(tpu.readByte(memory).getValue()), poppedValue);
                 break;
             }
-            case 1: { // Performs a relative move of 8-bit register value to an address based off the stack pointer's offset.
-                // extract address
-                u16 destAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
-                memory[destAddr] = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) );
-                break;
-            }
-            case 2: { // Performs a relative move into an 8-bit register from an address based off the stack pointer's offset.
-                Register destReg = getRegister8FromCode( tpu.readByte(memory).getValue() );
-                u16 srcAddr = tpu.readRegister16(Register::SP).getValue() - tpu.readWord(memory).getValue();
-                tpu.moveToRegister( destReg, memory[srcAddr].getValue() );
-                break;
-            }
+            case 1: break; // Pops the top two bytes off the stack without storing them.
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: rmov.");
+                throw std::invalid_argument("Invalid MOD byte for operation: popw.");
                 break;
             }
         }
+
+        // move the stack pointer back down
+        tpu.moveToRegister(Register::SP, lowerAddr);
     }
 
     void processADD(TPU& tpu, Memory& memory) {
@@ -625,6 +718,46 @@ namespace instructions {
                 break;
             }
         }
+    }
+
+    void processBUF(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u16 value;
+        switch (mod.getValue() & 0b111) {
+            case 0: { // Buffers a value from an 8-bit register, updating the flags according to the register value.
+                u8 opA = tpu.readByte(memory).getValue();
+                value = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
+                break;
+            }
+            case 1: { // Buffers a value from a 16-bit register, updating the flags according to the register value.
+                u8 opA = tpu.readByte(memory).getValue();
+                value = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
+                break;
+            }
+            case 2: { // Buffers an imm8 value, updating the flags according to the value.
+                value = tpu.readByte(memory).getValue();
+                break;
+            }
+            case 3: { // Buffers an imm16 value, updating the flags according to the value.
+                value = tpu.readWord(memory).getValue();
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: not.");
+                break;
+            }
+        }
+
+        // update flags
+        tpu.setFlag(CARRY, 0); // same as overflow
+        tpu.setFlag(PARITY, getParity(value));
+        tpu.setFlag(ZERO, value == 0);
+        tpu.setFlag(SIGN, (value & (1u << 7)) > 0);
+        tpu.setFlag(OVERFLOW, 0);
     }
 
     void processAND(TPU& tpu, Memory& memory) {

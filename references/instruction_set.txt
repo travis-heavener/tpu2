@@ -8,30 +8,37 @@ syscall                     0x02            Triggers a syscall.
 
 call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
 
-jmp label                   0x04 /0         Moves the instruction pointer to the specified label.
-jz label                    0x04 /1         Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
-jnz label                   0x04 /2         Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
-jc label                    0x04 /3         Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
-jnc label                   0x04 /4         Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
+ret                         0x04            Revert the instruction pointer to the previous memory address stored in the base pointer.
 
-mov @addr, imm8             0x05 /0         Move imm8 into address in memory
-mov @addr, reg              0x05 /1         Move value in 8-bit register to memory address.
-mov reg, imm8               0x05 /2         Move imm8 into 8-bit register
-mov reg, imm16              0x05 /3         Move imm16 into 16-bit register
-mov reg, @addr              0x05 /4         Move 8-bit value from memory address into 8-bit register.
-mov reg, reg                0x05 /5         Move value between 8-bit registers.
-mov reg, reg                0x05 /6         Move value between 16-bit registers.
+jmp label                   0x05 /0         Moves the instruction pointer to the specified label.
+jz label                    0x05 /1         Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
+jnz label                   0x05 /2         Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
+jc label                    0x05 /3         Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
+jnc label                   0x05 /4         Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
 
-push reg                    0x06 /0         Pushes the value of an 8-bit register onto the stack.
-push imm8                   0x06 /1         Pushes an imm8 value onto the stack.
-pop reg                     0x07 /0         Pops the last byte off the stack to an 8-bit register.
-pop                         0x07 /1         Pops the last byte off the stack without storing it.
+mov @addr, imm8             0x06 /0         Move imm8 into address in memory.
+mov @addr, reg              0x06 /1         Move value in 8-bit register to memory address.
+mov reg, imm8               0x06 /2         Move imm8 into 8-bit register.
+mov reg, @addr              0x06 /3         Move 8-bit value from memory address into 8-bit register.
+mov reg, reg                0x06 /4         Move value between 8-bit registers.
+mov [offset], reg           0x06 /5         Move value from a memory address at an offset to a pointer register (SP, BP, CP) to an 8-bit register.
+mov reg, [offset]           0x06 /6         Move value from an 8-bit register to the memory address at an offset from a pointer register (SP, BP, CP).
 
-ret                         0x08            Revert the instruction pointer to the previous memory address stored in the base pointer.
+movw reg, imm16             0x07 /0         Move imm16 into 16-bit register.
+movw reg, reg               0x07 /1         Move value between 16-bit registers.
 
-rmov $-offset, imm8         0x09 /0         Performs a relative move of imm8 to an address based off the stack pointer's offset.
-rmov $-offset, reg          0x09 /1         Performs a relative move of 8-bit register value to an address based off the stack pointer's offset.
-rmov reg, $-offset          0x09 /2         Performs a relative move into an 8-bit register from an address based off the stack pointer's offset.
+push reg                    0x08 /0         Pushes the value of an 8-bit register onto the stack.
+push reg                    0x08 /1         Pushes the value of a 16-bit register onto the stack, lowest byte first.
+push imm8                   0x08 /2         Pushes an imm8 value onto the stack.
+push imm16                  0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
+push @addr                  0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
+push [offset]               0x08 /5         Pushes an 8-bit value from a relative address of a pointer register onto the stack.
+
+pop reg                     0x09 /0         Pops the top byte off the stack to an 8-bit register.
+pop                         0x09 /1         Pops the last byte off the stack without storing it.
+
+popw reg                    0x0A /0         Pops the top two bytes off the stack to a 16-bit register, the top byte into the upper half.
+popw                        0x0A /1         Pops the top two bytes off the stack without storing them.
 
 add reg, imm8               0x14 /0         Adds 8-bit register and imm8 and stores in first operand.
 add reg, imm16              0x14 /1         Adds 16-bit register and imm16 and stores in first operand.
@@ -52,6 +59,11 @@ div imm8                    0x17 /0         Divides the AL register by imm8 and 
 div imm16                   0x17 /1         Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
 div reg                     0x17 /2         Divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
 div reg                     0x17 /3         Divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
+
+buf reg                     0x1F /0         Buffers a value from an 8-bit register, updating the flags according to the register value.
+buf reg                     0x1F /1         Buffers a value from a 16-bit register, updating the flags according to the register value.
+buf imm8                    0x1F /2         Buffers an imm8 value, updating the flags according to the value.
+buf imm16                   0x1F /3         Buffers an imm16 value, updating the flags according to the value.
 
 and reg, imm8               0x20 /0         Logical AND between 8-bit register and imm8, stored in first operand.
 and reg, imm16              0x20 /1         Logical AND between 16-bit register and imm16, stored in first operand.
