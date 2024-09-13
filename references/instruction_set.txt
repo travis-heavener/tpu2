@@ -6,9 +6,9 @@ hlt                         0x01            Halts/stops the clock on the CPU.
 
 syscall                     0x02            Triggers a syscall.
 
-call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
+call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer on the callstack.
 
-ret                         0x04            Revert the instruction pointer to the previous memory address stored in the base pointer.
+ret                         0x04            Revert the instruction pointer to the previous memory address stored on top of the callstack.
 
 jmp label                   0x05 /0         Moves the instruction pointer to the specified label.
 jz label                    0x05 /1         Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.

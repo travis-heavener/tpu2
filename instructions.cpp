@@ -102,24 +102,42 @@ namespace instructions {
     }
 
     void processCALL(TPU& tpu, Memory& memory) {
-        // Moves the instruction pointer to a named label's entry address, storing the current instruction pointer in the base pointer.
+        // Moves the instruction pointer to a named label's entry address, storing the current instruction pointer on the callstack.
 
         // get jump destination address (increments IP twice)
-        u16 addr = tpu.readWord(memory).getValue();
+        u16 destAddr = tpu.readWord(memory).getValue();
 
-        // store current IP in BP
-        tpu.moveToRegister(Register::BP, tpu.readRegister16(Register::IP).getValue());
-        
-        // sleep after getting destination address & storing IP in BP
-        tpu.sleep();
+        // store IP on callstack
+        u16 callstackAddr = tpu.readRegister16(Register::CP).getValue();
+        u16 prevIP = tpu.readRegister16(Register::IP).getValue();
+        memory[callstackAddr] = prevIP & 0x00FF;
+        memory[callstackAddr+1] = (prevIP & 0xFF00) >> 8;
+
+        // update callstack ptr 
+        tpu.moveToRegister(Register::CP, callstackAddr + 2);
 
         // jump to destination address
-        tpu.moveToRegister(Register::IP, addr);
+        tpu.moveToRegister(Register::IP, destAddr);
+
+        // sleep after storing IP
+        tpu.sleep();
     }
 
-    void processRET(TPU& tpu, Memory&) {
-        // Revert the instruction pointer to the previous memory address stored in the base pointer.
-        tpu.moveToRegister(Register::IP, tpu.readRegister16(Register::BP).getValue());
+    void processRET(TPU& tpu, Memory& memory) {
+        // Revert the instruction pointer to the previous memory address stored on top of the callstack.
+        u16 callstackAddr = tpu.readRegister16(Register::CP).getValue();
+        u16 destAddr = memory[callstackAddr-1].getValue();
+        destAddr <<= 8;
+        destAddr |= memory[callstackAddr-2].getValue();
+
+        // update callstack ptr 
+        tpu.moveToRegister(Register::CP, callstackAddr - 2);
+
+        // jump to destination address
+        tpu.moveToRegister(Register::IP, destAddr);
+
+        // sleep after storing IP
+        tpu.sleep();
     }
 
     void processJMP(TPU& tpu, Memory& memory) {
