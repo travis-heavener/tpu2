@@ -17,7 +17,7 @@ void parseMOVW(const std::vector<std::string>&, Memory&, u16&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
 void parseNOTBUF(const std::vector<std::string>&, Memory&, u16&, OPCode);
-void parsePUSH(const std::vector<std::string>&, Memory&, u16&);
+void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&);
 void parsePOPW(const std::vector<std::string>&, Memory&, u16&);
 void parseBitShifts(const std::vector<std::string>&, Memory&, u16&, bool);
@@ -252,9 +252,9 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
     } else if (kwd == "movw") {
         checkArgs(args, 2); // check for extra args
         parseMOVW(args, memory, instIndex);
-    } else if (kwd == "push") {
+    } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
-        parsePUSH(args, memory, instIndex);
+        parsePUSH(args, memory, instIndex, kwd == "push");
     } else if (kwd == "pop") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOP(args, memory, instIndex);
@@ -541,12 +541,18 @@ void parseNOTBUF(const std::vector<std::string>& args, Memory& memory, u16& inst
     }
 }
 
-void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW) {
     memory[instIndex++] = OPCode::PUSH;
 
     try { // try as register (0-1)
         Register reg = getRegisterFromString(args[0]);
-        memory[instIndex++] = !isRegister8Bit(reg); // MOD byte
+        if (isPUSHW) { // try as 1
+            if (isRegister8Bit(reg)) throw std::invalid_argument("Expected 16-bit register.");
+            memory[instIndex++] = 1; // MOD byte
+        } else { // try as 0
+            if (!isRegister8Bit(reg)) throw std::invalid_argument("Expected 8-bit register.");
+            memory[instIndex++] = 0; // MOD byte
+        }
         memory[instIndex++] = reg;
     } catch (std::invalid_argument&) { // try as addr/offset/imm8/imm16
         switch (args[0][0]) {
@@ -581,14 +587,15 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
                 break;
             }
             default: { // try as imm8/16 (2-3)
-                u32 arg = std::stoul(args[0]);
-                if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
-
-                if (arg > 0xFF) { // imm16 (3)
+                if (isPUSHW) { // try as imm16 (3)
+                    u32 arg = std::stoul(args[0]);
+                    if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
                     memory[instIndex++] = 3; // MOD byte
                     memory[instIndex++] = arg & 0x00FF;
                     memory[instIndex++] = (arg & 0xFF00) >> 8;
-                } else { // imm8 (2)
+                } else { // try as imm8 (2)
+                    u16 arg = std::stoul(args[0]);
+                    if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
                     memory[instIndex++] = 2; // MOD byte
                     memory[instIndex++] = arg;
                 }

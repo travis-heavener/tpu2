@@ -28,9 +28,9 @@ movw reg, imm16             0x07 /0         Move imm16 into 16-bit register.
 movw reg, reg               0x07 /1         Move value between 16-bit registers.
 
 push reg                    0x08 /0         Pushes the value of an 8-bit register onto the stack.
-push reg                    0x08 /1         Pushes the value of a 16-bit register onto the stack, lowest byte first.
+pushw reg                   0x08 /1         Pushes the value of a 16-bit register onto the stack, lowest byte first.
 push imm8                   0x08 /2         Pushes an imm8 value onto the stack.
-push imm16                  0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
+pushw imm16                 0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
 push @addr                  0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
 push [offset]               0x08 /5         Pushes an 8-bit value from a relative address of a pointer register onto the stack.
 
