@@ -1,9 +1,8 @@
-int test() {
-    return 63;
+int test(int a) {
+    return 63 + a;
 }
 
 int main() {
-    int f = test();
-    f + 0;
-    return 11;
+    int f = test(13 + 18);
+    return f;
 }

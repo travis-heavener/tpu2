@@ -18,10 +18,14 @@ typedef std::map<std::string, assembled_func_t> label_map_t;
 // generate TPU assembly code from the AST
 void generateAssembly(AST&, std::ofstream&);
 
-// abstractions from generateAssembly for visual bliss
-void assembleBody(ASTNode*, std::ofstream&, label_map_t&, Scope&, const std::string&, const bool);
+// for assembling functions
+void assembleFunction(ASTFunction&, std::ofstream&);
+
+// for assembling body content that may or may not have its own scope
+// returns true if the current body has returned (really only matters in function scopes)
+bool assembleBody(ASTNode*, std::ofstream&, Scope&, const std::string&, const bool);
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode&, std::ofstream&, label_map_t&, Scope&);
+size_t assembleExpression(ASTNode&, std::ofstream&, Scope&);
 
 #endif

@@ -13,45 +13,43 @@
 #define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
 #define TAB "    "
 
+// staic fields
+static size_t nextFuncLabelID = 0;
 static size_t nextJMPLabelID = 0;
+static label_map_t labelMap;
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
-    // initialize list of function labels
-    size_t nextFunctionID = 0;
-    label_map_t labelMap; // function name, function label
-
     // iterate over global functions
     std::vector<ASTNode*>& globalChildren = ast.getChildren();
     for (ASTNode* pFunc : globalChildren) {
         // build list of function labels
         ASTFunction& funcNode = *static_cast<ASTFunction*>(pFunc);
-        const std::string funcName = funcNode.getName();
-        const std::string labelName = funcName == FUNC_MAIN_LABEL ?
-            FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFunctionID++));
 
-        // record function name & return type
-        labelMap[funcName] = {labelName, funcNode.getReturnType()};
+        // assemble function
+        assembleFunction(funcNode, outHandle);
+    }
+}
 
-        // create a scope for this body
-        Scope scope;
+// for assembling functions
+void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
+    // determine labelName
+    const std::string funcName = funcNode.getName();
+    const std::string labelName = funcName == FUNC_MAIN_LABEL ?
+        FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
 
-        // assemble this function into the file
-        outHandle << labelName << ":\n";
+    // record function name & return type
+    labelMap[funcName] = {labelName, funcNode.getReturnType()};
 
-        // for all the arguments in this function, add them to the scope
-        // arguments are already on the top of the stack
-        const std::vector<param_t>& params = funcNode.getParams();
-        for (param_t arg : params) {
-            // add the variable to the scope
-            scope.declareVariable(arg.second, arg.first, funcNode.err);
-        }
+    // create a scope for this body
+    Scope scope;
 
-        // allocate space on the stack for return bytes
-        size_t returnSize = getSizeOfType(funcNode.getReturnType());
-        
-        // hollow space on the stack to reference return value
-        scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
+    // assemble this function into the file
+    outHandle << labelName << ":\n";
+
+    // if this is main, add return byte spacing on top of stack
+    const size_t returnSize = getSizeOfType(funcNode.getReturnType());
+    if (funcName == FUNC_MAIN_LABEL) {
         for (size_t i = 0; i < returnSize; i++) {
             if (i+1 < returnSize) {
                 outHandle << TAB << "pushw 0\n";
@@ -60,30 +58,41 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
                 outHandle << TAB << "push 0\n";
             }
         }
+    }
 
-        // assemble body content
-        assembleBody(pFunc, outHandle, labelMap, scope, labelName + FUNC_END_LABEL_SUFFIX, true);
+    // add function args to scope (args on top of stack below return bytes)
+    const std::vector<param_t>& params = funcNode.getParams();
+    for (param_t arg : params) // add the variable to the scope
+        scope.declareVariable(arg.second, arg.first, funcNode.err);
+    
+    // add return bytes to scope
+    scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
-        // jmp to end of function if not returned yet
-        outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
+    // assemble body content
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, labelName + FUNC_END_LABEL_SUFFIX, true);
 
-        // mark the end of the function with a label
-        outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
+    // declare end of function label
+    if (!hasReturned && returnSize > 0)
+        throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
+    
+    // write return label
+    outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
 
-        // return values are on top of stack
-
-        // stop clock after execution is done IF MAIN or return to previous label
-        if (funcName == FUNC_MAIN_LABEL) {
-            outHandle << TAB << "hlt\n";
-        } else {
-            // return to previous label specified by BP
-            outHandle << TAB << "ret\n";
-        }
+    // stop clock after execution is done IF MAIN or return to previous label
+    if (funcName == FUNC_MAIN_LABEL) {
+        // handle return status
+        outHandle << TAB << "movw AX, 0x03\n"; // specify syscall type
+        outHandle << TAB << "popw BX\n"; // pop return status to AX
+        outHandle << TAB << "syscall\n"; // trigger syscall
+        outHandle << TAB << "hlt\n";
+    } else { // return to previous label from call instruction
+        outHandle << TAB << "ret\n";
     }
 }
 
-// for assembling body content that has its own scope
-void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope, const std::string& returnLabelName, const bool isNewScope=true) {
+// for assembling body content that may or may not have its own scope
+// returns true if the current body has returned (really only matters in function scopes)
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& returnLabelName, const bool isNewScope=true) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
 
     // iterate over children of this node
@@ -107,7 +116,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << loopStartLabel << ":\n";
 
                 // check condition
-                size_t resultSize = assembleExpression(*loop.pExpr, outHandle, labelMap, scope);
+                size_t resultSize = assembleExpression(*loop.pExpr, outHandle, scope);
 
                 // load result to AL/AX
                 if (resultSize == 2) {
@@ -124,7 +133,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, labelMap, scope, returnLabelName, true);
+                assembleBody(&loop, outHandle, scope, returnLabelName, true);
 
                 // jump back to the loopStartLabel
                 outHandle << TAB << "jmp " << loopStartLabel << '\n';
@@ -137,7 +146,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 ASTForLoop& loop = *static_cast<ASTForLoop*>(&child);
 
                 // assemble first expression in current scope
-                size_t resultSize = assembleExpression(*loop.pExprA, outHandle, labelMap, scope);
+                size_t resultSize = assembleExpression(*loop.pExprA, outHandle, scope);
 
                 // nothing from the expression is handled so pop the result off the stack
                 for (size_t j = 0; j < resultSize; j++) {
@@ -161,7 +170,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << loopStartLabel << ":\n";
 
                 // check condition
-                resultSize = assembleExpression(*loop.pExprB, outHandle, labelMap, scope);
+                resultSize = assembleExpression(*loop.pExprB, outHandle, scope);
 
                 // load result to AL/AX
                 if (resultSize > 1) {
@@ -178,10 +187,10 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, labelMap, scope, returnLabelName, true);
+                assembleBody(&loop, outHandle, scope, returnLabelName, true);
 
                 // assemble third expression
-                resultSize = assembleExpression(*loop.pExprC, outHandle, labelMap, scope);
+                resultSize = assembleExpression(*loop.pExprC, outHandle, scope);
 
                 // nothing from the expression is handled so pop the result off the stack
                 for (size_t j = 0; j < resultSize; j++) {
@@ -222,7 +231,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                         else // else if branch
                             pExpr = static_cast<ASTElseIfCondition*>(conditional.at(j))->pExpr;
 
-                        size_t resultSize = assembleExpression(*pExpr, outHandle, labelMap, scope);
+                        size_t resultSize = assembleExpression(*pExpr, outHandle, scope);
 
                         // pop the result off the stack to AL/AX
                         if (resultSize == 2) {
@@ -241,7 +250,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body (don't make new scope)
-                    assembleBody(conditional.at(j), outHandle, labelMap, scope, returnLabelName, false);
+                    assembleBody(conditional.at(j), outHandle, scope, returnLabelName, false);
 
                     // jump to merge label
                     outHandle << TAB << "jmp " << mergeLabel << '\n';
@@ -272,7 +281,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
                     }
                 } else { // has assignment, assemble its expression
                     // push to stack (lowest-first)
-                    size_t resultSize = assembleExpression(*varChild.pExpr, outHandle, labelMap, scope);
+                    size_t resultSize = assembleExpression(*varChild.pExpr, outHandle, scope);
 
                     // verify result size does not overflow
                     if (resultSize > typeSize)
@@ -298,7 +307,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
             case ASTNodeType::RETURN: {
                 // assemble expression
                 ASTReturn& retNode = *static_cast<ASTReturn*>(&child);
-                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, labelMap, scope);
+                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, scope);
 
                 // move result bytes to their place earlier on the stack
                 for (size_t j = 0; j < resultSize; j++) {
@@ -320,7 +329,7 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
             }
             case ASTNodeType::EXPR: {
                 // assemble expression
-                size_t resultSize = assembleExpression(child, outHandle, labelMap, scope);
+                size_t resultSize = assembleExpression(child, outHandle, scope);
 
                 // nothing from the expression is handled so pop the result off the stack
                 for (size_t j = 0; j < resultSize; j++) {
@@ -359,18 +368,19 @@ void assembleBody(ASTNode* pHead, std::ofstream& outHandle, label_map_t& labelMa
     }
 
     // if returning, jmp to the return label
-    if (hasReturned) {
+    if (hasReturned)
         outHandle << TAB << "jmp " << returnLabelName << '\n';
-    }
+    
+    return hasReturned;
 }
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map_t& labelMap, Scope& scope) {
+size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope) {
     // recurse this function for children, bottom-up
     size_t numChildren = bodyNode.size();
     std::vector<size_t> resultSizes;
     for (size_t i = 0; i < numChildren; ++i) {
-        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, labelMap, scope) );
+        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope) );
     }
 
     // assemble this node
@@ -898,15 +908,23 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, label_map
             const std::string funcName = func.raw;
             if (labelMap.count(funcName) == 0) throw TUnknownIdentifierException(func.err);
 
-            // call the function
+            // allocate space on the stack for return bytes
             assembled_func_t destFunc = labelMap[funcName];
-            outHandle << TAB << "call " << destFunc.labelName << '\n';
-
-            // return the return size of the function
-            // results are at the top of the stack, so update scope
             size_t returnSize = getSizeOfType(destFunc.returnType);
-            for (size_t i = 0; i < returnSize; i++) scope.addPlaceholder();
-            
+
+            for (size_t i = 0; i < returnSize; i++) {
+                if (i+1 < returnSize) {
+                    outHandle << TAB << "pushw 0\n";
+                    i++;
+                    scope.addPlaceholder(); // additional placeholder
+                } else {
+                    outHandle << TAB << "push 0\n";
+                }
+                scope.addPlaceholder();
+            }
+
+            // call the function
+            outHandle << TAB << "call " << destFunc.labelName << '\n';
             return returnSize;
         }
         case ASTNodeType::EXPR: {

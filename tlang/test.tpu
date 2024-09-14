@@ -1,33 +1,40 @@
 __UF0:
-    pushw 0
     pushw 63
+    push [SP-6]
+    push [SP-6]
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
     pop DL
     mov [SP-2], DL
     pop DL
     mov [SP-2], DL
-    jmp __UF0E
     jmp __UF0E
     __UF0E:
     ret
 main:
     pushw 0
-    call __UF0
-    push [SP-2]
-    push [SP-2]
-    pushw 0
+    pushw 13
+    pushw 18
     popw BX
     popw AX
     add AX, BX
     pushw AX
-    popw
-    pushw 11
+    pushw 0
+    call __UF0
+    push [SP-2]
+    push [SP-2]
     pop DL
-    mov [SP-6], DL
+    mov [SP-8], DL
     pop DL
-    mov [SP-6], DL
+    mov [SP-8], DL
     popw
     popw
-    jmp mainE
+    popw
     jmp mainE
     mainE:
+    movw AX, 0x03
+    popw BX
+    syscall
     hlt
