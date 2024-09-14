@@ -94,6 +94,12 @@ namespace instructions {
                 #endif
                 break;
             }
+            case Syscall::EXIT_STATUS: {
+                // get exit status
+                u16 exitStatus = tpu.readRegister16(Register::BX).getValue();
+                tpu.setExitCode(exitStatus);
+                break;
+            }
             default: {
                 throw std::invalid_argument("Invalid syscall code: " + syscallCode);
                 break;

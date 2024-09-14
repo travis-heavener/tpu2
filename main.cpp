@@ -43,5 +43,8 @@ int main(int argc, char* argv[]) {
     std::cout << tpu.readRegister16(Register::DX) << ' ' << tpu.readRegister16(Register::AX) << '\n';
     std::cout << memory[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
 
+    // print exit status
+    std::cout << "Program exited with status " << tpu.readRegister16(Register::ES).getValue() << ".\n";
+
     return 0;
 }

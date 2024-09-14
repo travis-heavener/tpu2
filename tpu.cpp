@@ -97,6 +97,7 @@ Word& TPU::readRegister16(Register reg) {
         case Register::DI: return DI;
         case Register::IP: return IP;
         case Register::CP: return CP;
+        case Register::ES: return ES;
         case Register::FLAGS: return FLAGS;
         default: throw std::invalid_argument("Invalid 16-bit register for get: " + reg);
     }

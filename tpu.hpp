@@ -76,12 +76,14 @@ enum Register {
     DI      = 0x0F,
     IP      = 0x10,
     CP      = 0x11,
-    FLAGS   = 0x12
+    ES      = 0x12,
+    FLAGS   = 0x13
 };
 
 // syscall codes
 enum Syscall {
-    STDOUT      = 0x00,     STDERR      = 0x01,     STDIN       = 0x02
+    STDOUT      = 0x00,     STDERR      = 0x01,     STDIN       = 0x02,
+    EXIT_STATUS = 0x03
 };
 
 constexpr Register getRegister16FromCode(unsigned short code) {
@@ -137,6 +139,7 @@ class TPU {
         Word SI; // source index
         Word DI; // destination index
         Word IP; // instruction pointer/program counter
+        Word ES; // the exit status of the last executed program
 
         // flag register
         Word FLAGS;
@@ -155,6 +158,7 @@ class TPU {
         void moveToRegister(Register, unsigned short);
         Word& readRegister16(Register);
         Byte& readRegister8(Register);
+        void setExitCode(u16 code) { this->ES = code; };
     private:
         int clockFreq;
         bool __hasSuspended = false; // true when a halt instruction is met
