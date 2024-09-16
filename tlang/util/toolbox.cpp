@@ -49,3 +49,21 @@ void escapeString(std::string& str) {
         }
     }
 }
+
+// helper for trimming strings in place
+void ltrimString(std::string& str) {
+    while (str.length() > 0 && std::isspace(str[0])) {
+        str.erase(str.begin(), str.begin()+1);
+    }
+}
+
+void rtrimString(std::string& str) {
+    while (str.length() > 0 && std::isspace(*str.rbegin())) {
+        str.erase(str.end()-1, str.end());
+    }
+}
+
+void trimString(std::string& str) {
+    ltrimString(str);
+    rtrimString(str);
+}

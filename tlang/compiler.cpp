@@ -1,8 +1,11 @@
+#include <filesystem>
 #include <iostream>
 #include <fstream>
+#include <stack>
 #include <vector>
 
 #include "assembler.hpp"
+#include "preprocessor.hpp"
 #include "lexer.hpp"
 #include "parser/parser.hpp"
 #include "util/util.hpp"
@@ -56,9 +59,14 @@ int main(int argc, char* argv[]) {
 
     AST* pAST = nullptr;
     try {
+        // 0. load cwd
+        cwd_stack cwdStack;
+        std::filesystem::path inPathAbs( inPath );
+        cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
+
         // 1. tokenize file
         std::vector<Token> tokens;
-        tokenize(inHandle, tokens);
+        tokenize(inHandle, tokens, cwdStack);
         inHandle.close();
 
         // 2. parse to AST & syntax checking (semantic analysis)

@@ -17,4 +17,9 @@ bool isCharValidIdentifierStart(const char);
 char escapeChar(const std::string&);
 void escapeString(std::string&);
 
+// helper for trimming strings in place
+void ltrimString(std::string&);
+void rtrimString(std::string&);
+void trimString(std::string&);
+
 #endif

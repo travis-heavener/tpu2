@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "lexer.hpp"
+#include "preprocessor.hpp"
 
 #include "util/util.hpp"
 
@@ -15,22 +16,34 @@ bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset
 }
 
 // tokenize a document to a vector of Tokens
-void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens) {
+void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cwdStack) {
     // continuously read in the entire document, adding tokens
     std::string line;
 
     line_t lineNumber = 0;
+    macrodef_map macrodefMap;
     while (std::getline(inHandle, line)) {
         // remove trailing \r if present (CRLF for Windows systems)
         if (*line.rbegin() == '\r') line.pop_back();
 
         // tokenize line
-        tokenizeLine(line, tokens, ++lineNumber);
+        tokenizeLine(line, tokens, ++lineNumber, macrodefMap, cwdStack);
     }
 }
 
 // tokenize a particular line
-void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t lineNumber) {
+void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack) {
+    if (line.size() == 0) return;
+
+    // replace any macro definitions
+    replaceMacrodefs(line, macrodefMap);
+
+    // run preprocessor for this line
+    bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack);
+
+    // skip lines used by the preprocessor
+    if (hasPreprocessed) return;
+
     // iterate over all characters
     const size_t lineLen = line.size();
     std::string buffer; // mutable buffer cleared each iteration
