@@ -2,6 +2,10 @@ void dummy() {
     // do nothing
 }
 
+int test(int a) {
+    return a * 3;
+}
+
 // int test(int a[1][2]) {
 //     return 63 + a[0][1];
 // }
@@ -14,7 +18,8 @@ int main() {
     };
     int f[4][2] = dum[2];
     int j[4][2] = dum[2];
-    return dum[2];
+    int c = dum[2];
+    return test(c);
 
     // char a = 23;
     // return a;

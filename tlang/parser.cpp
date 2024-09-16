@@ -12,6 +12,9 @@ AST* parseToAST(const std::vector<Token>& tokens) {
     // create the AST
     AST* pAST = new AST();
 
+    // create a scope stack to store variables and functions' types
+    scope_stack_t scopeStack = { parser_scope_t() }; // global scope
+
     // fill in the AST
     try {
         // only allow functions in the global scope
@@ -64,7 +67,7 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
             // all good to go
             endIndex = i;
-            pAST->push( parseFunction(tokens, startIndex, endIndex) );
+            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack) );
         }
     } catch (TException& e) {
         // free memory & rethrow
@@ -358,12 +361,9 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
     }
 }
 
-ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
     // get return type
     Type type(tokens[startIndex].type);
-
-    // create a new scope stack for scoped parser variables
-   scope_stack_t scopeStack = { parser_scope_t() };
 
     // get all array modifiers (only allow integer sizes)
     size_t i = startIndex;
@@ -387,6 +387,12 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
 
     // create node
     ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], type);
+
+    // put this function into the global scope
+    declareParserVariable(scopeStack, name, type, tokens[startIndex].err);
+
+    // create a new scope stack for scoped parser variables
+    scopeStack.push_back( parser_scope_t() );
 
     try {
         // skip opening parenthesis
