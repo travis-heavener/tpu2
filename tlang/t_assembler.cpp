@@ -54,7 +54,10 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
     // add function args to scope (args on top of stack below return bytes)
     for (size_t i = 0; i < funcNode.getNumParams(); i++) { // add the variable to the scope
-        ASTFuncParam arg = *funcNode.paramAt(i);
+        ASTFuncParam& arg = *funcNode.paramAt(i);
+        // doesn't currently support implied array dimensions in arguments
+        if (arg.type.hasEmptyArrayModifiers())
+            throw TSyntaxException(funcNode.err);
         scope.declareVariable(arg.type, arg.name, funcNode.err);
     }
 

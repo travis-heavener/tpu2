@@ -2,6 +2,38 @@ __UF0:
     jmp __UF0E
     __UF0E:
     ret
+__UF1:
+    movw BP, SP
+    push [SP-4]
+    push [SP-4]
+    pushw 1
+    popw BX
+    popw AX
+    sub AX, BX
+    pushw AX
+    popw AX
+    movw BX, 4
+    mul BX
+    add BP, AX
+    pushw 0
+    popw AX
+    movw BX, 2
+    mul BX
+    add BP, AX
+    push [BP-20]
+    push [BP-19]
+    pushw 3
+    popw BX
+    popw AX
+    mul BX
+    pushw AX
+    pop DL
+    mov [SP-2], DL
+    pop DL
+    mov [SP-2], DL
+    jmp __UF1E
+    __UF1E:
+    ret
 main:
     add SP, 2
     pushw 0
@@ -77,20 +109,30 @@ main:
     pushw 2
     pushw 0
     pushw 1
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    push [SP-8]
-    sub SP, 6
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    push [SP-42]
+    pushw 4
+    add SP, 2
+    call __UF1
     pop DL
-    mov [SP-92], DL
+    mov [SP-110], DL
     pop DL
-    mov [SP-92], DL
-    sub SP, 90
+    mov [SP-110], DL
+    sub SP, 108
     jmp mainE
     mainE:
     movw AX, 0x03

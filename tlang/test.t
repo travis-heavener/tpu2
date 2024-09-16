@@ -2,9 +2,9 @@ void dummy() {
     // do nothing
 }
 
-// int test(int a[][2], int size) {
-//     return a[size-1][0] * 3;
-// }
+int test(int a[4][2], int size) {
+    return a[size-1][0] * 3;
+}
 
 // int test(int a[1][2]) {
 //     return 63 + a[0][1];
@@ -21,7 +21,7 @@ int main() {
     int c = 90;
     int asdf[] = {1, 2, 0, 1};
 
-    return asdf;
+    return test(f, 4);
 
     // char a = 23;
     // return a;
