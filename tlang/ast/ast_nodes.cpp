@@ -123,6 +123,10 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     // take size of left arg
                     return typeA;
                 }
+                case TokenType::ASSIGN: {
+                    // take the type of the left-arg
+                    return getTypeFromNode(*pOp->left(), scopeStack);
+                }
                 default: throw TTypeInferException(pOp->err);
             }
             break;
