@@ -18,9 +18,8 @@ int main() {
     };
     int f[4][2] = dum[2];
     int j[4][2] = dum[2];
-    int c = dum[2];
-
-    int sd = dummy();
+    int c = 90;
+    int asdf[3] = {1, 2, 0};
 
     return test(c);
 

@@ -1,6 +1,7 @@
 #ifndef __TOOLBOX_HPP
 #define __TOOLBOX_HPP
 
+#include <algorithm>
 #include <map>
 #include <string>
 #include <vector>
@@ -49,6 +50,11 @@ class Type {
         size_t getStackSizeBytes() const;
 
         TokenType getPrimitiveType() const { return primitiveType; };
+
+        bool operator==(const Type&) const;
+        bool operator!=(const Type& t) const { return !(*this == t); };
+        bool checkArrayMods(const Type& t) const;
+        void flipModifiers() { std::reverse(arraySizes.begin(), arraySizes.end()); };
     private:
         TokenType primitiveType;
         std::vector<long long> arraySizes;

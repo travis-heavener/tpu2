@@ -297,6 +297,9 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                         i = j;
                     }
 
+                    // reverse the type's modifiers since they're backwards (inward-out)
+                    type.flipModifiers();
+
                     // create node
                     ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[start], type);
                     pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
@@ -336,12 +339,17 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                             ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
 
                             // verify all arguments have the same type
-                            pArrLit->setType( type );
-                            pExpr->type = type;
+                            Type arrType = pArrLit->inferType(scopeStack);
+                            pArrLit->setType( arrType );
+                            pExpr->type = arrType;
                         } else if (pExpr->at(0)->getNodeType() == ASTNodeType::IDENTIFIER) {
                             pExpr->type = type;
                         }
                     }
+
+                    // confirm assignment type matches
+                    if (!type.checkArrayMods(pExpr->type))
+                        throw TSyntaxException(tokens[idenStart].err);
                     break;
                 }
 
@@ -884,12 +892,13 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             i--; // skip back once since removing previous node
         }
 
-        // determine the type of all operation nodes & identifiers (anything not a literal)
+        // final checks
         const size_t numChildren = pHead->size();
         for (size_t i = 0; i < numChildren; i++) {
             ASTNode& node = *pHead->at(i);
             ASTNodeType nodeType = node.getNodeType();
 
+            // 1. determine the type of all operation nodes & identifiers (anything not a literal)
             if (nodeType == ASTNodeType::BIN_OP || nodeType == ASTNodeType::UNARY_OP) {
                 ASTOperator& op = *static_cast<ASTOperator*>(&node);
                 op.determineResultType(scopeStack);
@@ -898,14 +907,14 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 iden.determineResultType(scopeStack);
             }
         }
+
+        // infer expression result type
+        pHead->type = pHead->inferType(scopeStack);
     } catch (TException& e) {
         // free & rethrow
         delete pHead;
         throw e;
     }
-
-    // infer expression result type
-    pHead->type = pHead->inferType(scopeStack);
 
     return pHead;
 }

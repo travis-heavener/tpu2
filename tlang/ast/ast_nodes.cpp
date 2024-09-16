@@ -220,6 +220,7 @@ Type ASTArrayLiteral::inferType(scope_stack_t& scopeStack) const {
         ASTExpr* pExpr = static_cast<ASTExpr*>(pNode);
         type = type.checkDominant(pExpr->inferType(scopeStack));
     }
+    type.addArrayModifier( this->size() );
     return type;
 }
 

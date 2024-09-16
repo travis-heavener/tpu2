@@ -28,6 +28,38 @@ bool Type::hasEmptyArrayModifiers() const {
     return false;
 }
 
+bool Type::operator==(const Type& t) const {
+    // check primitive
+    if (primitiveType != t.primitiveType)
+        return false;
+
+    // check sizes
+    if (arraySizes.size() != t.arraySizes.size())
+        return false;
+    
+    // check each modifier
+    for (size_t i = 0; i < arraySizes.size(); ++i)
+        if (arraySizes[i] != t.arraySizes[i])
+            return false;
+    
+    // base case, match
+    return true;
+}
+
+bool Type::checkArrayMods(const Type& t) const {
+    // check sizes
+    if (arraySizes.size() != t.arraySizes.size())
+        return false;
+    
+    // check each modifier
+    for (size_t i = 0; i < arraySizes.size(); ++i)
+        if (arraySizes[i] != t.arraySizes[i])
+            return false;
+    
+    // base case, match
+    return true;
+}
+
 // it works out that by just checking the size of the primitive, we can determine
 // which type to take. char & bool may be cast as int, and any may be cast as a double
 Type Type::checkDominant(Type B) const {

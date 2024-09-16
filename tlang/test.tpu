@@ -1,0 +1,103 @@
+__UF0:
+    jmp __UF0E
+    __UF0E:
+    ret
+__UF1:
+    push [SP-4]
+    push [SP-4]
+    pushw 3
+    popw BX
+    popw AX
+    mul BX
+    pushw AX
+    pop DL
+    mov [SP-2], DL
+    pop DL
+    mov [SP-2], DL
+    jmp __UF1E
+    __UF1E:
+    ret
+main:
+    add SP, 2
+    pushw 0
+    pushw 1
+    pushw 2
+    pushw 3
+    pushw 4
+    pushw 5
+    pushw 6
+    pushw 7
+    pushw 8
+    pushw 9
+    pushw 10
+    pushw 11
+    pushw 12
+    pushw 13
+    pushw 14
+    pushw 15
+    pushw 16
+    pushw 17
+    pushw 18
+    pushw 19
+    pushw 20
+    pushw 21
+    pushw 22
+    pushw 23
+    sub SP, 24
+    movw BP, SP
+    pushw 2
+    popw AX
+    movw BX, 12
+    mul BX
+    add BP, AX
+    push [BP-24]
+    push [BP-23]
+    push [BP-22]
+    push [BP-21]
+    push [BP-20]
+    push [BP-19]
+    push [BP-18]
+    push [BP-17]
+    push [BP-16]
+    push [BP-15]
+    push [BP-14]
+    push [BP-13]
+    add SP, 4
+    movw BP, SP
+    pushw 2
+    popw AX
+    movw BX, 12
+    mul BX
+    add BP, AX
+    push [BP-40]
+    push [BP-39]
+    push [BP-38]
+    push [BP-37]
+    push [BP-36]
+    push [BP-35]
+    push [BP-34]
+    push [BP-33]
+    push [BP-32]
+    push [BP-31]
+    push [BP-30]
+    push [BP-29]
+    add SP, 4
+    pushw 90
+    pushw 1
+    pushw 2
+    pushw 0
+    push [SP-8]
+    push [SP-8]
+    add SP, 2
+    call __UF1
+    pop DL
+    mov [SP-68], DL
+    pop DL
+    mov [SP-68], DL
+    sub SP, 66
+    jmp mainE
+    mainE:
+    movw AX, 0x03
+    popw BX
+    syscall
+    hlt
