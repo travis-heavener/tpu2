@@ -117,6 +117,15 @@ char escapeChar(const std::string& str) {
     }
 }
 
+void escapeString(std::string& str) {
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\') {
+            str[i] = escapeChar(str.substr(i, 2));
+            str.erase(str.begin()+i+1, str.begin()+i+2);
+        }
+    }
+}
+
 // returns true if the given TokenType is that of a type name (ex. TYPE_INT)
 bool isTokenTypeName(TokenType type) {
     switch (type) {

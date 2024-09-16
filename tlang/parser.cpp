@@ -565,6 +565,28 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                 pHead->push( new ASTCharLiteral(c, tokens[i]) );
             } else if (tokens[i].type == TokenType::LIT_BOOL) {
                 pHead->push( new ASTBoolLiteral(tokens[i].raw == "true", tokens[i]) );
+            } else if (tokens[i].type == TokenType::LIT_STRING) {
+                std::string rawString = tokens[i].raw.substr(1, tokens[i].raw.size()-2);
+                escapeString( rawString );
+                rawString.push_back('\0'); // add null byte
+
+                // transform a string literal into a character array literal
+                ASTArrayLiteral* pArr = new ASTArrayLiteral(tokens[i]);
+                pHead->push(pArr);
+
+                // add each character as a child
+                Type type(TokenType::TYPE_CHAR);
+                for (const char c : rawString) {
+                    // create wrapper expression
+                    ASTExpr* pSubExpr = new ASTExpr(tokens[i]);
+                    pArr->push(pSubExpr);
+                    pSubExpr->push( new ASTCharLiteral(c, tokens[i]) );
+                    pSubExpr->type = type;
+                }
+
+                // set type
+                type.addArrayModifier(pArr->size());
+                pArr->setType( type );
             } else if (tokens[i].type == TokenType::VOID) {
                 pHead->push( new ASTVoidLiteral(tokens[i]) );
             } else if (isTokenUnaryOp(tokens[i].type)) { // handle unary operators

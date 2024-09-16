@@ -11,7 +11,7 @@ enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
     LPAREN, RPAREN, LBRACKET, RBRACKET, LBRACE, RBRACE, // (), [], {}
     TYPE_INT, TYPE_FLOAT, TYPE_CHAR, TYPE_BOOL, // type names
-    LIT_INT, LIT_FLOAT, LIT_BOOL, LIT_CHAR, VOID, // type literals
+    LIT_INT, LIT_FLOAT, LIT_BOOL, LIT_CHAR, LIT_STRING, VOID, // type literals
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
 
@@ -72,6 +72,7 @@ bool isCharValidIdentifierStart(const char);
 
 // used to expand an escaped character string
 char escapeChar(const std::string&);
+void escapeString(std::string&);
 
 // returns true if the given TokenType is that of a type name (ex. TYPE_INT)
 bool isTokenTypeName(TokenType);

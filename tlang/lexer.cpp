@@ -94,6 +94,28 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
             tokens.push_back(Token(err, buffer, TokenType::LIT_CHAR));
             continue;
         }
+
+        // string literals
+        if (line[i] == '"') {
+            // look for closing quote
+            buffer = line[i];
+            while (++i < lineLen) {
+                buffer.push_back(line[i]); // add character
+                if (line[i] == '\\') { // check for escape characters and skip next character
+                    if (i+1 == lineLen) throw TInvalidEscapeException(err);
+                    buffer.push_back(line[++i]); // add escaped character
+                } else if (line[i] == '"') { // break on closing quote
+                    break;
+                }
+            }
+
+            // if reached the end of the line, unclosed quote (don't rollback, breaks when hitting quote)
+            if (i == lineLen) throw TUnclosedQuoteException(err);
+            
+            // otherwise, add the token
+            tokens.push_back(Token(err, buffer, TokenType::LIT_STRING));
+            continue;
+        }
         
         // literal boolean
         if (isKwdPresent("true", line, i)) {
