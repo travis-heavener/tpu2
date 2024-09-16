@@ -3,8 +3,6 @@
 
 #include <stdexcept>
 
-#include "toolbox.hpp"
-
 // shorthand for making exceptions
 #define MAKE_EXCEPTION(name) class T##name##Exception : public TException { \
     public: \
@@ -13,7 +11,7 @@
 
 class TException {
     public:
-        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 1;};
+        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 0;};
 
         // virtual toString method
         virtual const std::string& toString() const { return msg; };
@@ -26,7 +24,6 @@ class TException {
 };
 
 // macro define exceptions
-
 MAKE_EXCEPTION(UnclosedGroup)
 MAKE_EXCEPTION(ZeroDiv)
 MAKE_EXCEPTION(InvalidToken)
@@ -35,5 +32,8 @@ MAKE_EXCEPTION(InvalidEscape)
 MAKE_EXCEPTION(UnclosedComment)
 MAKE_EXCEPTION(UnknownIdentifier)
 MAKE_EXCEPTION(IdentifierInUse)
+MAKE_EXCEPTION(TypeInfer)
+MAKE_EXCEPTION(InvalidOperation)
+MAKE_EXCEPTION(Syntax)
 
 #endif

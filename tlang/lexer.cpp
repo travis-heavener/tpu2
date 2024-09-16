@@ -56,7 +56,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
             continue;
         }
 
-        // int/double literals (cannot start with a decimal/period!!)
+        // int/float literals (cannot start with a decimal/period!!)
         if (std::isdigit(line[i])) {
             TokenType tokenType = TokenType::LIT_INT;
             buffer = line[i]; // update buffer
@@ -163,7 +163,7 @@ void tokenizeLine(const std::string& line, std::vector<Token>& tokens, line_t li
             i += 2; // offset by length of keyword - 1
             continue;
         } else if (isKwdPresent("double", line, i)) {
-            tokens.push_back(Token(err, "double", TokenType::TYPE_DOUBLE));
+            tokens.push_back(Token(err, "double", TokenType::TYPE_FLOAT));
             i += 5; // offset by length of keyword - 1
             continue;
         } else if (isKwdPresent("char", line, i)) {

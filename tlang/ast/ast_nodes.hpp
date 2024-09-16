@@ -12,7 +12,7 @@ enum class ASTNodeType {
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP,
-    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID
+    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_ARR, ARR_SUBSCRIPT
 };
 
 // base class for all AST node types
@@ -101,6 +101,9 @@ class ASTExpr : public ASTNode {
     public:
         ASTExpr(const Token& token) : ASTNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
+        
+        Type inferType(scope_stack_t& scopeStack) const;
+        Type type;
 };
 
 class ASTOperator : public ASTNode {
@@ -110,32 +113,43 @@ class ASTOperator : public ASTNode {
         
         ASTNode* left() { return children[0]; }
         ASTNode* right() { return children[1]; }
-        TokenType getOpTokenType() { return opType; }
+        TokenType getOpTokenType() const { return opType; }
 
         void setIsUnary(bool isUnary) { this->isUnary = isUnary; }
         bool getIsUnary() const { return this->isUnary; }
+
+        void determineResultType(scope_stack_t&);
+        Type getResultType() const { return returnType; };
     private:
         TokenType opType;
+        Type returnType;
         bool isUnary;
 };
 
 /************* LITERALS & IDENTIFIERS *************/
 
-typedef std::pair<std::string, TokenType> param_t;
+class ASTFuncParam {
+    public:
+        ASTFuncParam(const std::string& name, Type type) : name(name), type(type) {};
+        std::string name;
+        Type type;
+};
+
 class ASTFunction : public ASTNode {
     public:
-        ASTFunction(const std::string& name, const Token& token) : ASTNode(token), name(name), type(token.type) {};
+        ASTFunction(const std::string& name, const Token& token, Type type) : ASTNode(token), name(name), type(type), params() {};
+        ~ASTFunction();
         ASTNodeType getNodeType() const { return ASTNodeType::FUNCTION; };
-        void appendParam(const param_t p) {  params.push_back(p);  };
+        void appendParam(ASTFuncParam* p) {  params.push_back(p);  };
 
         const std::string& getName() const { return name; };
-        TokenType getReturnType() const { return type; };
-        std::vector<param_t> getParams() const { return params; };
+        Type getReturnType() const { return type; };
+        ASTFuncParam* paramAt(size_t i) { return params[i]; };
         size_t getNumParams() const { return params.size(); };
     private:
         std::string name; // name of function
-        TokenType type; // return type
-        std::vector<param_t> params; // parameters {name, type}
+        Type type; // return type
+        std::vector<ASTFuncParam*> params; // parameters {name, type}
 };
 
 class ASTFunctionCall : public ASTNode {
@@ -144,23 +158,52 @@ class ASTFunctionCall : public ASTNode {
         ASTNodeType getNodeType() const { return ASTNodeType::FUNCTION_CALL; };
 };
 
+class ASTArraySubscript : public ASTNode {
+    public:
+        ASTArraySubscript(const Token& token) : ASTNode(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::ARR_SUBSCRIPT; };
+};
+
 class ASTIdentifier : public ASTNode {
     public:
         ASTIdentifier(const Token& token, bool inAssign) : ASTNode(token), isInAssignExpr(inAssign) {};
+        ~ASTIdentifier();
         ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
         bool isInAssignExpr; // whether the identifier is being referenced (ex. x + 1) or assigned (x = 1)
+
+        // subscripts for array accessing
+        void addSubscript(ASTArraySubscript* pSub) { this->subscripts.push_back(pSub); };
+        const std::vector<ASTArraySubscript*>& getSubscripts() { return subscripts; };
+
+        void determineResultType(scope_stack_t&);
+        Type getResultType() const { return type; };
+    private:
+        Type type;
+        std::vector<ASTArraySubscript*> subscripts;
 };
 
 class ASTVarDeclaration : public ASTNode {
     public:
-        ASTVarDeclaration(const Token& token) : ASTNode(token), type(token.type) {};
+        ASTVarDeclaration(const Token& token, Type type) : ASTNode(token), type(type) {};
         ~ASTVarDeclaration();
         ASTNodeType getNodeType() const { return ASTNodeType::VAR_DECLARATION; };
-        TokenType getPrimitiveType() const { return type; }
+        Type getType() const { return type; }
 
         ASTIdentifier* pIdentifier = nullptr;
         ASTExpr* pExpr = nullptr;
-        TokenType type; // type of variable
+        Type type; // type of variable
+};
+
+class ASTArrayLiteral : public ASTNode {
+    public:
+        ASTArrayLiteral(const Token& token) : ASTNode(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_ARR; };
+        Type inferType(scope_stack_t&) const;
+
+        Type getType() const { return type; };
+        void setType(Type);
+    private:
+        Type type;
 };
 
 class ASTBoolLiteral : public ASTNode {

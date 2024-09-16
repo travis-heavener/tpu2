@@ -1,13 +1,15 @@
 #ifndef __TOOLBOX_HPP
 #define __TOOLBOX_HPP
 
+#include <map>
 #include <string>
+#include <vector>
 
 // token types
 enum TokenType {
     RETURN, SEMICOLON, IDENTIFIER, IF, ELSE_IF, ELSE, WHILE, FOR,
     LPAREN, RPAREN, LBRACKET, RBRACKET, LBRACE, RBRACE, // (), [], {}
-    TYPE_INT, TYPE_DOUBLE, TYPE_CHAR, TYPE_BOOL, // type names
+    TYPE_INT, TYPE_FLOAT, TYPE_CHAR, TYPE_BOOL, // type names
     LIT_INT, LIT_FLOAT, LIT_BOOL, LIT_CHAR, VOID, // type literals
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
@@ -22,6 +24,34 @@ enum TokenType {
 
     // assignment operators
     ASSIGN
+};
+
+// literal types
+#define TYPE_NO_ARR_SIZE -1
+class Type {
+    public:
+        Type() : primitiveType(TokenType::VOID), arraySizes() {};
+        Type(TokenType primitiveType) : primitiveType(primitiveType), arraySizes() {};
+
+        // for adding an array with a specified size (ie. declarations)
+        void addArrayModifier(size_t size) { arraySizes.push_back(size); };
+
+        // for adding an array without a specified size (ie. parameter type)
+        void addEmptyArrayModifier() { arraySizes.push_back(TYPE_NO_ARR_SIZE); };
+        bool hasEmptyArrayModifiers() const;
+        void popArrayModifier() { arraySizes.pop_back(); };
+
+        bool isArray() const { return arraySizes.size() > 0; };
+
+        Type checkDominant(Type B) const;
+
+        const std::vector<long long>& getArrayModifiers() const { return arraySizes; };
+        size_t getStackSizeBytes() const;
+
+        TokenType getPrimitiveType() const { return primitiveType; };
+    private:
+        TokenType primitiveType;
+        std::vector<long long> arraySizes;
 };
 
 // helper to check if file exists
@@ -70,5 +100,15 @@ class Token {
         const std::string raw;
         TokenType type;
 };
+
+// for parser scope stacks
+typedef std::map<std::string, Type> parser_scope_t;
+typedef std::vector<parser_scope_t> scope_stack_t;
+
+// lookup variable from scope stack
+Type lookupParserVariable(scope_stack_t&, const std::string&, ErrInfo);
+
+// declare a variable in the immediate scope
+void declareParserVariable(scope_stack_t&, const std::string&, Type, ErrInfo);
 
 #endif

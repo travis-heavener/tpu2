@@ -15,11 +15,11 @@ class ScopeAddr {
     public:
         friend Scope;
 
-        ScopeAddr() : name(""), isAllocated(false) {};
-        ScopeAddr(TokenType type, const std::string& name) : name(name), type(type), isAllocated(true) {};
+        ScopeAddr() : name(""), type(), isAllocated(false) {};
+        ScopeAddr(Type type, const std::string& name) : name(name), type(type), isAllocated(true) {};
 
         std::string name;
-        TokenType type;
+        Type type;
         bool isAllocated; // true if taken by a variable, false otherwise (if a placeholder)
 };
 
@@ -29,7 +29,7 @@ class Scope {
         ~Scope() { for (ScopeAddr* pVar : children) delete pVar; }
 
         bool doesVarExist(const std::string&) const;
-        size_t declareVariable(TokenType, const std::string&, ErrInfo);
+        size_t declareVariable(Type, const std::string&, ErrInfo);
         size_t pop();
         size_t size() const { return children.size(); }
         size_t getOffset(const std::string&, ErrInfo) const;

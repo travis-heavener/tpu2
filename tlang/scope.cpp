@@ -9,13 +9,13 @@ bool Scope::doesVarExist(const std::string& name) const {
     return false;
 }
 
-size_t Scope::declareVariable(TokenType type, const std::string& name, ErrInfo err) {
+size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
     if (this->doesVarExist(name))
         throw TIdentifierInUseException(err);
     ScopeAddr* pVar = new ScopeAddr(type, name);
     this->children.push_back(pVar);
 
-    size_t size = getSizeOfType(type);
+    size_t size = type.getStackSizeBytes();
     for (size_t i = 0; i < size-1; i++) // add remaining placeholders
         this->addPlaceholder();
     return size;
@@ -23,15 +23,9 @@ size_t Scope::declareVariable(TokenType type, const std::string& name, ErrInfo e
 
 // pops the last variable off the stack's scope, returning the number of bytes freed
 size_t Scope::pop() {
-    ScopeAddr* pVar = *this->children.rbegin();
-    size_t size = pVar->isAllocated ? getSizeOfType(pVar->type) : 1;
-
-    for (size_t i = 0; i < size; i++) {
-        delete *this->children.rbegin();
-        this->children.pop_back();
-    }
-
-    return size;
+    delete *this->children.rbegin();
+    this->children.pop_back();
+    return 1;
 }
 
 // gets the offset address from the end with respect to the rest of the variables below it of a certain variable

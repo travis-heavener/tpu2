@@ -3,6 +3,43 @@
 #include <sys/stat.h>
 
 #include "toolbox.hpp"
+#include "t_exception.hpp"
+
+// get the total size taken up on the stack by this type
+size_t Type::getStackSizeBytes() const {
+    size_t size = getSizeOfType(this->primitiveType);
+
+    for (long long modifier : this->arraySizes) {
+        // not specified
+        if (modifier == TYPE_NO_ARR_SIZE)
+            size *= TYPE_NO_ARR_SIZE < 0 ? -1 : 1;
+        size *= modifier;
+    }
+
+    return size;
+}
+
+bool Type::hasEmptyArrayModifiers() const {
+    for (long long modifier : this->arraySizes)
+        if (modifier == TYPE_NO_ARR_SIZE)
+            return true;
+
+    // base case
+    return false;
+}
+
+// it works out that by just checking the size of the primitive, we can determine
+// which type to take. char & bool may be cast as int, and any may be cast as a double
+Type Type::checkDominant(Type B) const {
+    TokenType primA = this->primitiveType;
+    TokenType primB = B.primitiveType;
+
+    if (getSizeOfType(primA) > getSizeOfType(primB))
+        return *this;
+
+    // base case, assume B
+    return B;
+}
 
 // modified from https://stackoverflow.com/a/6296808
 bool doesFileExist(const std::string& file) {
@@ -43,7 +80,7 @@ char escapeChar(const std::string& str) {
 bool isTokenTypeName(TokenType type) {
     switch (type) {
         case TokenType::TYPE_INT:
-        case TokenType::TYPE_DOUBLE:
+        case TokenType::TYPE_FLOAT:
         case TokenType::TYPE_CHAR:
         case TokenType::TYPE_BOOL:
         case TokenType::VOID:
@@ -55,7 +92,7 @@ bool isTokenTypeName(TokenType type) {
 
 // true if the token is of TYPE_INT, TYPE_BOOL, etc.
 bool isTokenPrimitiveType(const TokenType type) {
-    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_DOUBLE || type == TYPE_INT;
+    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT;
 }
 
 // true if the token is an unary operator (ex. ~, !)
@@ -94,9 +131,37 @@ bool isTokenAssignOp(const TokenType type) {
 unsigned char getSizeOfType(TokenType type) {
     switch (type) {
         case TokenType::TYPE_INT: return 2; // 2-byte ints
-        case TokenType::TYPE_DOUBLE: return 4; // 4-byte floats
+        case TokenType::TYPE_FLOAT: return 4; // 4-byte floats
         case TokenType::TYPE_CHAR: return 1;
         case TokenType::TYPE_BOOL: return 1;
+        case TokenType::VOID: return 0;
         default: throw std::invalid_argument("Invalid type passed to getSizeOfType.");
     }
+}
+
+// lookup variable from scope stack
+Type lookupParserVariable(scope_stack_t& scopeStack, const std::string& name, ErrInfo err) {
+    // look in the stack, up
+    auto itr = scopeStack.rbegin();
+    for ((void)itr; itr != scopeStack.rend(); itr++) {
+        // check this scope
+        parser_scope_t& parserScope = *itr;
+        if (parserScope.count(name) > 0) {
+            return parserScope.at(name);
+        }
+    }
+
+    // base case, not found
+    throw TUnknownIdentifierException(err);
+}
+
+// declare a variable in the immediate scope
+void declareParserVariable(scope_stack_t& scopeStack, const std::string& name, Type type, ErrInfo err) {
+    // verify this variable isn't already defined in the immediate scope
+    parser_scope_t& parserScope = *scopeStack.rbegin();
+    if (parserScope.count(name) > 0)
+        throw TIdentifierInUseException(err);
+    
+    // declare variable
+    parserScope[name] = type;
 }

@@ -39,7 +39,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
 
     // record function name & return type
-    labelMap[funcName] = {labelName, funcNode.getReturnType()};
+    labelMap[funcName] = {labelName, labelName + FUNC_END_LABEL_SUFFIX, funcNode.getReturnType()};
 
     // create a scope for this body
     Scope scope;
@@ -48,28 +48,22 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     outHandle << labelName << ":\n";
 
     // if this is main, add return byte spacing on top of stack
-    const size_t returnSize = getSizeOfType(funcNode.getReturnType());
-    if (funcName == FUNC_MAIN_LABEL) {
-        for (size_t i = 0; i < returnSize; i++) {
-            if (i+1 < returnSize) {
-                outHandle << TAB << "pushw 0\n";
-                i++;
-            } else {
-                outHandle << TAB << "push 0\n";
-            }
-        }
-    }
+    const size_t returnSize = funcNode.getReturnType().getStackSizeBytes();
+    if (funcName == FUNC_MAIN_LABEL && returnSize > 0)
+        outHandle << TAB << "add SP, " << returnSize << '\n';
 
     // add function args to scope (args on top of stack below return bytes)
-    const std::vector<param_t>& params = funcNode.getParams();
-    for (param_t arg : params) // add the variable to the scope
-        scope.declareVariable(arg.second, arg.first, funcNode.err);
-    
+    for (size_t i = 0; i < funcNode.getNumParams(); i++) { // add the variable to the scope
+        ASTFuncParam arg = *funcNode.paramAt(i);
+        scope.declareVariable(arg.type, arg.name, funcNode.err);
+    }
+
     // add return bytes to scope
-    scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
+    if (funcNode.getReturnType().getStackSizeBytes() > 0)
+        scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
-    bool hasReturned = assembleBody(&funcNode, outHandle, scope, labelName + FUNC_END_LABEL_SUFFIX, true);
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName);
 
     // declare end of function label
     if (!hasReturned && returnSize > 0)
@@ -92,8 +86,10 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& returnLabelName, const bool isNewScope=true) {
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
+    const size_t returnSize = labelMap[funcName].returnType.getStackSizeBytes();
+    const std::string returnLabel = labelMap[funcName].returnLabel;
 
     // iterate over children of this node
     bool hasReturned = false;
@@ -133,7 +129,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, scope, returnLabelName, true);
+                assembleBody(&loop, outHandle, scope, funcName);
 
                 // jump back to the loopStartLabel
                 outHandle << TAB << "jmp " << loopStartLabel << '\n';
@@ -187,7 +183,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, scope, returnLabelName, true);
+                assembleBody(&loop, outHandle, scope, funcName);
 
                 // assemble third expression
                 resultSize = assembleExpression(*loop.pExprC, outHandle, scope);
@@ -250,7 +246,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body (don't make new scope)
-                    assembleBody(conditional.at(j), outHandle, scope, returnLabelName, false);
+                    assembleBody(conditional.at(j), outHandle, scope, funcName, false);
 
                     // jump to merge label
                     outHandle << TAB << "jmp " << mergeLabel << '\n';
@@ -264,50 +260,34 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
             case ASTNodeType::VAR_DECLARATION: {
                 // create space on stack
                 ASTVarDeclaration& varChild = *static_cast<ASTVarDeclaration*>(&child);
-                const TokenType varType = varChild.getPrimitiveType();
-                const size_t typeSize = getSizeOfType(varType);
+                const Type varType = varChild.getType();
+                const size_t typeSize = varType.getStackSizeBytes();
 
                 // get the value of the assignment
                 if (varChild.pExpr == nullptr) { // no assignment, set to 0
                     for (size_t j = 0; j < typeSize; j++) {
                         if (j+1 < typeSize) {
                             outHandle << TAB << "pushw 0\n";
-                            scope.addPlaceholder(); // additional push
-                            j++;
+                            ++j;
                         } else {
                             outHandle << TAB << "push 0\n";
                         }
-                        scope.addPlaceholder();
                     }
                 } else { // has assignment, assemble its expression
-                    // push to stack (lowest-first)
-                    size_t resultSize = assembleExpression(*varChild.pExpr, outHandle, scope);
+                    assembleExpression(*varChild.pExpr, outHandle, scope, typeSize);
 
-                    // verify result size does not overflow
-                    if (resultSize > typeSize)
-                        throw std::runtime_error("resultSize of assembled expression exceeds its specified type size!");
-
-                    // fill remaining spots with zeros
-                    for (size_t j = resultSize; j < typeSize; j++) {
-                        if (j+1 < typeSize) {
-                            outHandle << TAB << "pushw 0\n";
-                            scope.addPlaceholder(); // additional push
-                            j++;
-                        } else {
-                            outHandle << TAB << "push 0\n";
-                        }
-                        scope.addPlaceholder();
-                    }
+                    // remove any placeholders
+                    for (size_t j = 0; j < typeSize; j++) scope.pop();
                 }
-                
+
                 // add variable to scope
                 scope.declareVariable(varType, varChild.pIdentifier->raw, varChild.pIdentifier->err);
                 break;
             }
             case ASTNodeType::RETURN: {
-                // assemble expression
+                // assemble expression (first and only child of retNode is an ASTExpr*)
                 ASTReturn& retNode = *static_cast<ASTReturn*>(&child);
-                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, scope);
+                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, scope, returnSize);
 
                 // move result bytes to their place earlier on the stack
                 for (size_t j = 0; j < resultSize; j++) {
@@ -350,40 +330,67 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
         }
     }
 
+    // remove extra scope variables after the scope closes
     if (isNewScope) {
-        // remove extra scope variables after the scope closes
         size_t sizeFreed = 0;
         while (scope.size() > startingScopeSize)
             sizeFreed += scope.pop();
 
-        // write pop instructions
-        for (size_t i = 0; i < sizeFreed; i++) {
-            if (i+1 < sizeFreed) {
-                outHandle << TAB << "popw\n";
-                i++;
-            } else {
-                outHandle << TAB << "pop\n";
-            }
-        }
+        // move back SP
+        if (sizeFreed > 0)
+            outHandle << TAB << "sub SP, " << sizeFreed << '\n';
     }
 
     // if returning, jmp to the return label
     if (hasReturned)
-        outHandle << TAB << "jmp " << returnLabelName << '\n';
+        outHandle << TAB << "jmp " << returnLabel << '\n';
     
     return hasReturned;
 }
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope) {
-    // recurse this function for children, bottom-up
+size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope, long long desiredSize) {
+    // if this is a literal array without a type (ie. not part of an assignment), yell at the user (LOUDLY)
+    // literal arrays are ONLY allowed during assignment
+    if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
+        ASTArrayLiteral* pArr = static_cast<ASTArrayLiteral*>(&bodyNode);
+        if (pArr->getType().getPrimitiveType() == TokenType::VOID) // unset
+            throw TSyntaxException(bodyNode.err);
+    }
+
+    // get the desired size of any subexpression, in bytes
+    size_t desiredSubSize;
+    switch (bodyNode.getNodeType()) {
+        case ASTNodeType::BIN_OP:
+        case ASTNodeType::UNARY_OP: {
+            ASTOperator& op = *static_cast<ASTOperator*>(&bodyNode);
+            desiredSubSize = op.getResultType().getStackSizeBytes();
+            break;
+        }
+        case ASTNodeType::LIT_ARR: {
+            ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
+            Type subType = arr.getType();
+            subType.popArrayModifier();
+            desiredSubSize = subType.getStackSizeBytes(); // the size of each element
+            break;
+        }
+        case ASTNodeType::EXPR: {
+            ASTExpr& expr = *static_cast<ASTExpr*>(&bodyNode);
+            desiredSubSize = expr.type.getStackSizeBytes();
+            break;
+        }
+        default: desiredSubSize = -1; break;
+    }
+
+    // recurse this expression's children, bottom-up
     size_t numChildren = bodyNode.size();
     std::vector<size_t> resultSizes;
     for (size_t i = 0; i < numChildren; ++i) {
-        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope) );
+        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope, desiredSubSize) );
     }
 
     // assemble this node
+    long long finalResultSize = 0;
     bodyNode.isAssembled = true;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::UNARY_OP: {
@@ -394,7 +401,10 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 throw std::runtime_error("Invalid number of resultSizes, expected 1 for unary operation.");
 
             // ignore OP_ADD since it's really a buffer (passthrough)
-            if (unaryOp.getOpTokenType() == TokenType::OP_ADD) return resultSizes[0];
+            if (unaryOp.getOpTokenType() == TokenType::OP_ADD) {
+                finalResultSize = resultSizes[0];
+                break;
+            }
 
             // pop in reverse (higher first, later first)
             const size_t resultSize = resultSizes[0];
@@ -422,7 +432,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return resultSize;
+                    finalResultSize = resultSize;
+                    break;
                 }
                 case TokenType::OP_BIT_NOT: {
                     // flip all bits
@@ -436,7 +447,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return resultSize;
+                    finalResultSize = resultSize;
+                    break;
                 }
                 case TokenType::OP_BOOL_NOT: {
                     // set non-zero to zero, zero to 1
@@ -456,7 +468,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push values to stack
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 default:
                     throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
@@ -513,7 +526,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_SUB: {
                     // sub AX/AL to BX/BL
@@ -527,7 +541,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_MUL: {
                     // mul by BX/BL
@@ -538,7 +553,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "pushw AX\n";
                     scope.addPlaceholder();
                     scope.addPlaceholder();
-                    return 2;
+                    finalResultSize = 2;
+                    break;
                 }
                 case TokenType::OP_DIV: {
                     // div by BX/BL
@@ -552,7 +568,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_MOD: {
                     // get mod from div by BX/BL
@@ -566,7 +583,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AH\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_BIT_OR: {
                     outHandle << TAB << "or " << regA << ", " << regB << '\n';
@@ -579,7 +597,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_BIT_AND: {
                     outHandle << TAB << "and " << regA << ", " << regB << '\n';
@@ -592,7 +611,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_BIT_XOR: {
                     outHandle << TAB << "xor " << regA << ", " << regB << '\n';
@@ -605,7 +625,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_BOOL_OR: {
                     outHandle << TAB << "or " << regA << ", " << regB << '\n';
@@ -620,7 +641,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_BOOL_AND: {
                     // if either one is zero, boolean and is false
@@ -649,7 +671,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_EQ: {
                     // if A ^ B is zero, equal
@@ -668,7 +691,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_NEQ: {
                     // if A ^ B is zero, equal (keep as 0)
@@ -683,7 +707,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_LT: {
                     // if A < B, B-A will have carry and zero cleared
@@ -703,7 +728,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     /// push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_GT: {
                     // if A > B, A-B will have carry and zero cleared
@@ -723,7 +749,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_LTE: {
                     // if A <= B, B-A will have carry cleared
@@ -742,7 +769,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_GTE: {
                     // if A >= B, A-B will have carry cleared
@@ -761,7 +789,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
-                    return 1; // always returns an 8-bit bool
+                    finalResultSize = 1; // always returns an 8-bit bool
+                    break;
                 }
                 case TokenType::OP_LSHIFT: {
                     // can only use 8-bit register for shift count
@@ -775,7 +804,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::OP_RSHIFT: {
                     // can only use 8-bit register for shift count
@@ -789,18 +819,18 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push AL\n";
                     }
                     scope.addPlaceholder();
-                    return maxResultSize;
+                    finalResultSize = maxResultSize;
+                    break;
                 }
                 case TokenType::ASSIGN: {
                     // get the stack offset of the variable
                     if (bodyNode.at(0)->getNodeType() != ASTNodeType::IDENTIFIER)
-                        // throw TInvalidTokenException(bodyNode.at(0)->err);
-                        throw std::runtime_error(bodyNode.at(0)->raw + "\n" + bodyNode.raw);
+                        throw TSyntaxException(bodyNode.at(0)->err);
 
                     ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(bodyNode.at(0));
                     ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
                     size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
-                    size_t typeSize = getSizeOfType(pScopeVar->type);
+                    size_t typeSize = pScopeVar->type.getStackSizeBytes();
 
                     // move the rvalue to the identifier on the left
                     outHandle << TAB << "mov [SP-" << stackOffset << "], BL" << '\n';
@@ -815,7 +845,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "push BL\n";
                     }
                     scope.addPlaceholder();
-                    return typeSize;
+                    finalResultSize = typeSize;
+                    break;
                 }
                 default:
                     throw std::invalid_argument("Invalid binOp type in assembleExpression!");
@@ -839,7 +870,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 scope.addPlaceholder();
                 value >>= 8; // shift downward
             }
-            return size;
+            finalResultSize = size;
+            break;
         }
         case ASTNodeType::LIT_BOOL: {
             // get value & size of literal
@@ -858,7 +890,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 scope.addPlaceholder();
                 value >>= 8; // shift downward
             }
-            return size;
+            finalResultSize = size;
+            break;
         }
         case ASTNodeType::LIT_CHAR: {
             // get value & size of literal
@@ -877,7 +910,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 scope.addPlaceholder();
                 value >>= 8; // shift downward
             }
-            return size;
+            finalResultSize = size;
+            break;
         }
         case ASTNodeType::LIT_FLOAT: {
             throw std::invalid_argument("Float arithmetic not implemented yet!");
@@ -887,20 +921,62 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(&bodyNode);
             ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
             size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
-            size_t typeSize = getSizeOfType(pScopeVar->type);
 
-            // handle assignment operations vs read operations
-            if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
-                for (size_t i = 0; i < typeSize; i++) {
-                    // move value to top of stack
-                    outHandle << TAB << "push [SP-" << stackOffset << "]\n";
-                    scope.addPlaceholder();
+            // apply subscripts if necessary
+            size_t typeSize = pScopeVar->type.getStackSizeBytes();
+            if (identifier.getSubscripts().size() > 0) {
+                // move the SP to the BP to store the stackOffset's offset
+                outHandle << TAB << "movw BP, SP\n";
+
+                // update stack offset
+                const std::vector<long long>& stackMods = pScopeVar->type.getArrayModifiers();
+                const std::vector<ASTArraySubscript*>& subscripts = identifier.getSubscripts();
+
+                // assemble subscripts to get their result (****subscripts are ints)
+                size_t k = 0;
+                for (ASTArraySubscript* pSub : subscripts) {
+                    // get size of each subtype we're indexing
+                    typeSize /= stackMods[ k++ ];
+
+                    // add to BP the top int value on the stack (force subscript size to int)
+                    assembleExpression(*pSub, outHandle, scope, getSizeOfType(TokenType::TYPE_INT));
+
+                    // pop top int (subscript) to AX
+                    outHandle << TAB << "popw AX\n";
+                    scope.pop(); scope.pop();
+
+                    outHandle << TAB << "movw BX, " << typeSize << '\n'; // move typeSize to BX
+                    outHandle << TAB << "mul BX\n"; // scale AX by BX
+                    outHandle << TAB << "add BP, AX\n"; // add to BP
                 }
-                return typeSize;
+
+                // handle assignment operations vs read operations
+                if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
+                    for (size_t i = 0; i < typeSize; i++) {
+                        // move value to top of stack
+                        // use stackOffset-i since the stack is changing but BP is not
+                        outHandle << TAB << "push [BP-" << stackOffset-i << "]\n";
+                        scope.addPlaceholder();
+                    }
+                    finalResultSize = typeSize;
+                    break;
+                }
+            } else {
+                // handle assignment operations vs read operations
+                if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
+                    for (size_t i = 0; i < typeSize; i++) {
+                        // move value to top of stack
+                        outHandle << TAB << "push [SP-" << stackOffset << "]\n";
+                        scope.addPlaceholder();
+                    }
+                    finalResultSize = typeSize;
+                    break;
+                }
             }
 
             // base case, assignment operation, push nothing to the stack
-            return 0;
+            finalResultSize = 0;
+            break;
         }
         case ASTNodeType::FUNCTION_CALL: {
             // lookup the function
@@ -910,33 +986,67 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
             // allocate space on the stack for return bytes
             assembled_func_t destFunc = labelMap[funcName];
-            size_t returnSize = getSizeOfType(destFunc.returnType);
+            size_t returnSize = destFunc.returnType.getStackSizeBytes();
 
-            for (size_t i = 0; i < returnSize; i++) {
-                if (i+1 < returnSize) {
-                    outHandle << TAB << "pushw 0\n";
-                    i++;
-                    scope.addPlaceholder(); // additional placeholder
-                } else {
-                    outHandle << TAB << "push 0\n";
-                }
+            for (size_t i = 0; i < returnSize; i++)
                 scope.addPlaceholder();
-            }
+
+            // move SP forward
+            outHandle << TAB << "add SP, " << returnSize << '\n';
 
             // call the function
             outHandle << TAB << "call " << destFunc.labelName << '\n';
-            return returnSize;
+            finalResultSize = returnSize;
+            break;
+        }
+        case ASTNodeType::ARR_SUBSCRIPT: {
+            // passthrough the size of the subscript
+            desiredSize = getSizeOfType(TokenType::TYPE_INT); // force int size
+            finalResultSize = resultSizes[0];
+            break;
         }
         case ASTNodeType::EXPR: {
             // this is the top-most expression, so just pass through
-            return resultSizes[0];
+            finalResultSize = resultSizes[0];
+            break;
+        }
+        case ASTNodeType::LIT_ARR: {
+            // children are already on stack, so pass through the size of the node
+            ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
+            Type type = arr.getType();
+
+            // force type-cast all children
+            size_t sumResultSize = 0;
+            for (size_t resultSize : resultSizes) sumResultSize += resultSize;
+
+            finalResultSize = type.getStackSizeBytes();
+            break;
         }
         default: {
             throw std::invalid_argument("Invalid node type in assembleExpression!");
         }
     }
 
-    // base case, NEVER reached
-    throw std::invalid_argument("How did you even get here?");
-    return 0;
+    // cast size, if necessary
+    if (desiredSize != -1) {
+        if (finalResultSize < desiredSize) { // push extra 0s
+            for (long long i = finalResultSize; i < desiredSize; i++)
+                scope.addPlaceholder();
+
+            // move SP forward
+            outHandle << TAB << "add SP, " << (desiredSize - finalResultSize) << '\n';
+            finalResultSize = desiredSize;
+        } else if (finalResultSize > desiredSize) { // pop extra values
+            for (long long i = finalResultSize; i > desiredSize; i--)
+                scope.pop();
+            
+            // move SP back
+            outHandle << TAB << "sub SP, " << (finalResultSize - desiredSize) << '\n';
+
+            finalResultSize = desiredSize;
+        }
+    }
+
+    // output should now be pseudo-cast (I say pseudo because this isn't actually type-casting)
+    return finalResultSize;
 }

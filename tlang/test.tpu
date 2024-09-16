@@ -1,37 +1,107 @@
 __UF0:
-    pushw 63
-    push [SP-6]
-    push [SP-6]
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    pop DL
-    mov [SP-2], DL
-    pop DL
-    mov [SP-2], DL
-    jmp __UF0E
     __UF0E:
     ret
 main:
+    add SP, 2
     pushw 0
+    sub SP, 1
+    pushw 1
+    sub SP, 1
+    pushw 2
+    sub SP, 1
+    pushw 3
+    sub SP, 1
+    pushw 4
+    sub SP, 1
+    pushw 5
+    sub SP, 1
+    pushw 6
+    sub SP, 1
+    pushw 7
+    sub SP, 1
+    pushw 8
+    sub SP, 1
+    pushw 9
+    sub SP, 1
+    pushw 10
+    sub SP, 1
+    pushw 11
+    sub SP, 1
+    pushw 12
+    sub SP, 1
     pushw 13
+    sub SP, 1
+    pushw 14
+    sub SP, 1
+    pushw 15
+    sub SP, 1
+    pushw 16
+    sub SP, 1
+    pushw 17
+    sub SP, 1
     pushw 18
-    popw BX
+    sub SP, 1
+    pushw 19
+    sub SP, 1
+    pushw 20
+    sub SP, 1
+    pushw 21
+    sub SP, 1
+    pushw 22
+    sub SP, 1
+    pushw 23
+    sub SP, 1
+    movw BP, SP
+    pushw 2
     popw AX
-    add AX, BX
-    pushw AX
-    pushw 0
-    call __UF0
-    push [SP-2]
-    push [SP-2]
+    movw BX, 8
+    mul BX
+    add BP, AX
+    push [BP-24]
+    push [BP-23]
+    push [BP-22]
+    push [BP-21]
+    push [BP-20]
+    push [BP-19]
+    push [BP-18]
+    push [BP-17]
+    add SP, 8
+    movw BP, SP
+    pushw 2
+    popw AX
+    movw BX, 8
+    mul BX
+    add BP, AX
+    push [BP-40]
+    push [BP-39]
+    push [BP-38]
+    push [BP-37]
+    push [BP-36]
+    push [BP-35]
+    push [BP-34]
+    push [BP-33]
+    add SP, 8
+    movw BP, SP
+    pushw 2
+    popw AX
+    movw BX, 8
+    mul BX
+    add BP, AX
+    push [BP-56]
+    push [BP-55]
+    push [BP-54]
+    push [BP-53]
+    push [BP-52]
+    push [BP-51]
+    push [BP-50]
+    push [BP-49]
+    add SP, 4
+    sub SP, 10
     pop DL
-    mov [SP-8], DL
+    mov [SP-58], DL
     pop DL
-    mov [SP-8], DL
-    popw
-    popw
-    popw
+    mov [SP-58], DL
+    sub SP, 56
     jmp mainE
     mainE:
     movw AX, 0x03

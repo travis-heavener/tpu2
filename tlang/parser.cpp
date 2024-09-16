@@ -1,3 +1,4 @@
+#include <map>
 #include <stack>
 #include <vector>
 
@@ -77,7 +78,7 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
 /************************ FOR PARSING SPECIFIC ASTNodes ************************/
 
-void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
     // parse body lines and append to pHead
     for (size_t i = startIndex; i <= endIndex; i++) {
         switch (tokens[i].type) {
@@ -142,7 +143,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 }
 
                 // parse conditional
-                pHead->push( parseConditional(tokens, branchIndices, endCond) );
+                pHead->push( parseConditional(tokens, branchIndices, endCond, scopeStack) );
                 i = endCond; // jump to end of conditional
                 break;
             }
@@ -183,7 +184,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 if (i > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
 
                 // parse while loop
-                pHead->push( parseForLoop(tokens, loopStart, i) );
+                pHead->push( parseForLoop(tokens, loopStart, i, scopeStack) );
                 break;
             }
             case TokenType::WHILE: { // parse while-loop
@@ -223,7 +224,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 if (i > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
 
                 // parse while loop
-                pHead->push( parseWhileLoop(tokens, loopStart, i) );
+                pHead->push( parseWhileLoop(tokens, loopStart, i, scopeStack) );
                 break;
             }
             case TokenType::RETURN: { // parse return expression
@@ -241,7 +242,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
 
                 // append expression to pReturn
-                pReturn->push( parseExpression(tokens, i+1, endExpr-1) );
+                pReturn->push( parseExpression(tokens, i+1, endExpr-1, scopeStack) );
                 i = endExpr;
                 break;
             }
@@ -262,24 +263,56 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             default: { // base case, parse as expression
                 // check for variable assignment
                 if (isTokenPrimitiveType(tokens[i].type)) {
-                    ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[i]);
-                    pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
-
-                    // get identifier
-                    if (i+1 > endIndex || tokens[++i].type != TokenType::IDENTIFIER)
-                        throw TInvalidTokenException(tokens[i].err);
+                    size_t start = i;
 
                     // verify not end of input
                     if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
 
+                    // get type
+                    Type type(tokens[start].type);
+
+                    // get identifier
+                    if (tokens[++i].type != TokenType::IDENTIFIER)
+                        throw TInvalidTokenException(tokens[i].err);
+                    size_t idenStart = i;
+
+                    // get all array modifiers (only allow integer sizes)
+                    if (tokens[++i].type == TokenType::LBRACKET) {
+                        size_t j;
+                        for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; j += 3) {
+                            // verify next token is an int literal
+                            if (tokens[j+1].type != TokenType::LIT_INT)
+                                throw TInvalidTokenException(tokens[j+1].err);
+
+                            // verify token after literal is an RBRACKET
+                            if (tokens[j+2].type != TokenType::RBRACKET)
+                                throw TInvalidTokenException(tokens[j+2].err);
+
+                            // add array modifier
+                            type.addArrayModifier(std::stol(tokens[j+1].raw));
+                        }
+                        i = j;
+                    }
+
+                    // create node
+                    ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[start], type);
+                    pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
+
                     // create identifier node (always an assignment operator)
-                    pVarDec->pIdentifier = new ASTIdentifier(tokens[i], true);
+                    pVarDec->pIdentifier = new ASTIdentifier(tokens[idenStart], true);
+
+                    // add variable to scopeStack
+                    declareParserVariable(scopeStack, tokens[idenStart].raw, type, tokens[idenStart].err);
 
                     // if declared but not assigned, leave pExpr as nullptr
-                    if (tokens[++i].type == TokenType::SEMICOLON)
+                    if (tokens[i].type == TokenType::SEMICOLON) {
+                        // verify that any subscripts for an array type are provided
+                        if (type.hasEmptyArrayModifiers())
+                            throw TInvalidTokenException(tokens[start].err);
                         break;
-                    else if (tokens[i].type != TokenType::ASSIGN) // variable must be assigned
+                    } else if (tokens[i].type != TokenType::ASSIGN) { // variable must be assigned
                         throw TInvalidTokenException(tokens[i].err);
+                    }
 
                     // get expression
                     size_t endExpr = i+1; // skip over assignment operator
@@ -290,8 +323,22 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
                     
                     // append expression (*always* returns an ASTExpr* as an ASTNode*)
-                    pVarDec->pExpr = static_cast<ASTExpr*>(parseExpression(tokens, i+1, endExpr-1));
+                    ASTExpr* pExpr = static_cast<ASTExpr*>(parseExpression(tokens, i+1, endExpr-1, scopeStack));
+                    pVarDec->pExpr = pExpr;
                     i = endExpr; // update `i` to position of semicolon
+
+                    // update array literal's type
+                    if (type.isArray()) {
+                        if (pExpr->at(0)->getNodeType() == ASTNodeType::LIT_ARR) {
+                            ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
+
+                            // verify all arguments have the same type
+                            pArrLit->setType( type );
+                            pExpr->type = type;
+                        } else if (pExpr->at(0)->getNodeType() == ASTNodeType::IDENTIFIER) {
+                            pExpr->type = type;
+                        }
+                    }
                     break;
                 }
 
@@ -303,7 +350,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 // verify semicolon is present
                 if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
                 
-                pHead->push( parseExpression(tokens, i, endExpr-1) );
+                pHead->push( parseExpression(tokens, i, endExpr-1, scopeStack) );
                 i = endExpr;
                 break;
             }
@@ -312,34 +359,96 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 }
 
 ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+    // get return type
+    Type type(tokens[startIndex].type);
+
+    // create a new scope stack for scoped parser variables
+   scope_stack_t scopeStack = { parser_scope_t() };
+
+    // get all array modifiers (only allow integer sizes)
+    size_t i = startIndex;
+    if (tokens[++i].type == TokenType::LBRACKET) {
+        for ((void)i; tokens[i].type == TokenType::LBRACKET; i += 3) {
+            // verify next token is an int literal
+            if (tokens[i+1].type != TokenType::LIT_INT)
+                throw TInvalidTokenException(tokens[i+1].err);
+
+            // verify token after literal is an RBRACKET
+            if (tokens[i+2].type != TokenType::RBRACKET)
+                throw TInvalidTokenException(tokens[i+2].err);
+
+            // add array modifier
+            type.addArrayModifier(std::stol(tokens[i+1].raw));
+        }
+    }
+
     // get function name
-    const std::string name = tokens[startIndex+1].raw;
+    const std::string name = tokens[i++].raw;
 
     // create node
-    ASTFunction* pHead = new ASTFunction(name, tokens[startIndex]);
+    ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], type);
 
     try {
+        // skip opening parenthesis
+        ++i;
+
         // append parameters
-        size_t i = startIndex+3;
         while (tokens[i].type != TokenType::RPAREN) {
-            // verify param type is valid
-            TokenType paramType = tokens[i].type;
-            if ( !isTokenTypeName(paramType) )
-                throw TInvalidTokenException(tokens[i].err);
+            // get param type (checks the type)
+            Type type( tokens[i].type );
+            
+            size_t idenIndex = ++i;
 
-            const std::string paramName = tokens[++i].raw; // grab parameter name
-            pHead->appendParam({paramName, paramType}); // append parameter
+            // skip identifier
+            ++i;
 
-            if (tokens[i+1].type == TokenType::COMMA) i++; // skip next comma
-            i++; // base increment
+            // get all array modifiers
+            size_t numModifiers = 0;
+            while (tokens[i].type == TokenType::LBRACKET) {
+                if (tokens[i+1].type == TokenType::LIT_INT || numModifiers > 0) {
+                    // verify next token is an int literal
+                    if (tokens[i+1].type != TokenType::LIT_INT)
+                        throw TInvalidTokenException(tokens[i+1].err);
+
+                    // verify next token is an RBRACKET
+                    if (tokens[i+2].type != TokenType::RBRACKET)
+                        throw TInvalidTokenException(tokens[i+2].err);
+
+                    // add with value otherwise
+                    type.addArrayModifier( std::stol(tokens[i+1].raw) );
+                    i += 3;
+                } else {
+                    // verify next token is an RBRACKET
+                    if (tokens[i+1].type != TokenType::RBRACKET)
+                        throw TInvalidTokenException(tokens[i+1].err);
+
+                    // add empty array modifier if first bracket pair
+                    type.addEmptyArrayModifier();
+                    i += 2;
+                }
+                numModifiers++;
+            }
+
+            // grab parameter name
+            if (tokens[idenIndex].type != TokenType::IDENTIFIER)
+                throw TInvalidTokenException(tokens[idenIndex].err);
+
+            const std::string paramName = tokens[idenIndex].raw;
+            ASTFuncParam* pParam = new ASTFuncParam(paramName, type);
+            pHead->appendParam(pParam); // append parameter
+
+            // add argument to scopeStack
+            declareParserVariable(scopeStack, tokens[idenIndex].raw, type, tokens[idenIndex].err);
+
+            if (tokens[i].type == TokenType::COMMA) i++; // skip next comma
         }
 
         // verify opening brace is next
         if (tokens[++i].type != TokenType::LBRACE)
             throw TInvalidTokenException(tokens[i].err);
-        
+
         // parse body (up to but not including closing brace)
-        parseBody(pHead, tokens, i+1, endIndex-1);
+        parseBody(pHead, tokens, i+1, endIndex-1, scopeStack);
     } catch (TException& e) {
         delete pHead; // free & rethrow
         throw e;
@@ -349,10 +458,10 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     return pHead;
 }
 
-ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
     if (startIndex > endIndex) throw TInvalidTokenException(tokens[endIndex].err);
 
-    ASTNode* pHead = new ASTExpr(tokens[startIndex]);
+    ASTExpr* pHead = new ASTExpr(tokens[startIndex]);
 
     // iterate through expression
     try {
@@ -390,10 +499,10 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                         } else if (tokens[j].type == TokenType::RPAREN) {
                             parensIndices.pop();
                         } else if (parensIndices.size() == 0 && tokens[j].type == TokenType::COMMA) { // append subexpr
-                            pCall->push( parseExpression(tokens, subExprStart, j-1) );
+                            pCall->push( parseExpression(tokens, subExprStart, j-1, scopeStack) );
                             subExprStart = j+1;
                         } else if (parensIndices.size() == 0 && j+1 == end) { // append subexpr
-                            pCall->push( parseExpression(tokens, subExprStart, j) );
+                            pCall->push( parseExpression(tokens, subExprStart, j, scopeStack) );
                         }
                     }
 
@@ -401,7 +510,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
                     if (parensIndices.size() > 0)
                         throw TUnclosedGroupException(tokens[parensIndices.top()].err);
                 } else { // found a subexpression
-                    pHead->push( parseExpression(tokens, start+1, i-1) ); // recurse
+                    pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) ); // recurse
                 }
             } else if (tokens[i].type == TokenType::LIT_INT) {
                 pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
@@ -428,10 +537,67 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             } else if (tokens[i].type == TokenType::IDENTIFIER) {
                 // skip if this is actually a function call
                 if (i+1 <= endIndex && tokens[i+1].type == TokenType::LPAREN) continue;
-                
+
                 // if there's a next token and it's an assignment operator
                 bool isAssignExpr = i+1 <= endIndex && isTokenAssignOp(tokens[i+1].type);
                 pHead->push( new ASTIdentifier(tokens[i], isAssignExpr) );
+            } else if (tokens[i].type == TokenType::LBRACE) { // parse array literal
+                ASTArrayLiteral* pArr = new ASTArrayLiteral(tokens[i]);
+                pHead->push(pArr);
+
+                // find RBRACE
+                std::vector<size_t> groupsOpen = {i++};
+                size_t exprStart = i;
+                while (i <= endIndex && groupsOpen.size() > 0) {
+                    if (tokens[i].type == TokenType::LBRACE || tokens[i].type == TokenType::LPAREN || tokens[i].type == TokenType::LBRACKET) {
+                        groupsOpen.push_back(i);
+                    } else if (tokens[i].type == TokenType::RBRACE || tokens[i].type == TokenType::RPAREN || tokens[i].type == TokenType::RBRACKET) {
+                        groupsOpen.pop_back();
+                    } else if (groupsOpen.size() == 1 && tokens[i].type == TokenType::COMMA) {
+                        // split on commas, parse each subexpr
+                        pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
+                        exprStart = i+1;
+                    }
+                    ++i;
+                }
+
+                // set i back once
+                --i;
+
+                // verify brace is closed
+                if (i > endIndex) throw TUnclosedGroupException(tokens[exprStart].err);
+
+                // add last expression
+                pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
+            } else if (tokens[i].type == TokenType::LBRACKET) {
+                // array subscript operator
+                // find closing bracket
+                size_t startBracket = i;
+                size_t bracketsOpen = 0;
+
+                do {
+                    if (tokens[i].type == TokenType::LBRACKET) bracketsOpen++;
+                    else if (tokens[i].type == TokenType::RBRACKET) bracketsOpen--;
+                    ++i;
+                } while (i <= endIndex && bracketsOpen > 0);
+                --i; // set i back once
+
+                // verify closing bracket is found
+                if (bracketsOpen > 0) throw TUnclosedGroupException(tokens[startIndex].err);
+
+                // get previous identifier
+                if (pHead->lastChild()->getNodeType() != ASTNodeType::IDENTIFIER)
+                    throw TInvalidTokenException(tokens[startIndex].err);
+                ASTIdentifier& iden = *static_cast<ASTIdentifier*>(pHead->lastChild());
+
+                // parse expression for subscript
+                ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startIndex]);
+                iden.addSubscript( pArrSub );
+                pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack) );
+
+                // force subscript to have int type
+                ASTExpr* pSubExpr = static_cast<ASTExpr*>(pArrSub->lastChild());
+                pSubExpr->type = Type(TokenType::TYPE_INT);
             } else {
                 throw TInvalidTokenException(tokens[i].err);
             }
@@ -711,16 +877,34 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
             pHead->removeChild(i-1);
             i--; // skip back once since removing previous node
         }
+
+        // determine the type of all operation nodes & identifiers (anything not a literal)
+        const size_t numChildren = pHead->size();
+        for (size_t i = 0; i < numChildren; i++) {
+            ASTNode& node = *pHead->at(i);
+            ASTNodeType nodeType = node.getNodeType();
+
+            if (nodeType == ASTNodeType::BIN_OP || nodeType == ASTNodeType::UNARY_OP) {
+                ASTOperator& op = *static_cast<ASTOperator*>(&node);
+                op.determineResultType(scopeStack);
+            } else if (nodeType == ASTNodeType::IDENTIFIER) {
+                ASTIdentifier& iden = *static_cast<ASTIdentifier*>(&node);
+                iden.determineResultType(scopeStack);
+            }
+        }
     } catch (TException& e) {
         // free & rethrow
         delete pHead;
         throw e;
     }
 
+    // infer expression result type
+    pHead->type = pHead->inferType(scopeStack);
+
     return pHead;
 }
 
-ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex) {
+ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex, scope_stack_t& scopeStack) {
     ASTNode* pHead = new ASTConditional(tokens[branchIndices[0]]);
 
     try {
@@ -750,9 +934,9 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
 
                 // append expression
                 if (startToken.type == TokenType::IF) {
-                    static_cast<ASTIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2);
+                    static_cast<ASTIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack);
                 } else {
-                    static_cast<ASTElseIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2);
+                    static_cast<ASTElseIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack);
                 }
 
                 // offset the body token position
@@ -763,7 +947,7 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
             }
 
             // parse the body (up to but not including closing brace)
-            parseBody(pNode, tokens, bodyStart, endIndex-1);
+            parseBody(pNode, tokens, bodyStart, endIndex-1, scopeStack);
         }
     } catch (TException& e) {
         // free & rethrow
@@ -774,9 +958,12 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
     return pHead;
 }
 
-ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
     // create new node
     ASTWhileLoop* pHead = new ASTWhileLoop(tokens[startIndex]);
+
+    // create a new scope
+    scopeStack.push_back( parser_scope_t() );
 
     try {
         // append expression
@@ -786,22 +973,28 @@ ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startInde
         do { ++i; } while (tokens[i].type != TokenType::LBRACE);
 
         // parse expression
-        pHead->pExpr = parseExpression( tokens, startIndex+2, i-2); // ignore parenthesis
+        pHead->pExpr = parseExpression( tokens, startIndex+2, i-2, scopeStack ); // ignore parenthesis
 
         // parse body
-        parseBody( pHead, tokens, i+1, endIndex-1 ); // ignore braces
+        parseBody( pHead, tokens, i+1, endIndex-1, scopeStack ); // ignore braces
     } catch (TException& e) {
         delete pHead;
         throw e;
     }
 
+    // pop this scope off the stack
+    scopeStack.pop_back();
+
     // return node
     return pHead;
 }
 
-ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex) {
+ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
     // create new node
     ASTForLoop* pHead = new ASTForLoop(tokens[startIndex]);
+
+    // create a new scope
+    scopeStack.push_back( parser_scope_t() );
 
     try {
         // append sub-expressions
@@ -822,16 +1015,19 @@ ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex,
         } while (tokens[i].type != TokenType::LBRACE);
 
         // parse sub-expressions on semicolons
-        pHead->pExprA = parseExpression( tokens, startIndex+2, semiA-1); // ignore opening parenthesis & semicolon
-        pHead->pExprB = parseExpression( tokens, semiA+1, semiB-1); // ignore parenthesis & semicolon
-        pHead->pExprC = parseExpression( tokens, semiB+1, i-2); // ignore closing parenthesis
+        pHead->pExprA = parseExpression( tokens, startIndex+2, semiA-1, scopeStack); // ignore opening parenthesis & semicolon
+        pHead->pExprB = parseExpression( tokens, semiA+1, semiB-1, scopeStack); // ignore parenthesis & semicolon
+        pHead->pExprC = parseExpression( tokens, semiB+1, i-2, scopeStack); // ignore closing parenthesis
 
         // parse body
-        parseBody( pHead, tokens, i+1, endIndex-1 ); // ignore braces
+        parseBody( pHead, tokens, i+1, endIndex-1, scopeStack ); // ignore braces
     } catch (TException& e) {
         delete pHead;
         throw e;
     }
+
+    // pop this scope off the stack
+    scopeStack.pop_back();
 
     // return node
     return pHead;
