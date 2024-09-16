@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "assembler.hpp"
+#include "asm_loader.hpp"
 #include "memory.hpp"
 #include "tpu.hpp"
 

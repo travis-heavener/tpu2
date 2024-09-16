@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "toolbox.hpp"
+#include "type.hpp"
+#include "err_info.hpp"
 
 #define SCOPE_RETURN_START "0" // identifier cannot be named 0 so this is just a cheeky workaround
 

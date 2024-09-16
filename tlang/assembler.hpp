@@ -1,11 +1,11 @@
-#ifndef __T_ASSEMBLER_HPP
-#define __T_ASSEMBLER_HPP
+#ifndef __ASSEMBLER_HPP
+#define __ASSEMBLER_HPP
 
 #include <fstream>
 #include <map>
 #include <string>
 
-#include "scope.hpp"
+#include "util/util.hpp"
 #include "ast/ast.hpp"
 #include "ast/ast_nodes.hpp"
 

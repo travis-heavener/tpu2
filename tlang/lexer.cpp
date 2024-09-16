@@ -2,8 +2,8 @@
 #include <vector>
 
 #include "lexer.hpp"
-#include "toolbox.hpp"
-#include "t_exception.hpp"
+
+#include "util/util.hpp"
 
 // returns true if the keyword is present and is not part of an identifier
 bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset) {

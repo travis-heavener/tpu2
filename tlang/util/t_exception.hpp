@@ -3,6 +3,8 @@
 
 #include <stdexcept>
 
+#include "err_info.hpp"
+
 // shorthand for making exceptions
 #define MAKE_EXCEPTION(name) class T##name##Exception : public TException { \
     public: \

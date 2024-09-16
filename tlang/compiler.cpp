@@ -2,11 +2,10 @@
 #include <fstream>
 #include <vector>
 
-#include "toolbox.hpp"
-#include "t_exception.hpp"
-#include "t_assembler.hpp"
+#include "assembler.hpp"
 #include "lexer.hpp"
-#include "parser.hpp"
+#include "parser/parser.hpp"
+#include "util/util.hpp"
 
 /**
  * Compiles .t files to .tpu assembly files.

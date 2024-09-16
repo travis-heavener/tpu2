@@ -2,10 +2,9 @@
 #include <string>
 #include <vector>
 
-#include "t_assembler.hpp"
-#include "t_exception.hpp"
-#include "scope.hpp"
+#include "assembler.hpp"
 #include "ast/ast.hpp"
+#include "util/util.hpp"
 
 #define FUNC_MAIN_LABEL "main"
 #define FUNC_LABEL_PREFIX "__UF" // for "user function"

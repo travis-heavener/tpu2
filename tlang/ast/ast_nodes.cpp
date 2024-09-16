@@ -1,5 +1,5 @@
 #include "ast_nodes.hpp"
-#include "../t_exception.hpp"
+#include "../util/util.hpp"
 
 // used to help infer the type of objects
 Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {

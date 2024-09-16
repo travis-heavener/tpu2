@@ -4,7 +4,7 @@
 #include <fstream>
 #include <vector>
 
-#include "toolbox.hpp"
+#include "util/util.hpp"
 
 // tokenize a document to a vector of Tokens
 void tokenize(std::ifstream&, std::vector<Token>&);

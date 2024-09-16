@@ -1,5 +1,5 @@
-#ifndef __ASSEMBLER_HPP
-#define __ASSEMBLER_HPP
+#ifndef __ASM_LOADER_HPP
+#define __ASM_LOADER_HPP
 
 #include <map>
 #include <string>

@@ -27,6 +27,9 @@ Install ncurses (Linux only):
 To compile (Linux only):
 `g++ *.cpp util/*.cpp -o ./bin/main.o -Wall -Wextra -g -lncurses`
 
+To compile the T-language compiler (Linux only);
+`cd ./tlang && g++ *.cpp */*.cpp -o compiler.o -Wall -Wextra -g`
+
 ## Disclaimer
 
 1) ***THIS IS A WORK IN PROGRESS. THERE ARE ~~PROBABLY~~ POSSIBLY BUGS.***
