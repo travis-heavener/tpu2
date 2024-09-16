@@ -66,9 +66,13 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName);
 
     // declare end of function label
-    if (!hasReturned && returnSize > 0)
-        throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
-    
+    if (!hasReturned) {
+        if (returnSize > 0)
+            throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
+        else // force jump to return
+            outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
+    }
+
     // write return label
     outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
 

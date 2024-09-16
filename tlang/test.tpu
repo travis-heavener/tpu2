@@ -1,4 +1,5 @@
 __UF0:
+    jmp __UF0E
     __UF0E:
     ret
 __UF1:
