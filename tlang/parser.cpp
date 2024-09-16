@@ -310,9 +310,6 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                         i = j;
                     }
 
-                    // reverse the type's modifiers since they're backwards (outward-in)
-                    type.flipModifiers();
-
                     // create node
                     ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[start], type);
                     pHead->push(pVarDec); // append here so it gets freed on its own if an error occurs here
@@ -353,6 +350,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 
                             // verify all arguments have the same type
                             Type arrType = pArrLit->inferType(scopeStack);
+                            arrType.flipModifiers(); // inferred are backwards
                             pArrLit->setType( arrType );
                             pExpr->type = arrType;
                         } else if (pExpr->at(0)->getNodeType() == ASTNodeType::IDENTIFIER) {
@@ -363,10 +361,17 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     // confirm assignment type matches
                     if (!type.checkArrayMods(pExpr->type)) {
                         throw TSyntaxException(tokens[idenStart].err);
-                    } else if (type.isArray() && *type.getArrayModifiers().rbegin() == TYPE_NO_ARR_SIZE) {
+                    } else if (type.isArray() && type.getArrayModifiers()[0] == TYPE_NO_ARR_SIZE) {
                         // imply size from literal's type
+                        type.flipModifiers(); // flip to make this easier
                         type.popArrayModifier();
-                        type.addArrayModifier( *pExpr->type.getArrayModifiers().rbegin() );
+                        type.addArrayModifier( pExpr->type.getArrayModifiers()[0] );
+                        type.flipModifiers(); // unflip
+
+                        ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
+                        pArrLit->setType( type );
+                        pExpr->type = type;
+                        pVarDec->type = type;
                     }
                     break;
                 }

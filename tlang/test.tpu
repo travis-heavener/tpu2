@@ -2,21 +2,6 @@ __UF0:
     jmp __UF0E
     __UF0E:
     ret
-__UF1:
-    push [SP-4]
-    push [SP-4]
-    pushw 3
-    popw BX
-    popw AX
-    mul BX
-    pushw AX
-    pop DL
-    mov [SP-2], DL
-    pop DL
-    mov [SP-2], DL
-    jmp __UF1E
-    __UF1E:
-    ret
 main:
     add SP, 2
     pushw 0
@@ -43,44 +28,69 @@ main:
     pushw 21
     pushw 22
     pushw 23
-    sub SP, 40
     movw BP, SP
     pushw 2
     popw AX
-    movw BX, 4
+    movw BX, 16
     mul BX
     add BP, AX
-    push [BP-8]
-    push [BP-7]
-    push [BP-6]
-    push [BP-5]
-    add SP, 12
+    push [BP-48]
+    push [BP-47]
+    push [BP-46]
+    push [BP-45]
+    push [BP-44]
+    push [BP-43]
+    push [BP-42]
+    push [BP-41]
+    push [BP-40]
+    push [BP-39]
+    push [BP-38]
+    push [BP-37]
+    push [BP-36]
+    push [BP-35]
+    push [BP-34]
+    push [BP-33]
     movw BP, SP
     pushw 2
     popw AX
-    movw BX, 4
+    movw BX, 16
     mul BX
     add BP, AX
-    push [BP-24]
-    push [BP-23]
-    push [BP-22]
-    push [BP-21]
-    add SP, 12
+    push [BP-64]
+    push [BP-63]
+    push [BP-62]
+    push [BP-61]
+    push [BP-60]
+    push [BP-59]
+    push [BP-58]
+    push [BP-57]
+    push [BP-56]
+    push [BP-55]
+    push [BP-54]
+    push [BP-53]
+    push [BP-52]
+    push [BP-51]
+    push [BP-50]
+    push [BP-49]
     pushw 90
     pushw 1
     pushw 2
     pushw 0
     pushw 1
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
+    push [SP-8]
     sub SP, 6
-    push [SP-4]
-    push [SP-4]
-    add SP, 2
-    call __UF1
     pop DL
-    mov [SP-48], DL
+    mov [SP-92], DL
     pop DL
-    mov [SP-48], DL
-    sub SP, 46
+    mov [SP-92], DL
+    sub SP, 90
     jmp mainE
     mainE:
     movw AX, 0x03
