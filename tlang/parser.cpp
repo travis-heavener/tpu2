@@ -282,22 +282,35 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     // get all array modifiers (only allow integer sizes)
                     if (tokens[++i].type == TokenType::LBRACKET) {
                         size_t j;
-                        for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; j += 3) {
-                            // verify next token is an int literal
-                            if (tokens[j+1].type != TokenType::LIT_INT)
-                                throw TInvalidTokenException(tokens[j+1].err);
+                        size_t numModifiers = 0;
+                        for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; (void)j) {
+                            if (tokens[j+1].type == TokenType::LIT_INT || numModifiers > 0) {
+                                // verify next token is an int literal
+                                if (tokens[j+1].type != TokenType::LIT_INT)
+                                    throw TInvalidTokenException(tokens[i+1].err);
 
-                            // verify token after literal is an RBRACKET
-                            if (tokens[j+2].type != TokenType::RBRACKET)
-                                throw TInvalidTokenException(tokens[j+2].err);
+                                // verify next token is an RBRACKET
+                                if (tokens[j+2].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+2].err);
 
-                            // add array modifier
-                            type.addArrayModifier(std::stol(tokens[j+1].raw));
+                                // add with value otherwise
+                                type.addArrayModifier( std::stol(tokens[j+1].raw) );
+                                j += 3;
+                            } else {
+                                // verify next token is an RBRACKET
+                                if (tokens[j+1].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+1].err);
+
+                                // add empty array modifier if first bracket pair
+                                type.addEmptyArrayModifier();
+                                j += 2;
+                            }
+                            numModifiers++;
                         }
                         i = j;
                     }
 
-                    // reverse the type's modifiers since they're backwards (inward-out)
+                    // reverse the type's modifiers since they're backwards (outward-in)
                     type.flipModifiers();
 
                     // create node
@@ -348,8 +361,13 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     }
 
                     // confirm assignment type matches
-                    if (!type.checkArrayMods(pExpr->type))
+                    if (!type.checkArrayMods(pExpr->type)) {
                         throw TSyntaxException(tokens[idenStart].err);
+                    } else if (type.isArray() && *type.getArrayModifiers().rbegin() == TYPE_NO_ARR_SIZE) {
+                        // imply size from literal's type
+                        type.popArrayModifier();
+                        type.addArrayModifier( *pExpr->type.getArrayModifiers().rbegin() );
+                    }
                     break;
                 }
 

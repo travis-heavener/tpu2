@@ -52,9 +52,18 @@ bool Type::checkArrayMods(const Type& t) const {
         return false;
     
     // check each modifier
-    for (size_t i = 0; i < arraySizes.size(); ++i)
-        if (arraySizes[i] != t.arraySizes[i])
-            return false;
+    for (size_t i = 0; i < arraySizes.size(); ++i) {
+        if (i == arraySizes.size()-1) {
+            // allow empty, implied only if one has it (left-arg)
+            if (arraySizes[i] == TYPE_NO_ARR_SIZE && t.arraySizes[i] == TYPE_NO_ARR_SIZE)
+                return false;
+            else if (arraySizes[i] != TYPE_NO_ARR_SIZE && t.arraySizes[i] != TYPE_NO_ARR_SIZE && arraySizes[i] != t.arraySizes[i])
+                return false;
+        } else {
+            if (arraySizes[i] != t.arraySizes[i])
+                return false;
+        }
+    }
     
     // base case, match
     return true;
