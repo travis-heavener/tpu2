@@ -19,6 +19,9 @@ int main() {
     int f[4][2] = dum[2];
     int j[4][2] = dum[2];
     int c = dum[2];
+
+    int sd = dummy();
+
     return test(c);
 
     // char a = 23;

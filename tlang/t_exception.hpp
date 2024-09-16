@@ -35,5 +35,6 @@ MAKE_EXCEPTION(IdentifierInUse)
 MAKE_EXCEPTION(TypeInfer)
 MAKE_EXCEPTION(InvalidOperation)
 MAKE_EXCEPTION(Syntax)
+MAKE_EXCEPTION(VoidReturn)
 
 #endif
