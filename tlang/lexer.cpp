@@ -6,6 +6,8 @@
 
 #include "util/util.hpp"
 
+static bool isInMultilineComment = false;
+
 // returns true if the keyword is present and is not part of an identifier
 bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset) {
     if (line.find(kwd, offset) != offset) return false; // not present
@@ -35,19 +37,32 @@ void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cw
 void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack) {
     if (line.size() == 0) return;
 
+    // if in a multiline comment, look for closing char
+    size_t i = 0;
+    if (isInMultilineComment) {
+        if ((i = line.find("*/")) == std::string::npos) {
+            return;
+        } else { // jump to closing comment
+            i += 2;
+            isInMultilineComment = false;
+        }
+    }
+
     // replace any macro definitions
-    replaceMacrodefs(line, macrodefMap);
+    replaceMacrodefs(line, macrodefMap, i);
 
     // run preprocessor for this line
-    bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack);
+    if (!isInMultilineComment) {
+        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack);
 
-    // skip lines used by the preprocessor
-    if (hasPreprocessed) return;
+        // skip lines used by the preprocessor
+        if (hasPreprocessed) return;
+    }
 
     // iterate over all characters
     const size_t lineLen = line.size();
     std::string buffer; // mutable buffer cleared each iteration
-    for (size_t i = 0; i < lineLen; i++) {
+    for ((void)i; i < lineLen; i++) {
         if (std::isspace(line[i])) continue; // skip whitespace
 
         // reset buffer & prepare error info object
@@ -61,11 +76,15 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
         // handle multiline comments
         if (line.find("/*", i) == i) {
             i++;
-            tokens.push_back(Token(err, "/*", TokenType::BLOCK_COMMENT_START));
-            continue;
-        } else if (line.find("*/", i) == i) {
-            i++;
-            tokens.push_back(Token(err, "*/", TokenType::BLOCK_COMMENT_END));
+            // try to jump to closing comment
+            size_t closeIndex;
+            if ((closeIndex = line.find("*/", i)) != std::string::npos) {
+                i = closeIndex+1;
+                isInMultilineComment = false;
+            } else {
+                isInMultilineComment = true;
+                return;
+            }
             continue;
         }
 

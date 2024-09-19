@@ -15,6 +15,6 @@ typedef std::stack<std::filesystem::path> cwd_stack;
 
 bool preprocessLine(std::string, macrodef_map&, std::vector<Token>&, cwd_stack&);
 
-void replaceMacrodefs(std::string&, macrodef_map&);
+void replaceMacrodefs(std::string&, macrodef_map&, size_t=0);
 
 #endif

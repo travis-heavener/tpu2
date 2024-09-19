@@ -10,6 +10,8 @@
 #include "util/token.hpp"
 #include "util/toolbox.hpp"
 
+#define STDLIB_LOC "stdlib/stdlib.t"
+
 // break apart a string into its keywords from spaces
 void breakKeywords(const std::string& line, std::vector<std::string>& kwds) {
     // create stringstream from line
@@ -51,30 +53,44 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
     } else if (macroType == "include") { // include something
         if (kwds.size() != 2) throw std::runtime_error("Malformed macro include.");
 
+        bool isLocalInclude;
+        if (kwds[1][0] == '"') {
+            if (*kwds[1].rbegin() != '"')
+                throw std::runtime_error("Malformed macro include.");
+            isLocalInclude = true;
+        } else if (kwds[1][0] == '<') {
+            if (*kwds[1].rbegin() != '>')
+                throw std::runtime_error("Malformed macro include.");
+            isLocalInclude = false;
+        } else {
+            throw std::runtime_error("Malformed macro include.");
+        }
+
         // get the desired file
-        bool isLocalInclude = kwds[1][0] == '"';
         const std::string& inPath = kwds[1].substr(1, kwds[1].size()-2);
 
+        std::filesystem::path inPathAbs;
         if (isLocalInclude) {
-            // load the file, tokenize
-            std::filesystem::path inPathAbs = cwdStack.top() / std::filesystem::path(inPath);
-            std::ifstream inHandle(inPathAbs);
-
-            if (!inHandle.is_open())
-                throw std::runtime_error("Failed to open included file: " + inPath);
-
-            // set CWD
-            cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
-
-            // tokenize
-            tokenize(inHandle, tokens, cwdStack);
-
-            // close file
-            cwdStack.pop();
-            inHandle.close();
+            inPathAbs = cwdStack.top() / std::filesystem::path(inPath);
         } else {
-            throw std::runtime_error("TODO: implement stdlib.");
+            inPathAbs = std::filesystem::path(STDLIB_LOC);
         }
+
+        // load the file, tokenize
+        std::ifstream inHandle(inPathAbs);
+
+        if (!inHandle.is_open())
+            throw std::runtime_error("Failed to open included file: " + inPath);
+
+        // set CWD
+        cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
+
+        // tokenize
+        tokenize(inHandle, tokens, cwdStack);
+
+        // close file
+        cwdStack.pop();
+        inHandle.close();
         return true;
     }
 
@@ -83,9 +99,9 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
 }
 
 // replace all macro-defined matches
-void replaceMacrodefs(std::string& line, macrodef_map& macroMap) {
+void replaceMacrodefs(std::string& line, macrodef_map& macroMap, size_t offset) {
     for (auto [oldStr, newStr] : macroMap) {
-        size_t i = 0;
+        size_t i = offset;
 
         while ((i = line.find(oldStr, i)) != std::string::npos) {
             // verify this is its own word

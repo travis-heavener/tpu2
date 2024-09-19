@@ -17,11 +17,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
 
             return type;
         }
-        case ASTNodeType::FUNCTION_CALL: {
-            Type type = lookupParserVariable(scopeStack, node.raw, node.err);
-            if (type.getStackSizeBytes() == 0) throw TVoidReturnException(node.err);
-            return type;
-        }
+        case ASTNodeType::FUNCTION_CALL: return lookupParserVariable(scopeStack, node.raw, node.err);
         case ASTNodeType::LIT_INT: return Type(TokenType::TYPE_INT);
         case ASTNodeType::LIT_BOOL: return Type(TokenType::TYPE_BOOL);
         case ASTNodeType::LIT_CHAR: return Type(TokenType::TYPE_CHAR);

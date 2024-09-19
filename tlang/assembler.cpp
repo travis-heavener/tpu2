@@ -65,15 +65,12 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
-    bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName);
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName, true, true);
 
     // declare end of function label
-    if (!hasReturned) {
-        if (returnSize > 0)
-            throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
-        else // force jump to return
-            outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
-    }
+    if (!hasReturned && returnSize > 0)
+        throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
+    outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
 
     // write return label
     outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
@@ -92,7 +89,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope) {
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope, const bool isTopScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
     const size_t returnSize = labelMap[funcName].returnType.getStackSizeBytes();
     const std::string returnLabel = labelMap[funcName].returnLabel;
@@ -100,7 +97,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
     // iterate over children of this node
     bool hasReturned = false;
     size_t numChildren = pHead->size();
-    for (size_t i = 0; i < numChildren; i++) {
+    for (size_t i = 0; i < numChildren && !hasReturned; i++) {
         ASTNode& child = *pHead->at(i);
 
         // switch on node type
@@ -135,7 +132,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                hasReturned = !isTopScope && hasReturnedLocal;
 
                 // jump back to the loopStartLabel
                 outHandle << TAB << "jmp " << loopStartLabel << '\n';
@@ -189,7 +187,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 outHandle << TAB << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                hasReturned = !isTopScope && hasReturnedLocal;
 
                 // assemble third expression
                 resultSize = assembleExpression(*loop.pExprC, outHandle, scope);
@@ -233,16 +232,11 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                         else // else if branch
                             pExpr = static_cast<ASTElseIfCondition*>(conditional.at(j))->pExpr;
 
-                        size_t resultSize = assembleExpression(*pExpr, outHandle, scope);
+                        assembleExpression(*pExpr, outHandle, scope, getSizeOfType(TokenType::TYPE_BOOL));
 
-                        // pop the result off the stack to AL/AX
-                        if (resultSize == 2) {
-                            outHandle << TAB << "popw AX\n";
-                            scope.pop(); // additional pop
-                        } else {
-                            outHandle << TAB << "xor AH, AH\n"; // clear AH since no value is put there
-                            outHandle << TAB << "pop AL\n"; // pop to AL
-                        }
+                        // pop the result off the stack to AL
+                        outHandle << TAB << "xor AH, AH\n"; // clear AH since no value is put there
+                        outHandle << TAB << "pop AL\n"; // pop to AL
                         scope.pop();
 
                         // if false, jump to next condition
@@ -251,8 +245,9 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                     }
 
                     // this is executed when not jumping anywhere (else branch or false condition)
-                    // process the body (don't make new scope)
-                    assembleBody(conditional.at(j), outHandle, scope, funcName, false);
+                    // process the body in a new scope
+                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, funcName);
+                    hasReturned = !isTopScope && hasReturnedLocal;
 
                     // jump to merge label
                     outHandle << TAB << "jmp " << mergeLabel << '\n';
@@ -308,9 +303,6 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                 // jmp to the end label to finish closing the function
                 hasReturned = true;
-
-                // break out of this loop since any code after return is skipped
-                i = numChildren;
                 break;
             }
             case ASTNodeType::EXPR: {
@@ -322,7 +314,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                     if (j+1 < resultSize) {
                         outHandle << TAB << "popw\n";
                         scope.pop(); // additional pop
-                        j++;
+                        ++j;
                     } else {
                         outHandle << TAB << "pop\n";
                     }
@@ -337,19 +329,21 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
     }
 
     // remove extra scope variables after the scope closes
-    if (isNewScope) {
+    if (isNewScope || hasReturned) {
         size_t sizeFreed = 0;
         while (scope.size() > startingScopeSize)
             sizeFreed += scope.pop();
 
         // move back SP
-        if (sizeFreed > 0)
-            outHandle << TAB << "sub SP, " << sizeFreed << '\n';
+        for (size_t i = 0; i < sizeFreed; ++i) {
+            if (i+1 < sizeFreed) {
+                outHandle << TAB << "popw\n";
+                ++i;
+            } else {
+                outHandle << TAB << "pop\n";
+            }
+        }
     }
-
-    // if returning, jmp to the return label
-    if (hasReturned)
-        outHandle << TAB << "jmp " << returnLabel << '\n';
     
     return hasReturned;
 }
@@ -367,12 +361,6 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
     // get the desired size of any subexpression, in bytes
     size_t desiredSubSize;
     switch (bodyNode.getNodeType()) {
-        case ASTNodeType::BIN_OP:
-        case ASTNodeType::UNARY_OP: {
-            ASTOperator& op = *static_cast<ASTOperator*>(&bodyNode);
-            desiredSubSize = op.getResultType().getStackSizeBytes();
-            break;
-        }
         case ASTNodeType::LIT_ARR: {
             ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
             Type subType = arr.getType();
@@ -463,11 +451,13 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
                     outHandle << TAB << "add " << regA << ", 0\n";
                     outHandle << TAB << "jz " << labelZero << '\n'; // zero, set to 1
-                    outHandle << TAB << "mov " << regA << ", 0\n"; // currently non-zero, set to 0
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // currently non-zero, set to 0
+                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // currently non-zero, set to 0
                     outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
 
                     outHandle << TAB << labelZero << ":\n"; // currently zero, set to 1
-                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
+                    else                outHandle << TAB << "mov " << regA << ", 1\n";
                     outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
                     outHandle << TAB << labelMerge << ":\n"; // reconvene branches
 
@@ -491,6 +481,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             unsigned char maxResultSize = std::max(resultSizes[0], resultSizes[1]);
 
             // pop in reverse (higher first, later first)
+            if (maxResultSize < 1 || maxResultSize > 2) throw TSyntaxException(bodyNode.err);
+
             if (maxResultSize == 2) {
                 if (resultSizes[1] == 2) { // there's a value here
                     outHandle << TAB << "popw BX\n";
@@ -499,6 +491,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "xor BH, BH\n";
                     outHandle << TAB << "pop BL\n";
                 }
+            } else {
+                outHandle << TAB << "pop BL\n";
             }
             scope.pop();
 
@@ -512,6 +506,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "xor AH, AH\n";
                         outHandle << TAB << "pop AL\n";
                     }
+                } else {
+                    outHandle << TAB << "pop AL\n";
                 }
                 scope.pop();
             }
@@ -640,7 +636,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // if ZF is cleared, expression is true (set to 1)
                     const std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
-                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
+                    else                outHandle << TAB << "mov " << regA << ", 1\n";
                     outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
                     outHandle << TAB << labelName << ":\n"; // reconvene with other branch
 
@@ -658,7 +655,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "or " << regA << ", 0\n"; // sets ZF if 0
                     outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
-                    outHandle << TAB << "mov " << regA << ", 1\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
+                    else                outHandle << TAB << "mov " << regA << ", 1\n";
                     outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
                     outHandle << TAB << labelName << ":\n"; // reconvene with other branch
 
@@ -667,7 +665,10 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "or " << regB << ", 0\n"; // sets ZF if 0
                     outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
-                    outHandle << TAB << "mov " << regB << ", 1\n";
+                    if (regB[1] == 'X')
+                        outHandle << TAB << "movw " << regB << ", 1\n";
+                    else
+                        outHandle << TAB << "mov " << regB << ", 1\n";
                     outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
                     outHandle << TAB << labelName << ":\n"; // reconvene with other branch
 
@@ -687,11 +688,13 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "xor " << regA << ", " << regB << '\n';
 
                     outHandle << TAB << "jz " << labelEQ << '\n';
-                    outHandle << TAB << "mov " << regA << ", 0\n"; // non-zero becomes 0
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // non-zero becomes 0
+                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // non-zero becomes 0
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
 
                     outHandle << TAB << labelEQ << ":\n";
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // zero becomes 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // zero becomes 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // zero becomes 1
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -706,7 +709,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
                     outHandle << TAB << "xor " << regA << ", " << regB << '\n';
                     outHandle << TAB << "jz " << labelMerger << '\n';
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // non-zero becomes 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // non-zero becomes 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // non-zero becomes 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
@@ -724,10 +728,13 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "jz " << labelGTE << '\n'; // zero is set, A == B
                     outHandle << TAB << "jc " << labelGTE << '\n'; // carry is set, A > B
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
+
                     outHandle << TAB << labelGTE << ":\n"; // set regA to 0
-                    outHandle << TAB << "mov " << regA << ", 0\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
+                    else                outHandle << TAB << "mov " << regA << ", 0\n";
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
@@ -745,10 +752,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "jz " << labelLTE << '\n'; // zero is set, A == B
                     outHandle << TAB << "jc " << labelLTE << '\n'; // carry is set, A > B
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelLTE << ":\n"; // set regA to 0
-                    outHandle << TAB << "mov " << regA << ", 0\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
+                    else                outHandle << TAB << "mov " << regA << ", 0\n";
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
@@ -765,10 +774,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     const std::string labelGT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "jc " << labelGT << '\n'; // carry is set, A > B
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelGT << ":\n"; // set regA to 0
-                    outHandle << TAB << "mov " << regA << ", 0\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // set regA to 1
+                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // set regA to 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
@@ -785,10 +796,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     const std::string labelLT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     outHandle << TAB << "jc " << labelLT << '\n'; // carry is set, A > B
-                    outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelLT << ":\n"; // set regA to 0
-                    outHandle << TAB << "mov " << regA << ", 0\n";
+                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
+                    else                outHandle << TAB << "mov " << regA << ", 0\n";
                     outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
 
@@ -837,6 +850,9 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
                     size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
                     size_t typeSize = pScopeVar->type.getStackSizeBytes();
+
+                    // prevent void assignment
+                    if (resultSizes[1] == 0) throw TVoidReturnException(identifier.err);
 
                     // move the rvalue to the identifier on the left
                     outHandle << TAB << "mov [SP-" << stackOffset << "], BL" << '\n';
@@ -994,11 +1010,16 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             assembled_func_t destFunc = labelMap[funcName];
             size_t returnSize = destFunc.returnType.getStackSizeBytes();
 
-            for (size_t i = 0; i < returnSize; i++)
+            for (size_t i = 0; i < returnSize; i++) {
+                if (i+1 < returnSize) {
+                    outHandle << TAB << "pushw 0\n";
+                    scope.addPlaceholder();
+                    ++i;
+                } else {
+                    outHandle << TAB << "push 0\n";
+                }
                 scope.addPlaceholder();
-
-            // move SP forward
-            outHandle << TAB << "add SP, " << returnSize << '\n';
+            }
 
             // call the function
             outHandle << TAB << "call " << destFunc.labelName << '\n';
@@ -1035,20 +1056,34 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
     // cast size, if necessary
     if (desiredSize != -1) {
-        if (finalResultSize < desiredSize) { // push extra 0s
-            for (long long i = finalResultSize; i < desiredSize; i++)
-                scope.addPlaceholder();
+        // prevent returning void to an expression
+        if (finalResultSize == 0 && desiredSize > 0) throw TVoidReturnException(bodyNode.err);
 
-            // move SP forward
-            outHandle << TAB << "add SP, " << (desiredSize - finalResultSize) << '\n';
+        if (finalResultSize < desiredSize) { // push extra 0s
+            for (long long i = finalResultSize; i < desiredSize; i++) {
+                if (i+1 < desiredSize) {
+                    outHandle << TAB << "pushw 0\n";
+                    scope.addPlaceholder();
+                    ++i;
+                } else {
+                    outHandle << TAB << "push 0\n";
+                }
+                scope.addPlaceholder();
+            }
+
             finalResultSize = desiredSize;
         } else if (finalResultSize > desiredSize) { // pop extra values
-            for (long long i = finalResultSize; i > desiredSize; i--)
+            for (long long i = finalResultSize; i > desiredSize; i--) {
+                if (i-1 > desiredSize) {
+                    outHandle << TAB << "popw\n";
+                    scope.pop();
+                    --i;
+                } else {
+                    outHandle << TAB << "pop\n";
+                }
                 scope.pop();
+            }
             
-            // move SP back
-            outHandle << TAB << "sub SP, " << (finalResultSize - desiredSize) << '\n';
-
             finalResultSize = desiredSize;
         }
     }

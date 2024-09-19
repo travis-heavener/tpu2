@@ -1,11 +1,8 @@
-#define dummy "Hi"
-#define whyWouldYouEvenUseThis 1
-#define iDontKnow 6
+#define dummy "this is a test"
 
-#include "test2.t"
+#include <stdlib>
 
 int main() {
     char myName[] = dummy;
-    int x = whyWouldYouEvenUseThis << iDontKnow;
-    return square(x);
+    return strlen(myName);
 }

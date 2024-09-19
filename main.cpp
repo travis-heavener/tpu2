@@ -2,7 +2,7 @@
 
 #include "tpu.hpp"
 #include "memory.hpp"
-#include "assembler.hpp"
+#include "asm_loader.hpp"
 
 /**
  * The TPU-2 (Terrible Processing Unit version 2) is an emulated 16-bit CPU.
