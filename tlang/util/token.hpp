@@ -18,7 +18,7 @@ enum TokenType {
     OP_LT, OP_LTE, OP_GT, OP_GTE, // <, <=, >, >=
     OP_LSHIFT, OP_RSHIFT, // <<, >>
     OP_ADD, OP_SUB, ASTERISK, OP_DIV, OP_MOD, // +, -, *, /, %
-    OP_BIT_OR, OP_BIT_AND, OP_BIT_NOT, OP_BIT_XOR, // |, &, ~, ^
+    OP_BIT_OR, AMPERSAND, OP_BIT_NOT, OP_BIT_XOR, // |, &, ~, ^
     OP_BOOL_OR, OP_BOOL_AND, OP_BOOL_NOT, // ||, &&, !
     OP_EQ, OP_NEQ, // ==, !=
 

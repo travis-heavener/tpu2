@@ -193,11 +193,13 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType opType = currentOp.getOpTokenType();
 
-        // if it's a binary op, check for asterisk dereference
-        if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK) continue;
+        // if it's a binary op, check for asterisk dereference or ampersand address operator
+        if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType == TokenType::AMPERSAND)
+            continue;
 
         // basically, unary can only work if it's after A) nothing or B) another operator
-        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB || opType == TokenType::ASTERISK) &&
+        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB ||
+             opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) &&
             !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
                         pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
             continue;
@@ -207,8 +209,11 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
         // if this is an asterisk, set it to a unary
-        if (opType == TokenType::ASTERISK)
+        if (opType == TokenType::ASTERISK) {
             currentOp.setIsUnary(true);
+        } else if (opType == TokenType::AMPERSAND) {
+            currentOp.setIsUnary(true);
+        }
 
         // append next node as child of this
         currentNode.push( pHead->at(i+1) );
@@ -353,7 +358,7 @@ void parsePrecedence8(ASTNode* pHead) {
         // verify this is bitwise and
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
-        if (tokenType != TokenType::OP_BIT_AND) continue;
+        if (tokenType != TokenType::AMPERSAND) continue;
 
         // check for following expression
         if (i == 0 || i+1 == pHead->size()) throw TInvalidTokenException(currentNode.err);

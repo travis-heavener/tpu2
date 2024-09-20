@@ -273,7 +273,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
                     i++; // offset by length of keyword - 1
                     tokens.push_back(Token(err, "&&", TokenType::OP_BOOL_AND));
                 } else {
-                    tokens.push_back(Token(err, "&", TokenType::OP_BIT_AND));
+                    tokens.push_back(Token(err, "&", TokenType::AMPERSAND));
                 }
                 continue;
             }

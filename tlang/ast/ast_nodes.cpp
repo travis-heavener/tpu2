@@ -59,6 +59,12 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
 
                     return typeA;
                 }
+                case TokenType::AMPERSAND: {
+                    // you can get the address to literally anything, it works (trust me)
+                    Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
+                    typeA.addPointer();
+                    return typeA;
+                }
                 default: {
                     // handle typecast unary
                     if (pOp->getUnaryType() == ASTUnaryType::TYPE_CAST)
@@ -79,7 +85,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                 case TokenType::ASTERISK:
                 case TokenType::OP_DIV:
                 case TokenType::OP_MOD:
-                case TokenType::OP_BIT_AND:
+                case TokenType::AMPERSAND:
                 case TokenType::OP_BIT_OR:
                 case TokenType::OP_BIT_XOR: {
                     // take size of whichever primitive is larger
@@ -222,6 +228,14 @@ void ASTOperator::determineResultType(scope_stack_t& scopeStack) {
 
     // update this node type
     this->returnType = getTypeFromNode(*this, scopeStack);
+}
+
+bool ASTOperator::isChildLValue(size_t i) const {
+    // check if the child is an lvalue or not
+    throw std::runtime_error("WHERE YOU LEFT OFF, IF LVALUE IS PRESENT WE CAN GET ITS ADDRESS");
+
+    // base case, does not result in lvalue
+    return false;
 }
 
 // get the result type of an identifier

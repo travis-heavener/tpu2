@@ -380,6 +380,10 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             if (op.getOpTokenType() == TokenType::ASTERISK) {
                 desiredSubSize = op.getResultType().getStackSizeBytes();
                 isSubSizeOnlyFirstChild = true;
+            } else if (op.getOpTokenType() == TokenType::AMPERSAND) { // check for address operator
+                // check for lvalue
+                if (!op.isChildLValue(0))
+                    throw TSyntaxException(op.err);
             }
             break;
         }
@@ -500,6 +504,25 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
                     // restore BP from DX
                     outHandle << TAB << "movw BP, DX\n";
+                    break;
+                }
+                case TokenType::AMPERSAND: {
+                    // get address from result
+                    throw std::runtime_error("UNIMPLEMENTED, NEED TO FINISH LVALUE METHOD IN AST_NODES.CPP");
+                    /*
+                    
+                    
+                    TODO LIST:
+                    [X] add typecasting
+                    2. add sizeof operator
+                    3a. implement heap & malloc
+                    3b. pointers
+                    4c. force stack ptr bounds
+                    4. improve function lookup for args
+                    5. add implicit typecasting
+                    
+                    
+                    */
                     break;
                 }
                 default: {
@@ -657,7 +680,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     finalResultSize = maxResultSize;
                     break;
                 }
-                case TokenType::OP_BIT_AND: {
+                case TokenType::AMPERSAND: {
                     outHandle << TAB << "and " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)

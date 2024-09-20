@@ -42,6 +42,7 @@ class Type {
         TokenType primitiveType;
         std::vector<long long> arraySizes;
         size_t numPtrs = 0;
+        bool isLValue;
 };
 
 #endif

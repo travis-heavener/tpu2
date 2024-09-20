@@ -31,7 +31,7 @@ bool isTokenBinaryOp(const TokenType type) {
     return type == OP_LT || type == OP_LTE || type == OP_GT || type == OP_GTE ||
            type == OP_LSHIFT || type == OP_RSHIFT || type == OP_ADD ||
            type == OP_SUB || type == ASTERISK || type == OP_DIV || type == OP_MOD ||
-           type == OP_BIT_OR || type == OP_BIT_AND || type == OP_BIT_XOR ||
+           type == OP_BIT_OR || type == AMPERSAND || type == OP_BIT_XOR ||
            type == OP_BOOL_OR || type == OP_BOOL_AND || type == OP_EQ || type == OP_NEQ ||
            type == ASSIGN;
 }
@@ -44,7 +44,7 @@ bool isTokenLiteral(const TokenType type) {
 // true if the token is a comparison operator
 bool isTokenCompOp(const TokenType type) {
     return type == OP_LT || type == OP_LTE || type == OP_GT || type == OP_GTE ||  type == OP_BIT_OR ||
-           type == OP_BIT_AND || type == OP_BIT_XOR || type == OP_BOOL_OR || type == OP_BOOL_AND ||
+           type == AMPERSAND || type == OP_BIT_XOR || type == OP_BOOL_OR || type == OP_BOOL_AND ||
            type == OP_EQ || type == OP_NEQ;
 }
 
