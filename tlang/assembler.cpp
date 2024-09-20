@@ -359,7 +359,8 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
     }
 
     // get the desired size of any subexpression, in bytes
-    size_t desiredSubSize;
+    size_t desiredSubSize = -1;
+    bool isSubSizeOnlyFirstChild = false;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::LIT_ARR: {
             ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
@@ -373,13 +374,24 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             desiredSubSize = expr.type.getStackSizeBytes();
             break;
         }
-        default: desiredSubSize = -1; break;
+        case ASTNodeType::UNARY_OP: {
+            // check for dereference
+            ASTOperator& op = *static_cast<ASTOperator*>(&bodyNode);
+            if (op.getOpTokenType() == TokenType::ASTERISK) {
+                desiredSubSize = op.getResultType().getStackSizeBytes();
+                isSubSizeOnlyFirstChild = true;
+            }
+            break;
+        }
+        default: break;
     }
 
     // recurse this expression's children, bottom-up
     size_t numChildren = bodyNode.size();
     std::vector<size_t> resultSizes;
     for (size_t i = 0; i < numChildren; ++i) {
+        if (isSubSizeOnlyFirstChild && i > 0) desiredSubSize = -1;
+
         // prevent parsing typecasts
         if (bodyNode.at(i)->getNodeType() == ASTNodeType::TYPE_CAST) continue;
 
@@ -468,6 +480,26 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "push AL\n";
                     scope.addPlaceholder();
                     finalResultSize = 1; // always returns an 8-bit bool
+                    break;
+                }
+                case TokenType::ASTERISK: {
+                    // backup BP to DX
+                    outHandle << TAB << "movw DX, BP\n";
+
+                    // dereference the pointer whose value is stored in AX
+                    outHandle << TAB << "movw BP, AX\n";
+
+                    // pass final result size
+                    finalResultSize = desiredSize;
+
+                    // move that value to the stack
+                    for (long long k = 0; k < finalResultSize; ++k) {
+                        outHandle << TAB << "push [BP+" << k << "]\n";
+                        scope.addPlaceholder();
+                    }
+
+                    // restore BP from DX
+                    outHandle << TAB << "movw BP, DX\n";
                     break;
                 }
                 default: {

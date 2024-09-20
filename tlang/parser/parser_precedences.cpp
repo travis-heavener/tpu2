@@ -53,7 +53,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 // grab type (only allow pointer asterisk or typename)
                 Type type( tokens[start+1].type );
 
-                for (size_t j = start+2; j < i-1; ++j) {
+                for (size_t j = start+2; j < i; ++j) {
                     // only accept asterisk
                     if (tokens[j].type != TokenType::ASTERISK)
                         throw TInvalidTokenException(tokens[j].err);
@@ -187,14 +187,17 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     // precedence 2 (R -> L)
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
-        if (currentNode.getNodeType() != ASTNodeType::UNARY_OP) continue;
+        if (currentNode.getNodeType() != ASTNodeType::UNARY_OP && currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
         // ignore + and - if this is a binary math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType opType = currentOp.getOpTokenType();
 
+        // if it's a binary op, check for asterisk dereference
+        if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK) continue;
+
         // basically, unary can only work if it's after A) nothing or B) another operator
-        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) &&
+        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB || opType == TokenType::ASTERISK) &&
             !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
                         pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
             continue;
@@ -202,6 +205,10 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
 
         // confirm there is a token after this
         if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+
+        // if this is an asterisk, set it to a unary
+        if (opType == TokenType::ASTERISK)
+            currentOp.setIsUnary(true);
 
         // append next node as child of this
         currentNode.push( pHead->at(i+1) );

@@ -46,6 +46,7 @@ bool isTokenBinaryOp(const TokenType);
 bool isTokenLiteral(const TokenType);
 bool isTokenCompOp(const TokenType);
 bool isTokenAssignOp(const TokenType);
+bool isNonValueType(const TokenType);
 
 // returns the size of a primitive type in bytes
 unsigned char getSizeOfType(TokenType type);

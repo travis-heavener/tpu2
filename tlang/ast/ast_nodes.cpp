@@ -37,7 +37,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     if (typeA.isArray()) throw TInvalidOperationException(pOp->err);
 
                     // take size of left arg
-                    return Type(typeA.getPrimitiveType());
+                    return typeA;
                 }
                 case TokenType::OP_BIT_NOT:
                 case TokenType::OP_BOOL_NOT: {
@@ -49,6 +49,15 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
 
                     // take size of boolean
                     return Type(TokenType::TYPE_BOOL);
+                }
+                case TokenType::ASTERISK: {
+                    // verify typecast is valid
+                    Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
+
+                    if (typeA.getNumPtrs() == 0) throw TInvalidOperationException(pOp->err);
+                    typeA.popPointer();
+
+                    return typeA;
                 }
                 default: {
                     // handle typecast unary
