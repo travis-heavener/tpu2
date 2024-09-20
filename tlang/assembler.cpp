@@ -640,13 +640,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "div " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) { // uses AX as result and DX as remainder in 16-bit mode
+                    if (maxResultSize == 2) // uses AX as result and DX as remainder in 16-bit mode
                         outHandle << TAB << "pushw DX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AH\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -654,13 +652,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "or " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -668,13 +664,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "and " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -682,13 +676,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "xor " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -878,13 +870,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "shl " << regA << ", BL\n";
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -893,13 +883,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "shr " << regA << ", BL\n";
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -922,13 +910,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         outHandle << TAB << "mov [SP-" << stackOffset-1 << "], BH" << '\n';
 
                     // push the value of the variable onto the stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw BX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push BL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = typeSize;
                     break;
                 }
