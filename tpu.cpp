@@ -165,6 +165,11 @@ void TPU::execute(Memory& memory) {
         default:
             throw std::invalid_argument("Invalid or unimplemented instruction code: " + opCode);
     }
+
+    // verify the SP is in bounds
+    if (SP.getValue() < STACK_LOWER_ADDR || SP.getValue() > STACK_UPPER_ADDR) {
+        throw std::runtime_error("Stack over/underflow");
+    }
 }
 
 // starts the clock and runs until a halt instruction is encountered
