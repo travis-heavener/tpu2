@@ -47,7 +47,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     outHandle << labelName << ":\n";
 
     // if this is main, add return byte spacing on top of stack
-    const size_t returnSize = funcNode.getReturnType().getStackSizeBytes();
+    const size_t returnSize = funcNode.getReturnType().getSizeBytes();
     if (funcName == FUNC_MAIN_LABEL && returnSize > 0)
         outHandle << TAB << "add SP, " << returnSize << '\n';
 
@@ -61,7 +61,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     }
 
     // add return bytes to scope
-    if (funcNode.getReturnType().getStackSizeBytes() > 0)
+    if (funcNode.getReturnType().getSizeBytes() > 0)
         scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
@@ -91,7 +91,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 // returns true if the current body has returned (really only matters in function scopes)
 bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope, const bool isTopScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
-    const size_t returnSize = labelMap[funcName].returnType.getStackSizeBytes();
+    const size_t returnSize = labelMap[funcName].returnType.getSizeBytes();
     const std::string returnLabel = labelMap[funcName].returnLabel;
 
     // iterate over children of this node
@@ -262,7 +262,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 // create space on stack
                 ASTVarDeclaration& varChild = *static_cast<ASTVarDeclaration*>(&child);
                 const Type varType = varChild.getType();
-                const size_t typeSize = varType.getStackSizeBytes();
+                const size_t typeSize = varType.getSizeBytes();
 
                 // get the value of the assignment
                 if (varChild.pExpr == nullptr) { // no assignment, set to 0
@@ -367,19 +367,19 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
             Type subType = arr.getType();
             subType.popArrayModifier();
-            desiredSubSize = subType.getStackSizeBytes(); // the size of each element
+            desiredSubSize = subType.getSizeBytes(); // the size of each element
             break;
         }
         case ASTNodeType::EXPR: {
             ASTExpr& expr = *static_cast<ASTExpr*>(&bodyNode);
-            desiredSubSize = expr.type.getStackSizeBytes();
+            desiredSubSize = expr.type.getSizeBytes();
             break;
         }
         case ASTNodeType::UNARY_OP: {
             // check for dereference
             ASTOperator& op = *static_cast<ASTOperator*>(&bodyNode);
             if (op.getOpTokenType() == TokenType::ASTERISK) {
-                desiredSubSize = op.getResultType().getStackSizeBytes();
+                desiredSubSize = op.getResultType().getSizeBytes();
                 isSubSizeOnlyFirstChild = true;
             } else if (op.getOpTokenType() == TokenType::AMPERSAND) { // check for address-of operator
                 // check for lvalue
@@ -440,13 +440,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "xor " << regA << ", " << (resultSize > 1 ? "0x8000" : "0x80") << '\n';
                     
                     // push values to stack
-                    if (resultSize == 2) {
+                    if (resultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(resultSize);
                     finalResultSize = resultSize;
                     break;
                 }
@@ -455,13 +453,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "not " << regA << '\n';
                     
                     // push values to stack
-                    if (resultSize == 2) {
+                    if (resultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(resultSize);
                     finalResultSize = resultSize;
                     break;
                 }
@@ -511,24 +507,15 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 case TokenType::AMPERSAND: {
                     // buffer result
                     outHandle << TAB << "pushw AX\n";
-                    scope.addPlaceholder();
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(2);
                     finalResultSize = 2;
-
-                    /*
-                    
-                    
-                    TODO LIST:
-                    [X] add typecasting
-                    [X] pointers
-                    1. add sizeof operator
-                    2. implement heap & malloc
-                        - force stack ptr bounds
-                    3. improve function lookup for args
-                        - add implicit typecasting
-                    
-                    
-                    */
+                    break;
+                }
+                case TokenType::SIZEOF: {
+                    // push the size of whatever the result on the stack is (as int16)
+                    outHandle << TAB << "pushw " << resultSize << '\n';
+                    scope.addPlaceholder(2);
+                    finalResultSize = 2;
                     break;
                 }
                 default: {
@@ -538,16 +525,14 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                         ASTTypeCast& typeCast = *static_cast<ASTTypeCast*>(unaryOp.left());
                         
                         if (desiredSize == -1)
-                            desiredSize = typeCast.type.getStackSizeBytes();
+                            desiredSize = typeCast.type.getSizeBytes();
 
                         // buffer the value to the stack
-                        if (resultSize == 2) {
+                        if (resultSize == 2)
                             outHandle << TAB << "pushw AX\n";
-                            scope.addPlaceholder();
-                        } else {
+                        else
                             outHandle << TAB << "push AL\n";
-                        }
-                        scope.addPlaceholder();
+                        scope.addPlaceholder(resultSize);
                         finalResultSize = resultSize;
                         break;
                     }
@@ -605,13 +590,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "add " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -620,13 +603,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "sub " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) {
+                    if (maxResultSize == 2)
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -637,8 +618,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     // push result to stack (lowest-first)
                     // max size is 16-bit so just ignore overflow
                     outHandle << TAB << "pushw AX\n";
-                    scope.addPlaceholder();
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(2);
                     finalResultSize = 2;
                     break;
                 }
@@ -647,13 +627,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     outHandle << TAB << "div " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2) { // uses AX as result and DX as remainder in 16-bit mode
+                    if (maxResultSize == 2) // uses AX as result and DX as remainder in 16-bit mode
                         outHandle << TAB << "pushw AX\n";
-                        scope.addPlaceholder(); // additional placeholder
-                    } else {
+                    else
                         outHandle << TAB << "push AL\n";
-                    }
-                    scope.addPlaceholder();
+                    scope.addPlaceholder(maxResultSize);
                     finalResultSize = maxResultSize;
                     break;
                 }
@@ -933,7 +911,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(bodyNode.at(0));
                     ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
                     size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
-                    size_t typeSize = pScopeVar->type.getStackSizeBytes();
+                    size_t typeSize = pScopeVar->type.getSizeBytes();
 
                     // prevent void assignment
                     if (resultSizes[1] == 0) throw TVoidReturnException(identifier.err);
@@ -1029,7 +1007,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
 
             // apply subscripts if necessary
-            size_t typeSize = pScopeVar->type.getStackSizeBytes();
+            size_t typeSize = pScopeVar->type.getSizeBytes();
             if (identifier.getSubscripts().size() > 0) {
                 // move the SP to the BP to store the stackOffset's offset
                 outHandle << TAB << "movw BP, SP\n";
@@ -1117,7 +1095,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
             // allocate space on the stack for return bytes
             assembled_func_t destFunc = labelMap[funcName];
-            size_t returnSize = destFunc.returnType.getStackSizeBytes();
+            size_t returnSize = destFunc.returnType.getSizeBytes();
 
             for (size_t i = 0; i < returnSize; i++) {
                 if (i+1 < returnSize) {
@@ -1155,7 +1133,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             size_t sumResultSize = 0;
             for (size_t resultSize : resultSizes) sumResultSize += resultSize;
 
-            finalResultSize = type.getStackSizeBytes();
+            finalResultSize = type.getSizeBytes();
             break;
         }
         default: {

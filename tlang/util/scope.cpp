@@ -15,7 +15,7 @@ size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
     ScopeAddr* pVar = new ScopeAddr(type, name);
     this->children.push_back(pVar);
 
-    size_t size = type.getStackSizeBytes();
+    size_t size = type.getSizeBytes();
     for (size_t i = 0; i < size-1; i++) // add remaining placeholders
         this->addPlaceholder();
     return size;
@@ -48,4 +48,9 @@ ScopeAddr* Scope::getVariable(const std::string& name, ErrInfo err) const {
 
     // base case, not found
     throw TUnknownIdentifierException(err);
+}
+
+void Scope::addPlaceholder(size_t n) {
+    for (size_t i = 0; i < n; ++i)
+        children.push_back(new ScopeAddr());
 }

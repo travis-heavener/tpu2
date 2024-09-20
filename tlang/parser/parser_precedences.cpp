@@ -214,6 +214,11 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         } else if (opType == TokenType::AMPERSAND) {
             currentOp.setIsUnary(true);
         }
+        
+        // update unary type
+        if (opType == TokenType::SIZEOF) {
+            currentOp.setUnaryType(ASTUnaryType::SIZEOF);
+        }
 
         // append next node as child of this
         currentNode.push( pHead->at(i+1) );

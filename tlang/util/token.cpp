@@ -23,7 +23,7 @@ bool isTokenPrimitiveType(const TokenType type) {
 
 // true if the token is an unary operator (ex. ~, !)
 bool isTokenUnaryOp(const TokenType type) {
-    return type == OP_BOOL_NOT || type == OP_ADD || type == OP_SUB || type == OP_BIT_NOT;
+    return type == OP_BOOL_NOT || type == OP_ADD || type == OP_SUB || type == OP_BIT_NOT || type == SIZEOF;
 }
 
 // true if the token is a binary operator (ex. *, /, ==)

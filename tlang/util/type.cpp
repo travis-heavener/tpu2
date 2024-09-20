@@ -1,7 +1,7 @@
 #include "type.hpp"
 
-// get the total size taken up on the stack by this type
-size_t Type::getStackSizeBytes() const {
+// get the total size taken up in memory by this type
+size_t Type::getSizeBytes() const {
     // memory addresses are 2 bytes on a 16-bit system such as this
     size_t size = (this->numPtrs == 0) ? getSizeOfType(this->primitiveType) : 2;
 

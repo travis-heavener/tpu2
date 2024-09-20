@@ -95,6 +95,10 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
                     typeA.addPointer();
                     return typeA;
                 }
+                case TokenType::SIZEOF: {
+                    // sizeof *always* returns an int
+                    return Type(TokenType::TYPE_INT);
+                }
                 default: {
                     // handle typecast unary
                     if (pOp->getUnaryType() == ASTUnaryType::TYPE_CAST) {

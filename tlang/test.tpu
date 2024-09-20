@@ -76,15 +76,12 @@ main:
     push 115
     push 0
     movw BP, SP
-    pushw 10
-    popw AX
-    movw BX, 1
-    mul BX
-    add BP, AX
     sub BP, 7
     pushw BP
     popw AX
     pushw AX
+    popw AX
+    pushw 2
     pop DL
     mov [SP-9], DL
     pop DL

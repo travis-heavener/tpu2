@@ -36,7 +36,7 @@ class Scope {
         size_t getOffset(const std::string&, ErrInfo) const;
         ScopeAddr* getVariable(const std::string&, ErrInfo) const;
 
-        void addPlaceholder() { children.push_back(new ScopeAddr()); };
+        void addPlaceholder(size_t=1);
     private:
         std::vector<ScopeAddr*> children;
 };

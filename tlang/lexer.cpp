@@ -167,6 +167,13 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             continue;
         }
 
+        // sizeof keyword
+        if (isKwdPresent("sizeof", line, i)) {
+            i += 5; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "sizeof", TokenType::SIZEOF));
+            continue;
+        }
+
         // check for individual characters that can't be a part of a larger operator or anything
         #define ADD_SINGLE_CHAR_TOKEN(c, type) tokens.push_back(Token(err, c, type)); continue;
         switch (line[i]) {

@@ -21,6 +21,7 @@ enum TokenType {
     OP_BIT_OR, AMPERSAND, OP_BIT_NOT, OP_BIT_XOR, // |, &, ~, ^
     OP_BOOL_OR, OP_BOOL_AND, OP_BOOL_NOT, // ||, &&, !
     OP_EQ, OP_NEQ, // ==, !=
+    SIZEOF,
 
     // assignment operators
     ASSIGN

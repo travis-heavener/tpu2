@@ -30,7 +30,7 @@ class Type {
         Type checkDominant(Type B) const;
 
         const std::vector<long long>& getArrayModifiers() const { return arraySizes; };
-        size_t getStackSizeBytes() const;
+        size_t getSizeBytes() const;
 
         TokenType getPrimitiveType() const { return primitiveType; };
 
