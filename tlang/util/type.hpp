@@ -38,11 +38,15 @@ class Type {
         bool operator!=(const Type& t) const { return !(*this == t); };
         bool checkArrayMods(const Type& t) const;
         void flipModifiers() { std::reverse(arraySizes.begin(), arraySizes.end()); };
+
+        // NOT used in EQ/NEQ comparison
+        bool getIsLValue() const { return isLValue; };
+        void setIsLValue(bool lv) { isLValue = lv; };
     private:
         TokenType primitiveType;
         std::vector<long long> arraySizes;
         size_t numPtrs = 0;
-        bool isLValue;
+        bool isLValue = false;
 };
 
 #endif

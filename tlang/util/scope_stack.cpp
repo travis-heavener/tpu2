@@ -30,4 +30,7 @@ void declareParserVariable(scope_stack_t& scopeStack, const std::string& name, T
     
     // declare variable
     parserScope[name] = type;
+
+    // force the type to have an lvalue status
+    parserScope[name].setIsLValue(true);
 }

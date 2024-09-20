@@ -27,6 +27,6 @@ void assembleFunction(ASTFunction&, std::ofstream&);
 bool assembleBody(ASTNode*, std::ofstream&, Scope&, const std::string&, const bool=true, const bool=false);
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode&, std::ofstream&, Scope&, long long=-1);
+size_t assembleExpression(ASTNode&, std::ofstream&, Scope&, long long=-1, const bool=false);
 
 #endif

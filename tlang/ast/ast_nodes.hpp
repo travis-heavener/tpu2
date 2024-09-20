@@ -133,8 +133,6 @@ class ASTOperator : public ASTNode {
 
         void determineResultType(scope_stack_t&);
         Type getResultType() const { return returnType; };
-
-        bool isChildLValue(size_t) const;
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;
         TokenType opType;
@@ -193,6 +191,7 @@ class ASTIdentifier : public ASTNode {
 
         void determineResultType(scope_stack_t&);
         Type getResultType() const { return type; };
+        Type& getResultTypeRef() { return type; };
     private:
         Type type;
         std::vector<ASTArraySubscript*> subscripts;

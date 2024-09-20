@@ -349,7 +349,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 }
 
 // assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope, long long desiredSize) {
+size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope, long long desiredSize, const bool isLValue) {
     // if this is a literal array without a type (ie. not part of an assignment), yell at the user (LOUDLY)
     // literal arrays are ONLY allowed during assignment
     if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
@@ -360,6 +360,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
     // get the desired size of any subexpression, in bytes
     size_t desiredSubSize = -1;
+    bool isSubLValue = isLValue; // allow to pass through
     bool isSubSizeOnlyFirstChild = false;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::LIT_ARR: {
@@ -380,10 +381,11 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             if (op.getOpTokenType() == TokenType::ASTERISK) {
                 desiredSubSize = op.getResultType().getStackSizeBytes();
                 isSubSizeOnlyFirstChild = true;
-            } else if (op.getOpTokenType() == TokenType::AMPERSAND) { // check for address operator
+            } else if (op.getOpTokenType() == TokenType::AMPERSAND) { // check for address-of operator
                 // check for lvalue
-                if (!op.isChildLValue(0))
-                    throw TSyntaxException(op.err);
+                if (!op.getResultType().getIsLValue()) throw TSyntaxException(op.err);
+                desiredSubSize = 2; // size of mem address
+                isSubLValue = true;
             }
             break;
         }
@@ -399,7 +401,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
         // prevent parsing typecasts
         if (bodyNode.at(i)->getNodeType() == ASTNodeType::TYPE_CAST) continue;
 
-        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope, desiredSubSize) );
+        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope, desiredSubSize, isSubLValue) );
     }
 
     // assemble this node
@@ -507,8 +509,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     break;
                 }
                 case TokenType::AMPERSAND: {
-                    // get address from result
-                    throw std::runtime_error("UNIMPLEMENTED, NEED TO FINISH LVALUE METHOD IN AST_NODES.CPP");
+                    // buffer result
+                    outHandle << TAB << "pushw AX\n";
+                    scope.addPlaceholder();
+                    scope.addPlaceholder();
+                    finalResultSize = 2;
+
                     /*
                     
                     
@@ -1039,7 +1045,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     typeSize /= stackMods[ k++ ];
 
                     // add to BP the top int value on the stack (force subscript size to int)
-                    assembleExpression(*pSub, outHandle, scope, getSizeOfType(TokenType::TYPE_INT));
+                    assembleExpression(*pSub, outHandle, scope, getSizeOfType(TokenType::TYPE_INT), isLValue);
 
                     // pop top int (subscript) to AX
                     outHandle << TAB << "popw AX\n";
@@ -1052,24 +1058,49 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
 
                 // handle assignment operations vs read operations
                 if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
-                    for (size_t i = 0; i < typeSize; i++) {
-                        // move value to top of stack
-                        // use stackOffset-i since the stack is changing but BP is not
-                        outHandle << TAB << "push [BP-" << stackOffset-i << "]\n";
+                    // if this is an lvalue, push the *address*
+                    if (isLValue) {
+                        // sub stackOffset from BP
+                        outHandle << TAB << "sub BP, " << stackOffset << '\n';
+                        
+                        // push BP (points to address of identifier)
+                        outHandle << TAB << "pushw BP\n";
                         scope.addPlaceholder();
+                        scope.addPlaceholder();
+                        finalResultSize = 2;
+                    } else { // otherwise, push *value*
+                        for (size_t i = 0; i < typeSize; i++) {
+                            // move value to top of stack
+                            // use stackOffset-i since the stack is changing but BP is not
+                            outHandle << TAB << "push [BP-" << stackOffset-i << "]\n";
+                            scope.addPlaceholder();
+                        }
+                        finalResultSize = typeSize;
                     }
-                    finalResultSize = typeSize;
                     break;
                 }
             } else {
                 // handle assignment operations vs read operations
                 if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
-                    for (size_t i = 0; i < typeSize; i++) {
-                        // move value to top of stack
-                        outHandle << TAB << "push [SP-" << stackOffset << "]\n";
+                    // if this is an lvalue, push the *address*
+                    if (isLValue) {
+                        // move address into BP
+                        outHandle << TAB << "movw BP, SP\n";
+                        outHandle << TAB << "sub BP, " << stackOffset << '\n';
+
+                        // push BP (points to address of identifier)
+                        outHandle << TAB << "pushw BP\n";
                         scope.addPlaceholder();
+                        scope.addPlaceholder();
+                        finalResultSize = 2;
+                    } else { // otherwise, push *value*
+                        for (size_t i = 0; i < typeSize; i++) {
+                            // move value to top of stack
+                            outHandle << TAB << "push [SP-" << stackOffset << "]\n";
+                            scope.addPlaceholder();
+                        }
+                        finalResultSize = typeSize;
                     }
-                    finalResultSize = typeSize;
                     break;
                 }
             }

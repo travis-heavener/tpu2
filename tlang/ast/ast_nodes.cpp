@@ -2,7 +2,7 @@
 #include "../util/util.hpp"
 
 // used to help infer the type of objects
-Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
+Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLValue=false) {
     switch (node.getNodeType()) {
         case ASTNodeType::IDENTIFIER: {
             ASTIdentifier& iden = *static_cast<ASTIdentifier*>(&node);
@@ -14,10 +14,24 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
             size_t numSubscripts = iden.getSubscripts().size();
             for (size_t i = 0; i < numSubscripts; i++)
                 type.popArrayModifier();
+            
+            // if this is a pointer, store as an lvalue
+            if (type.getNumPtrs() > 0 || overrideAsLValue) {
+                type.setIsLValue(true);
+            } else {
+                // force to not be an lvalue (lookupParserVariable stores lvalue status as true)
+                type.setIsLValue(false);
+            }
 
             return type;
         }
-        case ASTNodeType::FUNCTION_CALL: return lookupParserVariable(scopeStack, node.raw, node.err);
+        case ASTNodeType::FUNCTION_CALL: {
+            Type retType = lookupParserVariable(scopeStack, node.raw, node.err);
+
+            // prevent from being an lvalue (returned values are temporary)
+            retType.setIsLValue(false);
+            return retType;
+        }
         case ASTNodeType::LIT_INT: return Type(TokenType::TYPE_INT);
         case ASTNodeType::LIT_BOOL: return Type(TokenType::TYPE_BOOL);
         case ASTNodeType::LIT_CHAR: return Type(TokenType::TYPE_CHAR);
@@ -36,6 +50,9 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     // prevent array
                     if (typeA.isArray()) throw TInvalidOperationException(pOp->err);
 
+                    // prevent type from being an lvalue
+                    if (typeA.getIsLValue()) throw TInvalidOperationException(node.err);
+
                     // take size of left arg
                     return typeA;
                 }
@@ -47,28 +64,48 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     // prevent array
                     if (typeA.isArray()) throw TInvalidOperationException(pOp->err);
 
+                    // prevent type from being an lvalue if this is bitwise not
+                    if (pOp->getOpTokenType() == TokenType::OP_BIT_NOT) {
+                        if (typeA.getIsLValue()) throw TInvalidOperationException(node.err);
+                    }
+
                     // take size of boolean
                     return Type(TokenType::TYPE_BOOL);
                 }
                 case TokenType::ASTERISK: {
-                    // verify typecast is valid
+                    // verify dereference is valid
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
 
-                    if (typeA.getNumPtrs() == 0) throw TInvalidOperationException(pOp->err);
+                    if (typeA.getNumPtrs() == 0)
+                        throw TInvalidOperationException(pOp->err);
                     typeA.popPointer();
+
+                    // force dereferenced values to be lvalues
+                    typeA.setIsLValue(true);
 
                     return typeA;
                 }
                 case TokenType::AMPERSAND: {
-                    // you can get the address to literally anything, it works (trust me)
-                    Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
+                    // get address of lvalue
+                    Type typeA = getTypeFromNode(*pOp->left(), scopeStack, true);
+
+                    // verify the type is an lvalue
+                    if (!typeA.getIsLValue()) throw TInvalidOperationException(node.err);
+
                     typeA.addPointer();
                     return typeA;
                 }
                 default: {
                     // handle typecast unary
-                    if (pOp->getUnaryType() == ASTUnaryType::TYPE_CAST)
-                        return static_cast<ASTTypeCast*>(pOp->left())->type;
+                    if (pOp->getUnaryType() == ASTUnaryType::TYPE_CAST) {
+                        ASTNode& typeCastChild = *static_cast<ASTTypeCast*>(pOp->left())->at(0);
+                        Type retType = getTypeFromNode(typeCastChild, scopeStack);
+
+                        // if the type is a pointer, allow it to be an lvalue
+                        // for non-pointer types, disallow from being an lvalue
+                        retType.setIsLValue( retType.getNumPtrs() > 0 );
+                        return retType;
+                    }
                     
                     // not found
                     throw TTypeInferException(pOp->err);
@@ -100,10 +137,10 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     TokenType primA = typeA.getPrimitiveType();
                     TokenType primB = typeB.getPrimitiveType();
 
-                    if (getSizeOfType(primA) < getSizeOfType(primB))
-                        return typeB;
-                    else
-                        return typeA;
+                    // prevent return type from being an lvalue
+                    Type retType = getSizeOfType(primA) < getSizeOfType(primB) ? typeB : typeA;
+                    retType.setIsLValue(false);
+                    return retType;
                 }
                 case TokenType::OP_LT:
                 case TokenType::OP_GT:
@@ -143,7 +180,11 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                 }
                 case TokenType::ASSIGN: {
                     // take the type of the left-arg
-                    return getTypeFromNode(*pOp->left(), scopeStack);
+                    Type type = getTypeFromNode(*pOp->left(), scopeStack);
+
+                    // prevent type from being lvalue
+                    type.setIsLValue(false);
+                    return type;
                 }
                 default: throw TTypeInferException(pOp->err);
             }
@@ -184,7 +225,8 @@ ASTForLoop::~ASTForLoop() {
 
 ASTWhileLoop::~ASTWhileLoop() {
     // free expression
-    if (this->pExpr != nullptr) delete this->pExpr;
+    if (this->pExpr != nullptr)
+        delete this->pExpr;
 }
 
 ASTVarDeclaration::~ASTVarDeclaration() {
@@ -194,15 +236,13 @@ ASTVarDeclaration::~ASTVarDeclaration() {
 }
 
 ASTFunction::~ASTFunction() {
-    for (ASTFuncParam* p : params) {
+    for (ASTFuncParam* p : params)
         delete p;
-    }
 }
 
 ASTIdentifier::~ASTIdentifier() {
-    for (ASTArraySubscript* pSub : subscripts) {
+    for (ASTArraySubscript* pSub : subscripts)
         delete pSub;
-    }
 }
 
 // determine the type of this expression
@@ -230,17 +270,12 @@ void ASTOperator::determineResultType(scope_stack_t& scopeStack) {
     this->returnType = getTypeFromNode(*this, scopeStack);
 }
 
-bool ASTOperator::isChildLValue(size_t i) const {
-    // check if the child is an lvalue or not
-    throw std::runtime_error("WHERE YOU LEFT OFF, IF LVALUE IS PRESENT WE CAN GET ITS ADDRESS");
-
-    // base case, does not result in lvalue
-    return false;
-}
-
 // get the result type of an identifier
 void ASTIdentifier::determineResultType(scope_stack_t& scopeStack) {
     this->type = getTypeFromNode(*this, scopeStack);
+
+    // mark any identifier as an lvalue
+    this->type.setIsLValue(true);
 }
 
 Type ASTArrayLiteral::inferType(scope_stack_t& scopeStack) const {
@@ -251,12 +286,18 @@ Type ASTArrayLiteral::inferType(scope_stack_t& scopeStack) const {
         type = type.checkDominant(pExpr->inferType(scopeStack));
     }
     type.addArrayModifier( this->size() );
+
+    // prevent this from being an lvalue
+    type.setIsLValue(false);
     return type;
 }
 
 void ASTArrayLiteral::setType(Type type) {
     // update type
     this->type = type;
+
+    // prevent this from being an lvalue (children can be)
+    this->type.setIsLValue(false);
 
     // get the type for children (sum of children equals this)
     Type subType = type;
