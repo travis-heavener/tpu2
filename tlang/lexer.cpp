@@ -182,7 +182,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             case '^': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_BIT_XOR)
             case '+': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_ADD)
             case '-': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_SUB)
-            case '*': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_MUL)
+            case '*': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::ASTERISK)
             case '/': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_DIV)
             case '%': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::OP_MOD)
         }

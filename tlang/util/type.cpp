@@ -2,7 +2,8 @@
 
 // get the total size taken up on the stack by this type
 size_t Type::getStackSizeBytes() const {
-    size_t size = getSizeOfType(this->primitiveType);
+    // memory addresses are 2 bytes on a 16-bit system such as this
+    size_t size = (this->numPtrs == 0) ? getSizeOfType(this->primitiveType) : 2;
 
     for (long long modifier : this->arraySizes) {
         // not specified
@@ -25,12 +26,13 @@ bool Type::hasEmptyArrayModifiers() const {
 
 bool Type::operator==(const Type& t) const {
     // check primitive
-    if (primitiveType != t.primitiveType)
-        return false;
+    if (primitiveType != t.primitiveType) return false;
+
+    // check num ptrs
+    if (numPtrs != t.numPtrs) return false;
 
     // check sizes
-    if (arraySizes.size() != t.arraySizes.size())
-        return false;
+    if (arraySizes.size() != t.arraySizes.size()) return false;
     
     // check each modifier
     for (size_t i = 0; i < arraySizes.size(); ++i)
@@ -70,9 +72,13 @@ Type Type::checkDominant(Type B) const {
     TokenType primA = this->primitiveType;
     TokenType primB = B.primitiveType;
 
+    // if one is a pointer, just make both a pointer-sized chunk (stored as an int internally)
+    if (numPtrs > 0) return *this;
+    if (B.numPtrs > 0) return B;
+
     if (getSizeOfType(primA) > getSizeOfType(primB))
         return *this;
 
-    // base case, assume B
+    // else, assume B
     return B;
 }

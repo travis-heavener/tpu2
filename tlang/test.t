@@ -1,8 +1,8 @@
-#define dummy "this is a test"
+#include <stdlib.t>
 
-#include <stdlib>
-
-int main() {
-    char myName[] = dummy;
-    return strlen(myName);
+int****** main() {
+    int c = (char*)0;
+    // // int* a[3];
+    // return c;
+    return 0;
 }

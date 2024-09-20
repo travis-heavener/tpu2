@@ -29,6 +29,10 @@ AST* parseToAST(const std::vector<Token>& tokens) {
             if ( !isTokenTypeName(tokens[i].type) )
                 throw TInvalidTokenException(tokens[i].err);
             
+            // skip over any pointers attached
+            while (i+1 < tokensLen && tokens[i+1].type == TokenType::ASTERISK)
+                ++i;
+            
             // verify an identifier name is present
             if ( i+1 == tokensLen || tokens[++i].type != TokenType::IDENTIFIER )
                 throw TInvalidTokenException(tokens[i].err);
@@ -276,6 +280,12 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     // get type
                     Type type(tokens[start].type);
 
+                    // grab any pointers
+                    while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
+                        type.addPointer();
+                        ++i;
+                    }
+
                     // get identifier
                     if (tokens[++i].type != TokenType::IDENTIFIER)
                         throw TInvalidTokenException(tokens[i].err);
@@ -403,25 +413,15 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     // get return type
     Type type(tokens[startIndex].type);
 
-    // get all array modifiers (only allow integer sizes)
+    // append any pointers
     size_t i = startIndex;
-    if (tokens[++i].type == TokenType::LBRACKET) {
-        for ((void)i; tokens[i].type == TokenType::LBRACKET; i += 3) {
-            // verify next token is an int literal
-            if (tokens[i+1].type != TokenType::LIT_INT)
-                throw TInvalidTokenException(tokens[i+1].err);
-
-            // verify token after literal is an RBRACKET
-            if (tokens[i+2].type != TokenType::RBRACKET)
-                throw TInvalidTokenException(tokens[i+2].err);
-
-            // add array modifier
-            type.addArrayModifier(std::stol(tokens[i+1].raw));
-        }
+    while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
+        type.addPointer();
+        ++i;
     }
 
     // get function name
-    const std::string name = tokens[i++].raw;
+    const std::string name = tokens[++i].raw;
 
     // create node
     ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], type);
@@ -433,8 +433,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     scopeStack.push_back( parser_scope_t() );
 
     try {
-        // skip opening parenthesis
-        ++i;
+        i += 2; // skip over function name & opening parenthesis
 
         // append parameters
         while (tokens[i].type != TokenType::RPAREN) {

@@ -21,6 +21,10 @@ class Type {
         bool hasEmptyArrayModifiers() const;
         void popArrayModifier() { arraySizes.pop_back(); };
 
+        void addPointer() { ++numPtrs; };
+        void popPointer() { --numPtrs; };
+        size_t getNumPtrs() { return numPtrs; };
+
         bool isArray() const { return arraySizes.size() > 0; };
 
         Type checkDominant(Type B) const;
@@ -37,6 +41,7 @@ class Type {
     private:
         TokenType primitiveType;
         std::vector<long long> arraySizes;
+        size_t numPtrs = 0;
 };
 
 #endif

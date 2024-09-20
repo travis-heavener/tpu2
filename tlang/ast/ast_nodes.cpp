@@ -50,7 +50,14 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
                     // take size of boolean
                     return Type(TokenType::TYPE_BOOL);
                 }
-                default: throw TTypeInferException(pOp->err);
+                default: {
+                    // handle typecast unary
+                    if (pOp->getUnaryType() == ASTUnaryType::TYPE_CAST)
+                        return static_cast<ASTTypeCast*>(pOp->left())->type;
+                    
+                    // not found
+                    throw TTypeInferException(pOp->err);
+                }
             }
             break;
         }
@@ -60,7 +67,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack) {
             switch (pOp->getOpTokenType()) {
                 case TokenType::OP_ADD:
                 case TokenType::OP_SUB:
-                case TokenType::OP_MUL:
+                case TokenType::ASTERISK:
                 case TokenType::OP_DIV:
                 case TokenType::OP_MOD:
                 case TokenType::OP_BIT_AND:

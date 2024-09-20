@@ -11,8 +11,18 @@ enum class ASTNodeType {
     FUNCTION, FUNCTION_CALL, VAR_DECLARATION, IDENTIFIER, RETURN,
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
-    EXPR, UNARY_OP, BIN_OP,
+    EXPR, UNARY_OP, BIN_OP, TYPE_CAST, SIZEOF,
     LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_ARR, ARR_SUBSCRIPT
+};
+
+enum class ASTUnaryType {
+    BASE,
+    POST_INC,
+    POST_DEC,
+    PRE_INC,
+    PRE_DEC,
+    TYPE_CAST,
+    SIZEOF
 };
 
 // base class for all AST node types
@@ -118,9 +128,13 @@ class ASTOperator : public ASTNode {
         void setIsUnary(bool isUnary) { this->isUnary = isUnary; }
         bool getIsUnary() const { return this->isUnary; }
 
+        void setUnaryType(ASTUnaryType t) { this->unaryType = t; };
+        ASTUnaryType getUnaryType() const { return this->unaryType; };
+
         void determineResultType(scope_stack_t&);
         Type getResultType() const { return returnType; };
     private:
+        ASTUnaryType unaryType = ASTUnaryType::BASE;
         TokenType opType;
         Type returnType;
         bool isUnary;
@@ -238,6 +252,13 @@ class ASTVoidLiteral : public ASTNode {
     public:
         ASTVoidLiteral(const Token& token) : ASTNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_VOID; };
+};
+
+class ASTTypeCast : public ASTNode {
+    public:
+        ASTTypeCast(const Token& token, Type type) : ASTNode(token), type(type) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::TYPE_CAST; };
+        Type type;
 };
 
 #endif

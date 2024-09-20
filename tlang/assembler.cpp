@@ -380,6 +380,9 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
     size_t numChildren = bodyNode.size();
     std::vector<size_t> resultSizes;
     for (size_t i = 0; i < numChildren; ++i) {
+        // prevent parsing typecasts
+        if (bodyNode.at(i)->getNodeType() == ASTNodeType::TYPE_CAST) continue;
+
         resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope, desiredSubSize) );
     }
 
@@ -467,8 +470,28 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     finalResultSize = 1; // always returns an 8-bit bool
                     break;
                 }
-                default:
+                default: {
+                    // handle typecast unary
+                    if (unaryOp.getUnaryType() == ASTUnaryType::TYPE_CAST) {
+                        // typecast the value presented (for now, just adjust the size of bytes)
+                        ASTTypeCast& typeCast = *static_cast<ASTTypeCast*>(unaryOp.left());
+                        
+                        if (desiredSize == -1)
+                            desiredSize = typeCast.type.getStackSizeBytes();
+
+                        // buffer the value to the stack
+                        if (resultSize == 2) {
+                            outHandle << TAB << "pushw AX\n";
+                            scope.addPlaceholder();
+                        } else {
+                            outHandle << TAB << "push AL\n";
+                        }
+                        scope.addPlaceholder();
+                        finalResultSize = resultSize;
+                        break;
+                    }
                     throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
+                }
             }
             break;
         }
@@ -546,7 +569,7 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     finalResultSize = maxResultSize;
                     break;
                 }
-                case TokenType::OP_MUL: {
+                case TokenType::ASTERISK: {
                     // mul by BX/BL
                     outHandle << TAB << "mul " << regB << '\n';
 

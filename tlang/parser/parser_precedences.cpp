@@ -49,6 +49,24 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 // verify parenthesis are closed appropriately
                 if (parensIndices.size() > 0)
                     throw TUnclosedGroupException(tokens[parensIndices.top()].err);
+            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type)) { // check for typecast
+                // grab type (only allow pointer asterisk or typename)
+                Type type( tokens[start+1].type );
+
+                for (size_t j = start+2; j < i-1; ++j) {
+                    // only accept asterisk
+                    if (tokens[j].type != TokenType::ASTERISK)
+                        throw TInvalidTokenException(tokens[j].err);
+                    
+                    // add to type
+                    type.addPointer();
+                }
+
+                // append typecast as unary
+                ASTOperator* pOp = new ASTOperator(tokens[start], true);
+                pOp->setUnaryType(ASTUnaryType::TYPE_CAST);
+                pOp->push( new ASTTypeCast(tokens[start], type) );
+                pHead->push( pOp );
             } else { // found a subexpression
                 pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) ); // recurse
             }
@@ -201,7 +219,7 @@ void parsePrecedence3(ASTNode* pHead) {
         // verify this is mult/div/mod math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType opType = currentOp.getOpTokenType();
-        if (opType != TokenType::OP_MUL && opType != TokenType::OP_DIV && opType != TokenType::OP_MOD)
+        if (opType != TokenType::ASTERISK && opType != TokenType::OP_DIV && opType != TokenType::OP_MOD)
             continue;
         
         // check for following expression

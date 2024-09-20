@@ -68,56 +68,16 @@ __UF0:
     ret
 main:
     add SP, 2
-    push 116
-    push 104
-    push 105
-    push 115
-    push 32
-    push 105
-    push 115
-    push 32
-    push 97
-    push 32
-    push 116
-    push 101
-    push 115
-    push 116
-    push 0
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
-    push [SP-15]
     pushw 0
-    call __UF0
+    popw AX
+    pushw AX
+    pop
+    push 0
+    pushw 0
     pop DL
-    mov [SP-32], DL
+    mov [SP-4], DL
     pop DL
-    mov [SP-32], DL
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
+    mov [SP-4], DL
     popw
     jmp mainE
     mainE:
