@@ -194,7 +194,7 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         TokenType opType = currentOp.getOpTokenType();
 
         // if it's a binary op, check for asterisk dereference or ampersand address operator
-        if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType == TokenType::AMPERSAND)
+        if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType != TokenType::AMPERSAND)
             continue;
 
         // basically, unary can only work if it's after A) nothing or B) another operator
