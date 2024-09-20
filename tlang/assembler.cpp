@@ -520,12 +520,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     
                     TODO LIST:
                     [X] add typecasting
-                    2. add sizeof operator
-                    3a. implement heap & malloc
-                    3b. pointers
-                    4c. force stack ptr bounds
-                    4. improve function lookup for args
-                    5. add implicit typecasting
+                    [X] pointers
+                    1. add sizeof operator
+                    2. implement heap & malloc
+                        - force stack ptr bounds
+                    3. improve function lookup for args
+                        - add implicit typecasting
                     
                     
                     */
