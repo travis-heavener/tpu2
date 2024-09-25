@@ -5,31 +5,37 @@
 Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLValue=false) {
     switch (node.getNodeType()) {
         case ASTNodeType::IDENTIFIER: {
-            ASTIdentifier& iden = *static_cast<ASTIdentifier*>(&node);
+            ASTIdentifier* pIden = static_cast<ASTIdentifier*>(&node);
 
             // lookup the variable from the scope
             Type type = lookupParserVariable(scopeStack, node.raw, node.err);
 
             // handle any subscripts
-            size_t numSubscripts = iden.getSubscripts().size();
-            for (size_t i = 0; i < numSubscripts; i++)
-                type.popArrayModifier();
-            
+            size_t numSubscripts = pIden->getSubscripts().size();
+            for (size_t i = 0; i < numSubscripts; ++i) {
+                if (type.getNumArrayModifiers() > 0) {
+                    // pop off an array modifier if present
+                    type.popArrayModifier();
+                } else if (type.getNumPtrs() > 0) {
+                    // if not present, pop off a pointer
+                    type.popPointer();
+                } else {
+                    throw TSyntaxException(node.err);
+                }
+            }
+
             // if this is a pointer, store as an lvalue
             if (type.getNumPtrs() > 0 || overrideAsLValue) {
                 type.setIsLValue(true);
             } else {
-                // force to not be an lvalue (lookupParserVariable stores lvalue status as true)
-                type.setIsLValue(false);
+                type.setIsLValue(false); // force to not be an lvalue (lookupParserVariable stores lvalue status as true)
             }
 
             return type;
         }
         case ASTNodeType::FUNCTION_CALL: {
             Type retType = lookupParserVariable(scopeStack, node.raw, node.err);
-
-            // prevent from being an lvalue (returned values are temporary)
-            retType.setIsLValue(false);
+            retType.setIsLValue(false); // prevent from being an lvalue (returned values are temporary)
             return retType;
         }
         case ASTNodeType::LIT_INT: return Type(TokenType::TYPE_INT);
@@ -42,8 +48,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
         case ASTNodeType::UNARY_OP: {
             ASTOperator* pOp = static_cast<ASTOperator*>(&node);
             switch (pOp->getOpTokenType()) {
-                case TokenType::OP_ADD:
-                case TokenType::OP_SUB: {
+                case TokenType::OP_ADD: case TokenType::OP_SUB: {
                     // verify arg is valid
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
 
@@ -56,8 +61,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
                     // take size of left arg
                     return typeA;
                 }
-                case TokenType::OP_BIT_NOT:
-                case TokenType::OP_BOOL_NOT: {
+                case TokenType::OP_BIT_NOT: case TokenType::OP_BOOL_NOT: {
                     // verify arg is valid
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
 
@@ -121,14 +125,10 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
             ASTOperator* pOp = static_cast<ASTOperator*>(&node);
 
             switch (pOp->getOpTokenType()) {
-                case TokenType::OP_ADD:
-                case TokenType::OP_SUB:
-                case TokenType::ASTERISK:
-                case TokenType::OP_DIV:
-                case TokenType::OP_MOD:
-                case TokenType::AMPERSAND:
-                case TokenType::OP_BIT_OR:
-                case TokenType::OP_BIT_XOR: {
+                case TokenType::OP_ADD: case TokenType::OP_SUB:
+                case TokenType::ASTERISK: case TokenType::OP_DIV:
+                case TokenType::OP_MOD: case TokenType::AMPERSAND:
+                case TokenType::OP_BIT_OR: case TokenType::OP_BIT_XOR: {
                     // take size of whichever primitive is larger
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
                     Type typeB = getTypeFromNode(*pOp->right(), scopeStack);
@@ -146,14 +146,10 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
                     retType.setIsLValue(false);
                     return retType;
                 }
-                case TokenType::OP_LT:
-                case TokenType::OP_GT:
-                case TokenType::OP_LTE:
-                case TokenType::OP_GTE:
-                case TokenType::OP_EQ:
-                case TokenType::OP_NEQ:
-                case TokenType::OP_BOOL_AND:
-                case TokenType::OP_BOOL_OR: {
+                case TokenType::OP_LT: case TokenType::OP_GT:
+                case TokenType::OP_LTE: case TokenType::OP_GTE:
+                case TokenType::OP_EQ: case TokenType::OP_NEQ:
+                case TokenType::OP_BOOL_AND: case TokenType::OP_BOOL_OR: {
                     // verify both args are valid
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
                     Type typeB = getTypeFromNode(*pOp->right(), scopeStack);
@@ -165,8 +161,7 @@ Type getTypeFromNode(ASTNode& node, scope_stack_t& scopeStack, bool overrideAsLV
                     // take size of boolean
                     return Type(TokenType::TYPE_BOOL);
                 }
-                case TokenType::OP_LSHIFT:
-                case TokenType::OP_RSHIFT: {
+                case TokenType::OP_LSHIFT: case TokenType::OP_RSHIFT: {
                     Type typeA = getTypeFromNode(*pOp->left(), scopeStack);
                     Type typeB = getTypeFromNode(*pOp->right(), scopeStack);
 

@@ -439,6 +439,12 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
         while (tokens[i].type != TokenType::RPAREN) {
             // get param type (checks the type)
             Type type( tokens[i].type );
+
+            // add any pointers
+            while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
+                type.addPointer();
+                ++i;
+            }
             
             size_t idenIndex = ++i;
 

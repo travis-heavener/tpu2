@@ -1,68 +1,16 @@
 __UF0:
-    pushw 0
-    pushw 0
-    pushw 0
-    popw BX
-    mov [SP-4], BL
-    mov [SP-3], BH
-    pushw BX
-    popw
-    __J0:
     movw BP, SP
-    push [SP-4]
-    push [SP-4]
+    pushw 0
     popw AX
     movw BX, 1
     mul BX
     add BP, AX
-    push [BP-36]
+    push [BP-4]
     push 0
-    pop BL
-    pop AL
-    xor AL, BL
-    jz __J2
-    mov AL, 1
-    jmp __J2
-    __J2:
-    push AL
-    xor AH, AH
-    pop AL
-    buf AX
-    jz __J1
-    push [SP-2]
-    push [SP-2]
-    pushw 1
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    popw BX
-    mov [SP-2], BL
-    mov [SP-1], BH
-    pushw BX
-    popw
-    push [SP-4]
-    push [SP-4]
-    pushw 1
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    popw BX
-    mov [SP-4], BL
-    mov [SP-3], BH
-    pushw BX
-    popw
-    jmp __J0
-    __J1:
-    push [SP-2]
-    push [SP-2]
     pop DL
-    mov [SP-6], DL
+    mov [SP-2], DL
     pop DL
-    mov [SP-6], DL
-    popw
-    popw
+    mov [SP-2], DL
     jmp __UF0E
     __UF0E:
     ret
@@ -78,14 +26,13 @@ main:
     movw BP, SP
     sub BP, 7
     pushw BP
-    popw AX
-    pushw AX
-    popw AX
-    pushw 2
+    pushw 0
+    call __UF0
     pop DL
-    mov [SP-9], DL
+    mov [SP-11], DL
     pop DL
-    mov [SP-9], DL
+    mov [SP-11], DL
+    popw
     popw
     popw
     popw

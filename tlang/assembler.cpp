@@ -53,11 +53,11 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
     // add function args to scope (args on top of stack below return bytes)
     for (size_t i = 0; i < funcNode.getNumParams(); i++) { // add the variable to the scope
-        ASTFuncParam& arg = *funcNode.paramAt(i);
+        ASTFuncParam* pArg = funcNode.paramAt(i);
         // doesn't currently support implied array dimensions in arguments
-        if (arg.type.hasEmptyArrayModifiers())
+        if (pArg->type.hasEmptyArrayModifiers())
             throw TSyntaxException(funcNode.err);
-        scope.declareVariable(arg.type, arg.name, funcNode.err);
+        scope.declareFunctionParam(pArg->type, pArg->name, funcNode.err);
     }
 
     // add return bytes to scope
@@ -372,7 +372,9 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
         }
         case ASTNodeType::EXPR: {
             ASTExpr& expr = *static_cast<ASTExpr*>(&bodyNode);
-            desiredSubSize = expr.type.getSizeBytes();
+            // prevent array identifiers from having set sizes (they're passed as ptrs to functions)
+            if (!expr.type.isArray())
+                desiredSubSize = expr.type.getSizeBytes();
             break;
         }
         case ASTNodeType::UNARY_OP: {
@@ -1001,12 +1003,23 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 // update stack offset
                 const std::vector<long long>& stackMods = pScopeVar->type.getArrayModifiers();
                 const std::vector<ASTArraySubscript*>& subscripts = identifier.getSubscripts();
+                size_t numPtrs = pScopeVar->type.getNumPtrs();
 
                 // assemble subscripts to get their result (****subscripts are ints)
                 size_t k = 0;
                 for (ASTArraySubscript* pSub : subscripts) {
                     // get size of each subtype we're indexing
-                    typeSize /= stackMods[ k++ ];
+                    if (k >= stackMods.size() && numPtrs > 0) { // must be subscripting a pointer
+                        // if mutliple pointers left, this is a pointer (sizeof address)
+                        // else, the size of the primitive type
+                        typeSize = (--numPtrs > 0) ? 2 : getSizeOfType(pScopeVar->type.getPrimitiveType());
+                    } else if (k < stackMods.size()) {
+                        typeSize /= stackMods[ k ];
+                    } else {
+                        throw TSyntaxException(bodyNode.err);
+                    }
+
+                    ++k; // increment k
 
                     // add to BP the top int value on the stack (force subscript size to int)
                     assembleExpression(*pSub, outHandle, scope, getSizeOfType(TokenType::TYPE_INT), isLValue);
@@ -1023,14 +1036,14 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 // handle assignment operations vs read operations
                 if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
                     // if this is an lvalue, push the *address*
-                    if (isLValue) {
+                    bool isArray = stackMods.size() > subscripts.size();
+                    if (isLValue || isArray) {
                         // sub stackOffset from BP
                         outHandle << TAB << "sub BP, " << stackOffset << '\n';
                         
                         // push BP (points to address of identifier)
                         outHandle << TAB << "pushw BP\n";
-                        scope.addPlaceholder();
-                        scope.addPlaceholder();
+                        scope.addPlaceholder(2);
                         finalResultSize = 2;
                     } else { // otherwise, push *value*
                         for (size_t i = 0; i < typeSize; i++) {
@@ -1047,15 +1060,14 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                 // handle assignment operations vs read operations
                 if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
                     // if this is an lvalue, push the *address*
-                    if (isLValue) {
+                    if (isLValue || pScopeVar->type.isArray()) {
                         // move address into BP
                         outHandle << TAB << "movw BP, SP\n";
                         outHandle << TAB << "sub BP, " << stackOffset << '\n';
 
                         // push BP (points to address of identifier)
                         outHandle << TAB << "pushw BP\n";
-                        scope.addPlaceholder();
-                        scope.addPlaceholder();
+                        scope.addPlaceholder(2);
                         finalResultSize = 2;
                     } else { // otherwise, push *value*
                         for (size_t i = 0; i < typeSize; i++) {
@@ -1086,13 +1098,12 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             for (size_t i = 0; i < returnSize; i++) {
                 if (i+1 < returnSize) {
                     outHandle << TAB << "pushw 0\n";
-                    scope.addPlaceholder();
                     ++i;
                 } else {
                     outHandle << TAB << "push 0\n";
                 }
-                scope.addPlaceholder();
             }
+            scope.addPlaceholder(returnSize);
 
             // call the function
             outHandle << TAB << "call " << destFunc.labelName << '\n';

@@ -21,6 +21,23 @@ size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
     return size;
 }
 
+// handles any array as a pointer
+size_t Scope::declareFunctionParam(Type type, const std::string& name, ErrInfo err) {
+    if (type.isArray()) {
+        // pass any arrays by reference by pushing a pointer
+        // and dropping all array modifiers (mere suggestions)
+        size_t numArrayMods = type.getNumArrayModifiers();
+        for (size_t i = 0; i < numArrayMods; ++i)
+            type.popArrayModifier();
+
+        type.addPointer();
+        return declareVariable(type, name, err);
+    }
+
+    // base case, not an array, pass by value
+    return declareVariable(type, name, err);
+}
+
 // pops the last variable off the stack's scope, returning the number of bytes freed
 size_t Scope::pop() {
     delete *this->children.rbegin();

@@ -31,6 +31,7 @@ class Scope {
 
         bool doesVarExist(const std::string&) const;
         size_t declareVariable(Type, const std::string&, ErrInfo);
+        size_t declareFunctionParam(Type, const std::string&, ErrInfo);
         size_t pop();
         size_t size() const { return children.size(); }
         size_t getOffset(const std::string&, ErrInfo) const;

@@ -12,6 +12,9 @@ class Type {
     public:
         Type() : primitiveType(TokenType::VOID), arraySizes() {};
         Type(TokenType primitiveType) : primitiveType(primitiveType), arraySizes() {};
+        // Type(const Type& t) : primitiveType(t.primitiveType), arraySizes(t.arraySizes), numPtrs(t.numPtrs), isLValue(t.isLValue) {};
+
+        // Type& operator=(const Type&);
 
         // for adding an array with a specified size (ie. declarations)
         void addArrayModifier(size_t size) { arraySizes.push_back(size); };
@@ -20,6 +23,7 @@ class Type {
         void addEmptyArrayModifier() { arraySizes.push_back(TYPE_NO_ARR_SIZE); };
         bool hasEmptyArrayModifiers() const;
         void popArrayModifier() { arraySizes.pop_back(); };
+        size_t getNumArrayModifiers() const { return arraySizes.size(); };
 
         void addPointer() { ++numPtrs; };
         void popPointer() { --numPtrs; };

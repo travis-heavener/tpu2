@@ -1,5 +1,14 @@
 #include "type.hpp"
 
+// used to prevent deprecated-copy warnings (to make copy constuctor work)
+// Type& Type::operator=(const Type& t) {
+//     this->primitiveType = t.primitiveType;
+//     this->arraySizes = t.arraySizes;
+//     this->numPtrs = t.numPtrs;
+//     this->isLValue = t.isLValue;
+//     return *this;
+// }
+
 // get the total size taken up in memory by this type
 size_t Type::getSizeBytes() const {
     // memory addresses are 2 bytes on a 16-bit system such as this
