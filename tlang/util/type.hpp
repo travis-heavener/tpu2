@@ -11,7 +11,7 @@
 
 class Type {
     public:
-        Type() : primitiveType(TokenType::VOID), pointers() {};
+        Type() : pointers() {};
         Type(TokenType primitiveType) : primitiveType(primitiveType), pointers() {};
 
         void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
@@ -28,9 +28,19 @@ class Type {
 
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
+
+        bool isArray() const { return numArrayHints > 0; };
+
+        size_t getNumArrayHints() const { return numArrayHints; };
+        void setNumArrayHints(size_t n) { numArrayHints = n; };
+        size_t getArrayHint(size_t i) const { return pointers[i + pointers.size() - numArrayHints]; };
+        void setArrayHint(size_t i, size_t v) { pointers[i + pointers.size() - numArrayHints] = v; };
     private:
-        TokenType primitiveType;
+        TokenType primitiveType = TokenType::VOID;
         std::vector<size_t> pointers;
+        
+        // for arrays specifically
+        size_t numArrayHints = 0;
 };
 
 #endif

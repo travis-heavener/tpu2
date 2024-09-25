@@ -38,5 +38,6 @@ MAKE_EXCEPTION(TypeInfer)
 MAKE_EXCEPTION(InvalidOperation)
 MAKE_EXCEPTION(Syntax)
 MAKE_EXCEPTION(VoidReturn)
+MAKE_EXCEPTION(IllegalArraySize)
 
 #endif

@@ -282,7 +282,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 
                     // grab any pointers
                     while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-                        type.addPointer();
+                        type.addEmptyPointer();
                         ++i;
                     }
 
@@ -291,12 +291,12 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                         throw TInvalidTokenException(tokens[i].err);
                     size_t idenStart = i;
 
-                    // get all array modifiers (only allow integer sizes)
+                    // get all array size hints (only allow integer sizes)
+                    bool hasImplicitArraySizeHints = false;
                     if (tokens[++i].type == TokenType::LBRACKET) {
-                        size_t j;
-                        size_t numModifiers = 0;
+                        size_t j, numHints = 0;
                         for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; (void)j) {
-                            if (tokens[j+1].type == TokenType::LIT_INT || numModifiers > 0) {
+                            if (tokens[j+1].type == TokenType::LIT_INT || numHints > 0) {
                                 // verify next token is an int literal
                                 if (tokens[j+1].type != TokenType::LIT_INT)
                                     throw TInvalidTokenException(tokens[i+1].err);
@@ -306,7 +306,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                                     throw TInvalidTokenException(tokens[j+2].err);
 
                                 // add with value otherwise
-                                type.addArrayModifier( std::stol(tokens[j+1].raw) );
+                                type.addPointer( std::stol(tokens[j+1].raw) );
                                 j += 3;
                             } else {
                                 // verify next token is an RBRACKET
@@ -314,12 +314,16 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                                     throw TInvalidTokenException(tokens[j+1].err);
 
                                 // add empty array modifier if first bracket pair
-                                type.addEmptyArrayModifier();
+                                type.addEmptyPointer();
                                 j += 2;
+                                hasImplicitArraySizeHints = true;
                             }
-                            numModifiers++;
+                            numHints++;
                         }
                         i = j;
+
+                        // update type to know how many array size hints there are
+                        type.setNumArrayHints(numHints);
                     }
 
                     // create node
@@ -332,8 +336,8 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     // if declared but not assigned, leave pExpr as nullptr
                     if (tokens[i].type == TokenType::SEMICOLON) {
                         // verify that any subscripts for an array type are provided
-                        if (type.hasEmptyArrayModifiers())
-                            throw TInvalidTokenException(tokens[start].err);
+                        if (hasImplicitArraySizeHints)
+                            throw TIllegalArraySizeException(tokens[start].err);
                         
                         // add variable to scopeStack
                         declareParserVariable(scopeStack, tokens[idenStart].raw, type, tokens[idenStart].err);
@@ -355,37 +359,13 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     pVarDec->pExpr = pExpr;
                     i = endExpr; // update `i` to position of semicolon
 
-                    // update array literal's type
-                    if (type.isArray()) {
-                        if (pExpr->at(0)->getNodeType() == ASTNodeType::LIT_ARR) {
-                            ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
-
-                            // verify all arguments have the same type
-                            Type arrType = pArrLit->inferType(scopeStack);
-                            arrType.flipModifiers(); // inferred are backwards
-                            pArrLit->setType( arrType );
-                            pExpr->type = arrType;
-                            pVarDec->type = arrType;
-                            type = arrType;
-                        } else if (pExpr->at(0)->getNodeType() == ASTNodeType::IDENTIFIER) {
-                            pExpr->type = type;
-                        }
-                    }
-
                     // confirm assignment type matches
-                    if (!type.checkArrayMods(pExpr->type)) {
-                        throw TSyntaxException(tokens[idenStart].err);
-                    } else if (type.isArray() && type.getArrayModifiers()[0] == TYPE_NO_ARR_SIZE) {
+                    if (type.isArray() && type.getArrayHint(0) == TYPE_EMPTY_PTR) {
                         // imply size from literal's type
-                        type.flipModifiers(); // flip to make this easier
-                        type.popArrayModifier();
-                        type.addArrayModifier( pExpr->type.getArrayModifiers()[0] );
-                        type.flipModifiers(); // unflip
-
                         ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
-                        pArrLit->setType( type );
-                        pExpr->type = type;
-                        pVarDec->type = type;
+                        if (pArrLit->getNodeType() != ASTNodeType::LIT_ARR)
+                            throw TSyntaxException(pArrLit->err);
+                        type.setArrayHint(0, pArrLit->size());
                     }
 
                     // add variable to scopeStack
@@ -416,7 +396,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     // append any pointers
     size_t i = startIndex;
     while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-        type.addPointer();
+        type.addEmptyPointer();
         ++i;
     }
 
@@ -442,7 +422,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
 
             // add any pointers
             while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-                type.addPointer();
+                type.addEmptyPointer();
                 ++i;
             }
             
@@ -451,10 +431,10 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
             // skip identifier
             ++i;
 
-            // get all array modifiers
-            size_t numModifiers = 0;
+            // get all array size hints
+            size_t numHints = 0;
             while (tokens[i].type == TokenType::LBRACKET) {
-                if (tokens[i+1].type == TokenType::LIT_INT || numModifiers > 0) {
+                if (tokens[i+1].type == TokenType::LIT_INT || numHints > 0) {
                     // verify next token is an int literal
                     if (tokens[i+1].type != TokenType::LIT_INT)
                         throw TInvalidTokenException(tokens[i+1].err);
@@ -464,7 +444,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
                         throw TInvalidTokenException(tokens[i+2].err);
 
                     // add with value otherwise
-                    type.addArrayModifier( std::stol(tokens[i+1].raw) );
+                    type.addPointer( std::stol(tokens[i+1].raw) );
                     i += 3;
                 } else {
                     // verify next token is an RBRACKET
@@ -472,10 +452,10 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
                         throw TInvalidTokenException(tokens[i+1].err);
 
                     // add empty array modifier if first bracket pair
-                    type.addEmptyArrayModifier();
+                    type.addEmptyPointer();
                     i += 2;
                 }
-                numModifiers++;
+                numHints++;
             }
 
             // grab parameter name
