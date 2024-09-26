@@ -57,7 +57,7 @@ bool isTokenAssignOp(const TokenType type) {
 unsigned char getSizeOfType(TokenType type) {
     switch (type) {
         case TokenType::TYPE_INT: return 2; // 2-byte ints
-        case TokenType::TYPE_FLOAT: return 4; // 4-byte floats
+        case TokenType::TYPE_FLOAT: return 2; // 2-byte floats
         case TokenType::TYPE_CHAR: return 1;
         case TokenType::TYPE_BOOL: return 1;
         case TokenType::VOID: return 0;

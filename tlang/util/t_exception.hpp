@@ -39,5 +39,6 @@ MAKE_EXCEPTION(InvalidOperation)
 MAKE_EXCEPTION(Syntax)
 MAKE_EXCEPTION(VoidReturn)
 MAKE_EXCEPTION(IllegalArraySize)
+MAKE_EXCEPTION(IllegalImplicitCast)
 
 #endif

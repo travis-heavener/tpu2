@@ -6,17 +6,31 @@
 
 #include "token.hpp"
 
-// literal types
 #define TYPE_EMPTY_PTR 0
+
+// used to compare and implicitly cast types
+class Type; // fwd dec
+Type getDominantType(const Type&, const Type&);
 
 class Type {
     public:
-        Type() : pointers() {};
-        Type(TokenType primitiveType) : primitiveType(primitiveType), pointers() {};
+        friend Type getDominantType(const Type&, const Type&);
+
+        Type() : primitiveType(TokenType::VOID), pointers() {};
+        Type(TokenType prim) : primitiveType(prim), pointers() {};
+        Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
+        
+        Type(const Type& type) : primitiveType(type.primitiveType), pointers(type.pointers), _isUnsigned(type._isUnsigned), numArrayHints(type.numArrayHints) {};
+        Type(const Type&& type);
+
+        Type& operator=(const Type&);
+        Type& operator=(const Type&&);
+
+        bool isUnsigned() const { return _isUnsigned; };
 
         void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
-        void addPointer(size_t n) { pointers.push_back(n); };
-        void popPointer() { pointers.pop_back(); };
+        void addHintPointer(size_t);
+        void popPointer();
         size_t getNumPointers() const { return pointers.size(); };
         bool isPointer() const { return pointers.size() > 0; };
         void clearPtrs() { pointers.clear(); };
@@ -25,6 +39,15 @@ class Type {
         size_t getSizeBytes() const;
 
         TokenType getPrimitiveType() const { return primitiveType; };
+
+        // returns true if primitive is void and is not a void pointer
+        bool isVoidNonPtr() const { return primitiveType == TokenType::VOID && pointers.size() == 0; };
+
+        // returns true if this is a void pointer
+        bool isVoidPtr() const { return primitiveType == TokenType::VOID && pointers.size() > 0; };
+
+        // returns true if primitive type is void, regardless of pointers
+        bool isVoidAny() const { return primitiveType == TokenType::VOID; };
 
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
@@ -35,10 +58,16 @@ class Type {
         void setNumArrayHints(size_t n) { numArrayHints = n; };
         size_t getArrayHint(size_t i) const { return pointers[i + pointers.size() - numArrayHints]; };
         void setArrayHint(size_t i, size_t v) { pointers[i + pointers.size() - numArrayHints] = v; };
+
+        // clones self but revokes all array hints (for getting the address of this type, hints must be gone to get size right)
+        Type getAddressPointer() const;
+        void clearArrayHints();
     private:
-        TokenType primitiveType = TokenType::VOID;
+        TokenType primitiveType;
         std::vector<size_t> pointers;
         
+        bool _isUnsigned = false;
+
         // for arrays specifically
         size_t numArrayHints = 0;
 };

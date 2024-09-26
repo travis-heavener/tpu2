@@ -8,7 +8,8 @@
 #include "preprocessor.hpp"
 #include "lexer.hpp"
 #include "parser/parser.hpp"
-#include "util/util.hpp"
+#include "util/t_exception.hpp"
+#include "util/toolbox.hpp"
 
 /**
  * Compiles .t files to .tpu assembly files.

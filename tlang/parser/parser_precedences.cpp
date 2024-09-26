@@ -4,7 +4,10 @@
 #include "parser_precedences.hpp"
 #include "parser.hpp"
 
-#include "../util/util.hpp"
+#include "../util/token.hpp"
+#include "../util/toolbox.hpp"
+#include "../util/t_exception.hpp"
+#include "../util/scope_stack.hpp"
 #include "../ast/ast_nodes.hpp"
 
 void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex, ASTNode* pHead, scope_stack_t& scopeStack) {
@@ -29,26 +32,20 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 ASTFunctionCall* pCall = new ASTFunctionCall(tokens[start-1]);
                 pHead->push( pCall ); // append function call node
 
-                // append sub expressions separated by a comma
-                size_t end = i; // ends ON the closing parenthesis
-                size_t subExprStart = start+1;
-                std::stack<size_t> parensIndices; // only break subexprs that aren't inside parentheticals
-                for (size_t j = start+1; j < end; j++) {
-                    if (tokens[j].type == TokenType::LPAREN) {
-                        parensIndices.push(j);
-                    } else if (tokens[j].type == TokenType::RPAREN) {
-                        parensIndices.pop();
-                    } else if (parensIndices.size() == 0 && tokens[j].type == TokenType::COMMA) { // append subexpr
-                        pCall->push( parseExpression(tokens, subExprStart, j-1, scopeStack) );
-                        subExprStart = j+1;
-                    } else if (parensIndices.size() == 0 && j+1 == end) { // append subexpr
-                        pCall->push( parseExpression(tokens, subExprStart, j, scopeStack) );
-                    }
-                }
+                // find commas
+                std::vector<size_t> commaIndices;
+                delimitIndices(tokens, commaIndices, start+1, i-1); // ignore outer parens
 
-                // verify parenthesis are closed appropriately
-                if (parensIndices.size() > 0)
-                    throw TUnclosedGroupException(tokens[parensIndices.top()].err);
+                // append sub expressions separated by a comma
+                size_t subExprStart = start+1;
+                for (size_t j = 0; j < commaIndices.size(); ++j) {
+                    pCall->push( parseExpression(tokens, subExprStart, commaIndices[j] - 1, scopeStack, true) );
+                    subExprStart = commaIndices[j] + 1; // update for next sub expr
+
+                    // check for remaining expression
+                    if (j+1 == commaIndices.size())
+                        pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
+                }
             } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type)) { // check for typecast
                 // grab type (only allow pointer asterisk or typename)
                 Type type( tokens[start+1].type );
@@ -59,13 +56,17 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                         throw TInvalidTokenException(tokens[j].err);
                     
                     // add to type
-                    type.addPointer();
+                    type.addEmptyPointer();
                 }
 
                 // append typecast as unary
                 ASTOperator* pOp = new ASTOperator(tokens[start], true);
                 pOp->setUnaryType(ASTUnaryType::TYPE_CAST);
-                pOp->push( new ASTTypeCast(tokens[start], type) );
+                
+                ASTTypeCast* pTypeCast = new ASTTypeCast(tokens[start]);
+                pTypeCast->setType( type );
+                
+                pOp->push( pTypeCast );
                 pHead->push( pOp );
             } else { // found a subexpression
                 pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) ); // recurse
@@ -102,11 +103,11 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 ASTExpr* pSubExpr = new ASTExpr(tokens[i]);
                 pArr->push(pSubExpr);
                 pSubExpr->push( new ASTCharLiteral(c, tokens[i]) );
-                pSubExpr->type = type;
+                pSubExpr->setType(type);
             }
 
             // set type
-            type.addArrayModifier(pArr->size());
+            type.addHintPointer(pArr->size());
             pArr->setType( type );
         } else if (tokens[i].type == TokenType::VOID) {
             pHead->push( new ASTVoidLiteral(tokens[i]) );
@@ -132,8 +133,8 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 } else if (tokens[i].type == TokenType::RBRACE || tokens[i].type == TokenType::RPAREN || tokens[i].type == TokenType::RBRACKET) {
                     groupsOpen.pop_back();
                 } else if (groupsOpen.size() == 1 && tokens[i].type == TokenType::COMMA) {
-                    // split on commas, parse each subexpr
-                    pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
+                    // split on commas, parse each subexpr as its own top expression
+                    pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack, true) );
                     exprStart = i+1;
                 }
                 ++i;
@@ -146,7 +147,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             if (i > endIndex) throw TUnclosedGroupException(tokens[exprStart].err);
 
             // add last expression
-            pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
+            pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack, true) );
         } else if (tokens[i].type == TokenType::LBRACKET) {
             // array subscript operator
             // find closing bracket
@@ -171,11 +172,11 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             // parse expression for subscript
             ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startIndex]);
             iden.addSubscript( pArrSub );
-            pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack) );
+            pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack, true) );
 
             // force subscript to have int type
             ASTExpr* pSubExpr = static_cast<ASTExpr*>(pArrSub->lastChild());
-            pSubExpr->type = Type(TokenType::TYPE_INT);
+            pSubExpr->setType( Type(TokenType::TYPE_INT) );
         } else {
             throw TInvalidTokenException(tokens[i].err);
         }

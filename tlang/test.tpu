@@ -1,19 +1,3 @@
-__UF0:
-    movw BP, SP
-    pushw 0
-    popw AX
-    movw BX, 1
-    mul BX
-    add BP, AX
-    push [BP-4]
-    push 0
-    pop DL
-    mov [SP-2], DL
-    pop DL
-    mov [SP-2], DL
-    jmp __UF0E
-    __UF0E:
-    ret
 main:
     add SP, 2
     push 84
@@ -23,20 +7,44 @@ main:
     push 105
     push 115
     push 0
-    movw BP, SP
-    sub BP, 7
-    pushw BP
+    push 66
+    push 114
+    push 97
+    push 118
+    push 105
+    push 115
+    push 0
+    movw CX, SP
+    sub CX, 14
+    pushw CX
+    pushw 1
+    popw AX
+    popw CX
+    movw BX, 7
+    mul BX
+    add CX, AX
+    pushw CX
     pushw 0
-    call __UF0
+    popw AX
+    popw CX
+    movw BX, 1
+    mul BX
+    add CX, AX
+    pushw CX
+    popw BP
+    pushw [BP+0]
+    push 0
     pop DL
-    mov [SP-11], DL
+    mov [SP-16], DL
     pop DL
-    mov [SP-11], DL
+    mov [SP-16], DL
     popw
     popw
     popw
     popw
-    pop
+    popw
+    popw
+    popw
     jmp mainE
     mainE:
     movw AX, 0x03

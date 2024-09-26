@@ -4,7 +4,9 @@
 #include "lexer.hpp"
 #include "preprocessor.hpp"
 
-#include "util/util.hpp"
+#include "util/toolbox.hpp"
+#include "util/token.hpp"
+#include "util/t_exception.hpp"
 
 static bool isInMultilineComment = false;
 

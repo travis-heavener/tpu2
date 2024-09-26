@@ -4,7 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "../util/util.hpp"
+#include "../util/token.hpp"
+#include "../util/scope_stack.hpp"
 
 enum class ASTNodeType {
     NODE, // base class
@@ -107,20 +108,43 @@ class ASTWhileLoop : public ASTNode {
 
 /************* OPERATIONS *************/
 
-class ASTExpr : public ASTNode {
+class ASTTypedNode : public ASTNode {
     public:
-        ASTExpr(const Token& token) : ASTNode(token) {};
-        ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
-        
-        Type inferType(scope_stack_t& scopeStack) const;
+        ASTTypedNode(const Token& t) : ASTNode(t) {};
+
+        // infer this node's type from any children
+        virtual void inferType(scope_stack_t&);
+        void inferChildTypes(scope_stack_t&) const;
+
+        Type& getTypeRef() { return type; };
+        Type getType() const { return type; };
+        void setType(const Type& t) { type = t; };
+
+        bool isLValue() const { return _isLValue; };
+        void setIsLValue(bool);
+    private:
         Type type;
+        bool _isLValue = false;
 };
 
-class ASTOperator : public ASTNode {
+class ASTExpr : public ASTTypedNode {
     public:
-        ASTOperator(const Token& token, bool isUnary) : ASTNode(token), opType(token.type), isUnary(isUnary) {}
+        ASTExpr(const Token& token) : ASTTypedNode(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
+
+        // only called by top-most expression,
+        // resolves any lvalues to their rvalue if there aren't any operators that could enable them to be lvalues
+        void updateLValues();
+    private:
+        bool hasOperatorChild() const;
+        void revokeAllLValues();
+};
+
+class ASTOperator : public ASTTypedNode {
+    public:
+        ASTOperator(const Token& token, bool isUnary) : ASTTypedNode(token), opType(token.type), isUnary(isUnary) {}
         ASTNodeType getNodeType() const { return isUnary ? ASTNodeType::UNARY_OP : ASTNodeType::BIN_OP; }
-        
+
         ASTNode* left() { return children[0]; }
         ASTNode* right() { return children[1]; }
         TokenType getOpTokenType() const { return opType; }
@@ -130,13 +154,11 @@ class ASTOperator : public ASTNode {
 
         void setUnaryType(ASTUnaryType t) { this->unaryType = t; };
         ASTUnaryType getUnaryType() const { return this->unaryType; };
-
-        void determineResultType(scope_stack_t&);
-        Type getResultType() const { return returnType; };
+        
+        void inferType(scope_stack_t&);
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;
         TokenType opType;
-        Type returnType;
         bool isUnary;
 };
 
@@ -166,21 +188,23 @@ class ASTFunction : public ASTNode {
         std::vector<ASTFuncParam*> params; // parameters {name, type}
 };
 
-class ASTFunctionCall : public ASTNode {
+class ASTFunctionCall : public ASTTypedNode {
     public:
-        ASTFunctionCall(const Token& token) : ASTNode(token) {};
+        ASTFunctionCall(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::FUNCTION_CALL; };
+        void inferType(scope_stack_t&);
 };
 
-class ASTArraySubscript : public ASTNode {
+class ASTArraySubscript : public ASTTypedNode {
     public:
-        ASTArraySubscript(const Token& token) : ASTNode(token) {};
+        ASTArraySubscript(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::ARR_SUBSCRIPT; };
+        void inferType(scope_stack_t&);
 };
 
-class ASTIdentifier : public ASTNode {
+class ASTIdentifier : public ASTTypedNode {
     public:
-        ASTIdentifier(const Token& token, bool inAssign) : ASTNode(token), isInAssignExpr(inAssign) {};
+        ASTIdentifier(const Token& token, bool inAssign) : ASTTypedNode(token), isInAssignExpr(inAssign) {};
         ~ASTIdentifier();
         ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
         bool isInAssignExpr; // whether the identifier is being referenced (ex. x + 1) or assigned (x = 1)
@@ -189,11 +213,8 @@ class ASTIdentifier : public ASTNode {
         void addSubscript(ASTArraySubscript* pSub) { this->subscripts.push_back(pSub); };
         const std::vector<ASTArraySubscript*>& getSubscripts() { return subscripts; };
 
-        void determineResultType(scope_stack_t&);
-        Type getResultType() const { return type; };
-        Type& getResultTypeRef() { return type; };
+        void inferType(scope_stack_t&);
     private:
-        Type type;
         std::vector<ASTArraySubscript*> subscripts;
 };
 
@@ -203,63 +224,66 @@ class ASTVarDeclaration : public ASTNode {
         ~ASTVarDeclaration();
         ASTNodeType getNodeType() const { return ASTNodeType::VAR_DECLARATION; };
         Type getType() const { return type; }
+        Type& getTypeRef() { return type; }
+        void updateType(const Type&);
 
         ASTIdentifier* pIdentifier = nullptr;
         ASTExpr* pExpr = nullptr;
         Type type; // type of variable
 };
 
-class ASTArrayLiteral : public ASTNode {
+class ASTArrayLiteral : public ASTTypedNode {
     public:
-        ASTArrayLiteral(const Token& token) : ASTNode(token) {};
+        ASTArrayLiteral(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_ARR; };
-        Type inferType(scope_stack_t&) const;
 
-        Type getType() const { return type; };
-        void setType(Type);
-    private:
-        Type type;
+        void inferType(scope_stack_t&);
+        void setTypeRecursive(const Type&);
 };
 
-class ASTBoolLiteral : public ASTNode {
+class ASTBoolLiteral : public ASTTypedNode {
     public:
-        ASTBoolLiteral(bool val, const Token& token) : ASTNode(token), val(val) {};
+        ASTBoolLiteral(bool val, const Token& token) : ASTTypedNode(token), val(val) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_BOOL; };
+        void inferType(scope_stack_t&);
         bool val;
 };
 
-class ASTCharLiteral : public ASTNode {
+class ASTCharLiteral : public ASTTypedNode {
     public:
-        ASTCharLiteral(char val, const Token& token) : ASTNode(token), val(val) {};
+        ASTCharLiteral(char val, const Token& token) : ASTTypedNode(token), val(val) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_CHAR; };
+        void inferType(scope_stack_t&);
         char val;
 };
 
-class ASTFloatLiteral : public ASTNode {
+class ASTFloatLiteral : public ASTTypedNode {
     public:
-        ASTFloatLiteral(double val, const Token& token) : ASTNode(token), val(val) {};
+        ASTFloatLiteral(double val, const Token& token) : ASTTypedNode(token), val(val) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_FLOAT; };
+        void inferType(scope_stack_t&);
         double val;
 };
 
-class ASTIntLiteral : public ASTNode {
+class ASTIntLiteral : public ASTTypedNode {
     public:
-        ASTIntLiteral(int val, const Token& token) : ASTNode(token), val(val) {};
+        ASTIntLiteral(int val, const Token& token) : ASTTypedNode(token), val(val) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_INT; };
+        void inferType(scope_stack_t&);
         int val;
 };
 
-class ASTVoidLiteral : public ASTNode {
+class ASTVoidLiteral : public ASTTypedNode {
     public:
-        ASTVoidLiteral(const Token& token) : ASTNode(token) {};
+        ASTVoidLiteral(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_VOID; };
+        void inferType(scope_stack_t&);
 };
 
-class ASTTypeCast : public ASTNode {
+class ASTTypeCast : public ASTTypedNode {
     public:
-        ASTTypeCast(const Token& token, Type type) : ASTNode(token), type(type) {};
+        ASTTypeCast(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::TYPE_CAST; };
-        Type type;
 };
 
 #endif

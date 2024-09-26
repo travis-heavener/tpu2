@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "preprocessor.hpp"
-#include "util/util.hpp"
+#include "util/token.hpp"
 
 // tokenize a document to a vector of Tokens
 void tokenize(std::ifstream&, std::vector<Token>&, cwd_stack&);

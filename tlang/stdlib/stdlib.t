@@ -2,6 +2,8 @@
  * The "Standard Library" for the T Language.
  */
 
+#define NULL 0
+
 int strlen(char* str) {
     // caused a segfault vvvv
     // return *((char*)4098);
