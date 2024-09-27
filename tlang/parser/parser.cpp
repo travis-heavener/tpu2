@@ -447,7 +447,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
                         throw TInvalidTokenException(tokens[i+1].err);
 
                     // add empty array modifier if first bracket pair
-                    type.addHintPointer( TYPE_EMPTY_PTR );
+                    type.addEmptyPointer();
                     i += 2;
                 }
                 numHints++;
@@ -514,11 +514,20 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         throw e;
     }
 
-    // if this is the top expression, double-check all lvalues
-    if (isTopExpr)
-        pHead->updateLValues();
+    // verify only one child remains
+    if (pHead->size() != 1) throw TExpressionEvalException(pHead->err);
 
-    return pHead;
+    // if this is the top expression, double-check all lvalues
+    if (isTopExpr) {
+        pHead->reduceLValues();
+        return pHead;
+    }
+
+    // base case, not the top expression; strip pHead of wrapper pExpr
+    ASTNode* pNewHead = pHead->at(0);
+    pHead->removeChild(0);
+    delete pHead;
+    return pNewHead;
 }
 
 ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex, scope_stack_t& scopeStack) {

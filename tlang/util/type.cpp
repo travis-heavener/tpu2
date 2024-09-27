@@ -34,10 +34,10 @@ void Type::addHintPointer(size_t n) {
 }
 
 void Type::popPointer() {
-    pointers.pop_back();
-
     // decrement number of stored array hints
-    if (numArrayHints > 0) --numArrayHints;
+    if (*pointers.rbegin() != TYPE_EMPTY_PTR) --numArrayHints;
+
+    pointers.pop_back();
 }
 
 // get the total size taken up in memory by this type

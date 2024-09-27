@@ -32,18 +32,21 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 ASTFunctionCall* pCall = new ASTFunctionCall(tokens[start-1]);
                 pHead->push( pCall ); // append function call node
 
-                // find commas
-                std::vector<size_t> commaIndices;
-                delimitIndices(tokens, commaIndices, start+1, i-1); // ignore outer parens
+                // check for arguments
+                if (start+1 <= i-1) {
+                    // find commas
+                    std::vector<size_t> commaIndices;
+                    delimitIndices(tokens, commaIndices, start+1, i-1); // ignore outer parens
 
-                // append sub expressions separated by a comma
-                size_t subExprStart = start+1;
-                for (size_t j = 0; j < commaIndices.size(); ++j) {
-                    pCall->push( parseExpression(tokens, subExprStart, commaIndices[j] - 1, scopeStack, true) );
-                    subExprStart = commaIndices[j] + 1; // update for next sub expr
+                    // append sub expressions separated by a comma
+                    size_t subExprStart = start+1;
+                    for (size_t j = 0; j < commaIndices.size(); ++j) {
+                        pCall->push( parseExpression(tokens, subExprStart, commaIndices[j] - 1, scopeStack, true) );
+                        subExprStart = commaIndices[j] + 1; // update for next sub expr
+                    }
 
                     // check for remaining expression
-                    if (j+1 == commaIndices.size())
+                    if (subExprStart != i)
                         pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
                 }
             } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type)) { // check for typecast
@@ -134,7 +137,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                     groupsOpen.pop_back();
                 } else if (groupsOpen.size() == 1 && tokens[i].type == TokenType::COMMA) {
                     // split on commas, parse each subexpr as its own top expression
-                    pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack, true) );
+                    pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
                     exprStart = i+1;
                 }
                 ++i;
@@ -147,7 +150,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             if (i > endIndex) throw TUnclosedGroupException(tokens[exprStart].err);
 
             // add last expression
-            pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack, true) );
+            pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
         } else if (tokens[i].type == TokenType::LBRACKET) {
             // array subscript operator
             // find closing bracket

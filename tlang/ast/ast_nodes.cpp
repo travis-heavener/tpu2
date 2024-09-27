@@ -54,32 +54,35 @@ ASTIdentifier::~ASTIdentifier() {
         delete pSub;
 }
 
-// only called by top-most expression,
-// resolves any lvalues to their rvalue if there aren't any operators that could enable them to be lvalues
-void ASTExpr::updateLValues() {
-    // check for operators
-    bool hasOperatorNChild = hasOperatorChild();
+// remove any extra lvalues
+void ASTTypedNode::reduceLValues() {
+    // iterate over all children, removing lvalue status for anything that isn't in an operator
+    for (ASTNode* pChild : this->children) {
+        switch (pChild->getNodeType()) {
+            // operators already handle this themselves
+            default: {
+                ASTTypedNode* pTypedChild = static_cast<ASTTypedNode*>(pChild);
+                pTypedChild->reduceLValues();
 
-    // update any lvalues
-    if (!hasOperatorNChild)
-        revokeAllLValues(); // no operator child anywhere, so convert any lvalues to rvalues
-}
-
-void ASTExpr::revokeAllLValues() {
-    for (ASTNode* pChild : children) {
-        if (pChild->getNodeType() == ASTNodeType::EXPR) {
-            // recurse
-            ASTExpr* pSubExpr = static_cast<ASTExpr*>(pChild);
-            pSubExpr->revokeAllLValues();
+                // iterate over subscripts as well
+                if (pTypedChild->getNodeType() == ASTNodeType::IDENTIFIER) {
+                    ASTIdentifier* pIden = static_cast<ASTIdentifier*>(pTypedChild);
+                    for (ASTNode* pSubChild : pIden->getSubscripts())
+                        static_cast<ASTTypedNode*>(pSubChild)->reduceLValues();
+                }
+                break;
+            }
         }
-
-        // regardless, update this node's lvalue status
-        ASTTypedNode* pTypedNode = static_cast<ASTTypedNode*>(pChild);
-        pTypedNode->setIsLValue(false);
     }
 
-    // update self to not be an lvalue
-    this->setIsLValue(false);
+    // update self
+    // if (this->getNodeType() == ASTNodeType::IDENTIFIER)
+    //     this->setIsLValue(false);
+}
+
+void ASTOperator::reduceLValues() {
+    // prevent marking intentional lvalues as rvalues
+    // switch 
 }
 
 bool ASTExpr::hasOperatorChild() const {
@@ -132,17 +135,13 @@ void ASTArrayLiteral::setTypeRecursive(const Type& type) {
     Type desiredChildType = type;
     desiredChildType.popPointer();
 
-    for (ASTNode* pNode : this->children) {
-        // get child from within pExpr
-        ASTNode* pChild = pNode->at(0);
-
+    for (ASTNode* pChild : this->children) {
         // update child if child is array
         if (pChild->getNodeType() == ASTNodeType::LIT_ARR) {
             // sets the child's type to what we want, so don't need to check it
             static_cast<ASTArrayLiteral*>(pChild)->setTypeRecursive(desiredChildType);
         } else {
-            // number of children already confirmed to match, so update type in child & wrapper
-            static_cast<ASTExpr*>(pNode)->setType(desiredChildType);
+            // number of children already confirmed to match, so update type
             static_cast<ASTTypedNode*>(pChild)->setType(desiredChildType);
         }
     }
@@ -159,12 +158,6 @@ void ASTTypedNode::inferType(scope_stack_t& scopeStack) {
     for (ASTNode* pNode : this->children) {
         ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
         this->type = getDominantType( this->type, pChild->type );
-    }
-
-    // copy lvalue status from child if a wrapper
-    if (this->getNodeType() == ASTNodeType::EXPR) {
-        ASTTypedNode* pChild = static_cast<ASTTypedNode*>(children[0]);
-        this->setIsLValue( pChild->isLValue() );
     }
 }
 
@@ -200,7 +193,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
             case TokenType::OP_ADD: case TokenType::OP_SUB: case TokenType::OP_BIT_NOT: {
                 if (typeA.isPointer() || typeA.isVoidNonPtr()) // verify non-void & non-pointer
                     throw TInvalidOperationException(err);
-                this->setType( typeA );
+                this->setType(typeA);
                 pA->setIsLValue(false); // revoke lvalue status
                 break;
             }
@@ -226,6 +219,10 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 break;
             }
             case TokenType::AMPERSAND: {
+                // set left arg to lvalue if identifier
+                if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
+                    pA->setIsLValue(true);
+
                 // verify lvalue
                 if (!pA->isLValue()) throw TInvalidOperationException(err);
 
@@ -241,6 +238,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // verify non-void
                 if (typeA.isVoidNonPtr()) throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_INT) );
+                pA->setIsLValue(false);
                 break;
             }
             default: {
@@ -367,6 +365,10 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 break;
             }
             case TokenType::ASSIGN: {
+                // set left arg to lvalue if identifier
+                if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
+                    pA->setIsLValue(true);
+
                 // verify left arg is lvalue
                 if (!pA->isLValue()) throw TInvalidOperationException(err);
 
@@ -436,7 +438,7 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     this->setType( type );
 
     // mark this as an lvalue
-    this->setIsLValue(true);
+    // this->setIsLValue(true);
 }
 
 void ASTIntLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_INT));  }

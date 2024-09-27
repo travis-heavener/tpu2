@@ -40,5 +40,6 @@ MAKE_EXCEPTION(Syntax)
 MAKE_EXCEPTION(VoidReturn)
 MAKE_EXCEPTION(IllegalArraySize)
 MAKE_EXCEPTION(IllegalImplicitCast)
+MAKE_EXCEPTION(ExpressionEval)
 
 #endif

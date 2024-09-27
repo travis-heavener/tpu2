@@ -24,12 +24,8 @@ size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
 // handles any array as a pointer
 size_t Scope::declareFunctionParam(Type type, const std::string& name, ErrInfo err) {
     if (type.isArray()) {
-        // pass any arrays by reference by pushing a pointer
-        // and dropping all array modifiers (mere suggestions)
-        size_t numArrayMods = type.getNumArrayHints();
-        for (size_t i = 0; i < numArrayMods; ++i)
-            type.popPointer();
-
+        // replace top modifier with a pointer
+        type.popPointer();
         type.addEmptyPointer();
         return declareVariable(type, name, err);
     }

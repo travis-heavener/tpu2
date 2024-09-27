@@ -4,18 +4,12 @@
 
 #define NULL 0
 
-int strlen(char* str) {
-    // caused a segfault vvvv
-    // return *((char*)4098);
-    // caused a segfault ^^^^
-    return str[0];
+int strlen(int str[]) {
+    int i;
 
-    // int i;
-    // int len = 0;
+    while (str[i] != '\0') {
+        i = i + 1;
+    }
 
-    // for (i = 0; str[i] != '\0'; i = i + 1) {
-    //     len = len + 1;
-    // }
-
-    // return len;
+    return i;
 }

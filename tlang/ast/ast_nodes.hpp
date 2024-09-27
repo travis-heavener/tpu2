@@ -116,6 +116,9 @@ class ASTTypedNode : public ASTNode {
         virtual void inferType(scope_stack_t&);
         void inferChildTypes(scope_stack_t&) const;
 
+        // remove any extra lvalues
+        virtual void reduceLValues();
+
         Type& getTypeRef() { return type; };
         Type getType() const { return type; };
         void setType(const Type& t) { type = t; };
@@ -131,13 +134,8 @@ class ASTExpr : public ASTTypedNode {
     public:
         ASTExpr(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
-
-        // only called by top-most expression,
-        // resolves any lvalues to their rvalue if there aren't any operators that could enable them to be lvalues
-        void updateLValues();
     private:
         bool hasOperatorChild() const;
-        void revokeAllLValues();
 };
 
 class ASTOperator : public ASTTypedNode {
@@ -155,6 +153,8 @@ class ASTOperator : public ASTTypedNode {
         void setUnaryType(ASTUnaryType t) { this->unaryType = t; };
         ASTUnaryType getUnaryType() const { return this->unaryType; };
         
+        // remove any extra lvalues
+        void reduceLValues();
         void inferType(scope_stack_t&);
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;

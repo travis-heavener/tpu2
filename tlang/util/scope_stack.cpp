@@ -9,7 +9,7 @@
 Type lookupParserVariable(scope_stack_t& scopeStack, const std::string& name, ErrInfo err) {
     // look in the stack, up
     auto itr = scopeStack.rbegin();
-    for ((void)itr; itr != scopeStack.rend(); itr++) {
+    for ((void)itr; itr != scopeStack.rend(); ++itr) {
         // check this scope
         parser_scope_t& parserScope = *itr;
         if (parserScope.count(name) > 0) {
