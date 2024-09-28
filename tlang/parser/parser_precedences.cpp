@@ -224,11 +224,12 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType != TokenType::AMPERSAND)
             continue;
 
-        // prevent chaining of + or - unaries
-        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) && i != 0 &&
-            pHead->at(i-1)->getNodeType() != ASTNodeType::UNARY_OP &&
-            pHead->at(i-1)->getNodeType() != ASTNodeType::BIN_OP) {
-            continue;
+        // prevent chaining of + or - unaries (allow if previous node has children already)
+        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) && i > 0) {
+            ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
+            if (pPrev != nullptr && pPrev->getOpTokenType() == opType && pPrev->size() == 0) {
+                throw TInvalidTokenException(currentNode.err);
+            }
         }
 
         // confirm there is a token after this
