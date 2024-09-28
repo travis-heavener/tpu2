@@ -108,9 +108,13 @@ class ASTWhileLoop : public ASTNode {
 
 /************* OPERATIONS *************/
 
+// fwd dec
+class ASTArraySubscript;
+
 class ASTTypedNode : public ASTNode {
     public:
         ASTTypedNode(const Token& t) : ASTNode(t) {};
+        ~ASTTypedNode();
 
         // infer this node's type from any children
         virtual void inferType(scope_stack_t&);
@@ -125,6 +129,13 @@ class ASTTypedNode : public ASTNode {
 
         bool isLValue() const { return _isLValue; };
         void setIsLValue(bool);
+
+        // subscripts for array accessing
+        void addSubscript(ASTArraySubscript* pSub) { this->subscripts.push_back(pSub); };
+        const std::vector<ASTArraySubscript*>& getSubscripts() { return subscripts; };
+        size_t getNumSubscripts() const { return subscripts.size(); };
+    protected:
+        std::vector<ASTArraySubscript*> subscripts;
     private:
         Type type;
         bool _isLValue = false;
@@ -134,8 +145,6 @@ class ASTExpr : public ASTTypedNode {
     public:
         ASTExpr(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::EXPR; };
-    private:
-        bool hasOperatorChild() const;
 };
 
 class ASTOperator : public ASTTypedNode {
@@ -153,8 +162,6 @@ class ASTOperator : public ASTTypedNode {
         void setUnaryType(ASTUnaryType t) { this->unaryType = t; };
         ASTUnaryType getUnaryType() const { return this->unaryType; };
         
-        // remove any extra lvalues
-        void reduceLValues();
         void inferType(scope_stack_t&);
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;
@@ -163,6 +170,13 @@ class ASTOperator : public ASTTypedNode {
 };
 
 /************* LITERALS & IDENTIFIERS *************/
+
+class ASTArraySubscript : public ASTTypedNode {
+    public:
+        ASTArraySubscript(const Token& token) : ASTTypedNode(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::ARR_SUBSCRIPT; };
+        void inferType(scope_stack_t&);
+};
 
 class ASTFuncParam {
     public:
@@ -195,27 +209,13 @@ class ASTFunctionCall : public ASTTypedNode {
         void inferType(scope_stack_t&);
 };
 
-class ASTArraySubscript : public ASTTypedNode {
-    public:
-        ASTArraySubscript(const Token& token) : ASTTypedNode(token) {};
-        ASTNodeType getNodeType() const { return ASTNodeType::ARR_SUBSCRIPT; };
-        void inferType(scope_stack_t&);
-};
-
 class ASTIdentifier : public ASTTypedNode {
     public:
         ASTIdentifier(const Token& token, bool inAssign) : ASTTypedNode(token), isInAssignExpr(inAssign) {};
-        ~ASTIdentifier();
         ASTNodeType getNodeType() const { return ASTNodeType::IDENTIFIER; };
         bool isInAssignExpr; // whether the identifier is being referenced (ex. x + 1) or assigned (x = 1)
 
-        // subscripts for array accessing
-        void addSubscript(ASTArraySubscript* pSub) { this->subscripts.push_back(pSub); };
-        const std::vector<ASTArraySubscript*>& getSubscripts() { return subscripts; };
-
         void inferType(scope_stack_t&);
-    private:
-        std::vector<ASTArraySubscript*> subscripts;
 };
 
 class ASTVarDeclaration : public ASTNode {

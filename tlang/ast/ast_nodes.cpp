@@ -49,8 +49,8 @@ ASTFunction::~ASTFunction() {
         delete p;
 }
 
-ASTIdentifier::~ASTIdentifier() {
-    for (ASTArraySubscript* pSub : subscripts)
+ASTTypedNode::~ASTTypedNode() {
+    for (ASTNode* pSub : subscripts)
         delete pSub;
 }
 
@@ -58,52 +58,13 @@ ASTIdentifier::~ASTIdentifier() {
 void ASTTypedNode::reduceLValues() {
     // iterate over all children, removing lvalue status for anything that isn't in an operator
     for (ASTNode* pChild : this->children) {
-        switch (pChild->getNodeType()) {
-            // operators already handle this themselves
-            default: {
-                ASTTypedNode* pTypedChild = static_cast<ASTTypedNode*>(pChild);
-                pTypedChild->reduceLValues();
+        ASTTypedNode* pTypedChild = static_cast<ASTTypedNode*>(pChild);
+        pTypedChild->reduceLValues();
 
-                // iterate over subscripts as well
-                if (pTypedChild->getNodeType() == ASTNodeType::IDENTIFIER) {
-                    ASTIdentifier* pIden = static_cast<ASTIdentifier*>(pTypedChild);
-                    for (ASTNode* pSubChild : pIden->getSubscripts())
-                        static_cast<ASTTypedNode*>(pSubChild)->reduceLValues();
-                }
-                break;
-            }
-        }
+        // iterate over subscripts as well
+        for (ASTNode* pSubChild : pTypedChild->subscripts)
+            static_cast<ASTTypedNode*>(pSubChild)->reduceLValues();
     }
-
-    // update self
-    // if (this->getNodeType() == ASTNodeType::IDENTIFIER)
-    //     this->setIsLValue(false);
-}
-
-void ASTOperator::reduceLValues() {
-    // prevent marking intentional lvalues as rvalues
-    // switch 
-}
-
-bool ASTExpr::hasOperatorChild() const {
-    for (ASTNode* pChild : children) {
-        switch (pChild->getNodeType()) {
-            case ASTNodeType::UNARY_OP:
-            case ASTNodeType::BIN_OP: {
-                return true; // found one
-            }
-            case ASTNodeType::EXPR: {
-                // recurse
-                ASTExpr* pSubExpr = static_cast<ASTExpr*>(pChild);
-                if (pSubExpr->hasOperatorChild())
-                    return true; // found one
-            }
-            default: break;
-        }
-    }
-
-    // base case, not found
-    return false;
 }
 
 void ASTVarDeclaration::updateType(const Type& type) {
@@ -285,12 +246,19 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     // result type is just a memory address
                     this->setType( MEM_ADDR_TYPE );
                 } else if (!typeA.isPointer() && !typeB.isPointer()) {
-                    // at most one is a pointer, dominant type will take care of that so set the pointer to a mem addr
+                    // both are not pointers, dominant type will take care of that so set the pointer to a mem addr
                     if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
                     if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
 
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );
+                } else {
+                    // one is a pointer
+                    if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
+                    if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
+
+                    // assume dominant type
+                    this->setType( typeA.isPointer() ? typeA : typeB );
                 }
 
                 // revoke lvalue status from children
@@ -319,8 +287,13 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
                 if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
 
-                // assume dominant type
-                this->setType( getDominantType(typeA, typeB) );
+                if (typeA.isPointer() || typeB.isPointer()) {
+                    // set type to pointer
+                    this->setType( typeA.isPointer() ? typeA : typeB );
+                } else {
+                    // assume dominant type
+                    this->setType( getDominantType(typeA, typeB) );
+                }
 
                 // revoke lvalue status from children
                 pA->setIsLValue(false);
@@ -415,8 +388,6 @@ void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
     this->getTypeRef().addHintPointer( this->children.size() );
 }
 
-/******** NODES BELOW DON'T HAVE CHILDREN ********/
-
 void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // lookup the variable from the scope
     Type type = lookupParserVariable(scopeStack, this->raw, this->err);
@@ -424,7 +395,7 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // handle any subscripts
     size_t numSubscripts = this->subscripts.size();
     for (size_t i = 0; i < numSubscripts; ++i) {
-        // infer the subscipt's type
+        // infer the subscript's type
         this->subscripts[i]->inferType(scopeStack);
 
         // strip pointers from type
@@ -436,10 +407,9 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
 
     // set identifier's type
     this->setType( type );
-
-    // mark this as an lvalue
-    // this->setIsLValue(true);
 }
+
+/******** NODES BELOW DON'T HAVE CHILDREN ********/
 
 void ASTIntLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_INT));  }
 void ASTCharLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_CHAR));  }

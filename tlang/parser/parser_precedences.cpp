@@ -168,13 +168,18 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             if (bracketsOpen > 0) throw TUnclosedGroupException(tokens[startIndex].err);
 
             // get previous identifier
-            if (pHead->lastChild()->getNodeType() != ASTNodeType::IDENTIFIER)
-                throw TInvalidTokenException(tokens[startIndex].err);
-            ASTIdentifier& iden = *static_cast<ASTIdentifier*>(pHead->lastChild());
+            ASTTypedNode* pLastNode = dynamic_cast<ASTTypedNode*>(pHead->lastChild());
+            if (pLastNode == nullptr) // failed to cast to subscriptable type
+                throw TInvalidOperationException(tokens[startIndex].err);
+
+            // infer the last thing's type
+            pLastNode->inferType(scopeStack);
+            if (!pLastNode->getTypeRef().isPointer())
+                throw TInvalidOperationException(tokens[startIndex].err);
 
             // parse expression for subscript
             ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startIndex]);
-            iden.addSubscript( pArrSub );
+            pLastNode->addSubscript( pArrSub );
             pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack, true) );
 
             // force subscript to have int type
@@ -192,6 +197,9 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::UNARY_OP && currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+        
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // ignore + and - if this is a binary math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -212,13 +220,10 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         // confirm there is a token after this
         if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
-        // if this is an asterisk, set it to a unary
-        if (opType == TokenType::ASTERISK) {
+        // if this is also a binary op, set it to a unary
+        if (opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND)
             currentOp.setIsUnary(true);
-        } else if (opType == TokenType::AMPERSAND) {
-            currentOp.setIsUnary(true);
-        }
-        
+
         // update unary type
         if (opType == TokenType::SIZEOF) {
             currentOp.setUnaryType(ASTUnaryType::SIZEOF);
@@ -236,6 +241,9 @@ void parsePrecedence3(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is mult/div/mod math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -262,6 +270,9 @@ void parsePrecedence4(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         // + and - are counted as unaries by step 1
         if (currentNode.getNodeType() != ASTNodeType::UNARY_OP || currentNode.size() > 0) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is add/sub math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -290,6 +301,9 @@ void parsePrecedence5(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is a comparison operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         if (currentOp.getOpTokenType() != TokenType::OP_LSHIFT && currentOp.getOpTokenType() != TokenType::OP_RSHIFT) continue;
@@ -312,6 +326,9 @@ void parsePrecedence6(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is either GT, GTE, LT<, or LTE
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -339,6 +356,9 @@ void parsePrecedence7(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is an equality comparison
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -363,6 +383,9 @@ void parsePrecedence8(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+        
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is bitwise and
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -388,6 +411,9 @@ void parsePrecedence9(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -411,6 +437,9 @@ void parsePrecedence10(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -436,6 +465,9 @@ void parsePrecedence11(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -460,6 +492,9 @@ void parsePrecedence12(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -483,6 +518,9 @@ void parsePrecedence14(ASTNode* pHead) {
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is an assignment expression
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
