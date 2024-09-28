@@ -72,22 +72,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 pOp->push( pTypeCast );
                 pHead->push( pOp );
             } else { // found a subexpression
-                ASTNode* pSubExpr = parseExpression(tokens, start+1, i-1, scopeStack);
-
-                // append single child
-                if (pSubExpr->getNodeType() != ASTNodeType::EXPR) {
-                    pHead->push( pSubExpr );
-                } else {
-                    // extract & append multiple children
-                    ASTNode* pNewSub = pSubExpr->at(0);
-
-                    while (pNewSub->size() > 0) {
-                        pHead->push( pNewSub->at(0) );
-                        pNewSub->removeChild(0);
-                    }
-
-                    delete pSubExpr;
-                }
+                pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
             }
         } else if (tokens[i].type == TokenType::LIT_INT) {
             pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
@@ -230,6 +215,9 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
             if (pPrev != nullptr && pPrev->getOpTokenType() == opType && pPrev->size() == 0) {
                 throw TInvalidTokenException(currentNode.err);
             }
+
+            // verify the previous node is an operator (if not, it's a binary op)
+            if (pPrev == nullptr) continue;
         }
 
         // confirm there is a token after this
