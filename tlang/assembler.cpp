@@ -860,6 +860,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 }
             }
 
+            // if there are still array hints left, force as pointer
+            if (idenType.getNumArrayHints() > 0)
+                idenType.setForcedPointer(true);
+
             // update result type
             resultType = idenType;
             break;
@@ -912,6 +916,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         implicitCast(outHandle, resultType, desiredType, scope, bodyNode.err);
         resultType = desiredType; // update type to match
     }
+
+    // fix any forced pointers (not part of typecast)
+    if (resultType.usesForcedPointer() != desiredType.usesForcedPointer())
+        resultType.setForcedPointer(desiredType.usesForcedPointer());
 
     // result type now matches desired type
     return resultType;

@@ -5,37 +5,32 @@ main:
     sub CX, 2
     pushw CX
     popw AX
-    pushw AX ; *addr
+    pushw AX
     movw CX, SP
     sub CX, 2
     pushw CX
     popw AX
-    pushw AX ; *addr
+    pushw AX
     movw CX, SP
     sub CX, 2
     pushw CX
-    popw BP
-    push [BP+0]
-    push [BP+1]
+    popw AX
+    pushw AX
     popw AX
     movw BP, AX
     pushw BP
     popw AX
-    pushw AX ; *addr
+    pushw AX
     popw AX
     movw BP, AX
     pushw BP
     popw AX
-    pushw AX ; *addr
+    pushw AX
     popw AX
     movw BP, AX
     pushw BP
     popw AX
-    pushw AX ; *addr
-    popw AX
-    movw BP, AX
-    push [BP+0]
-    push [BP+1]
+    pushw AX
     pop DL
     mov [SP-2], DL
     pop DL

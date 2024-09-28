@@ -169,7 +169,13 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (typeA.getNumPointers() == 0) // check for pointers
                     throw TInvalidOperationException(err);
 
+                // if dereferencing an array, force as a pointer
+                if (typeA.isArray())
+                    pA->getTypeRef().setForcedPointer(true);
+
                 typeA.popPointer(); // pop a pointer off and set type
+                if (typeA.isArray()) // recheck forced ptr status after popping a ptr
+                    typeA.setForcedPointer(true);
 
                 if (typeA.isVoidNonPtr()) // check for dereferenced void pointer
                     throw TInvalidOperationException(err);
@@ -292,26 +298,18 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if ((typeA.isPointer() || typeB.isPointer()) && opType != TokenType::OP_ADD)
                     throw TInvalidOperationException(err);
 
-                // if pointer arithmetic, set the pointer to be of MEM_ADDR_TYPE and set
-                // this node to output the pointer's type
-                if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
-                if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
-
                 if (typeA.isPointer() || typeB.isPointer()) {
                     // wipe immediate array hint
-                    if (typeA.isPointer()) {
-                        typeA.popPointer();
-                        typeA.addEmptyPointer();
-                        pA->getTypeRef().setForcedPointer(true);
-                    } else {
-                        typeB.popPointer();
-                        typeB.addEmptyPointer();
-                        pB->getTypeRef().setForcedPointer(true);
+                    if (typeA.isArray()) {
+                        typeA.setForcedPointer(true);
+                        pA->setType( MEM_ADDR_TYPE );
+                    } else if (typeB.isArray()) {
+                        typeB.setForcedPointer(true);
+                        pB->setType( MEM_ADDR_TYPE );
                     }
 
                     // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
-                    this->getTypeRef().setForcedPointer(true); // force as pointer
                 } else {
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );

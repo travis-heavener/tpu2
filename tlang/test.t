@@ -10,20 +10,24 @@ int main() {
     // };
     // return 19 + ~(((((mat[0][2])))));
 
-    // int mat[2][3] = {
-    //     {1, 2, 3+9+1},
-    //     {4, 5, 6}
-    // };
+    int mat[2][3] = {
+        {1, 2, 3+9+1},
+        {4, 5, 6}
+    };
+
+    // works
+    // return mat[1][2];
+    // return mat[1];
+
+    return **(mat+6);
+    // return *mat[1];
 
     // return *(*(mat+1) + 2);
     // return (*(mat+6));
-    // return *(mat+6);
-    // return mat[1];
-    // return mat[1][2];
 
-    int x = 18;
-    int* pX = &x;
-    int** ppX = &pX;
+    // int x = 18;
+    // int* pX = &x;
+    // int** ppX = &pX;
     // return &*&*&*&ppX;
     // return &*ppX;
     // return **&*&ppX;
@@ -31,7 +35,7 @@ int main() {
     // return *&*&*&ppX;
     // return &*&ppX == &ppX;
     // return ppX;
-    return *&*&*&*ppX;
+    // return *&*&*&*ppX;
     // return &*&ppX;
 
     // works backwards and should only add the internal size instead of 2
@@ -46,9 +50,6 @@ int main() {
 
     // int** ppMat = &a;
     // return (ppMat + 2);
-
-    // works
-    // return mat[1][2];
 
     // int A = 'T';
     // int B = 'r';
