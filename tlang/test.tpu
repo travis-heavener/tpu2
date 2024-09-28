@@ -1,48 +1,45 @@
 main:
     add SP, 2
-    pushw 1
-    pushw 2
-    pushw 3
-    pushw 4
-    pushw 5
-    movw CX, SP
-    sub CX, 10
-    pushw CX
-    popw AX
-    pushw AX
+    pushw 18
     movw CX, SP
     sub CX, 2
     pushw CX
     popw AX
-    pushw AX
+    pushw AX ; *addr
+    movw CX, SP
+    sub CX, 2
+    pushw CX
+    popw AX
+    pushw AX ; *addr
     movw CX, SP
     sub CX, 2
     pushw CX
     popw BP
     push [BP+0]
     push [BP+1]
-    pushw 1
-    popw BX
     popw AX
-    sub AX, BX
-    pushw AX
+    movw BP, AX
+    pushw BP
     popw AX
-    movw DX, BP
+    pushw AX ; *addr
+    popw AX
+    movw BP, AX
+    pushw BP
+    popw AX
+    pushw AX ; *addr
+    popw AX
+    movw BP, AX
+    pushw BP
+    popw AX
+    pushw AX ; *addr
+    popw AX
     movw BP, AX
     push [BP+0]
     push [BP+1]
-    movw BP, DX
     pop DL
-    mov [SP-16], DL
+    mov [SP-2], DL
     pop DL
-    mov [SP-16], DL
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
-    popw
+    mov [SP-2], DL
     jmp mainE
     mainE:
     movw AX, 0x03

@@ -187,11 +187,12 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // verify lvalue
                 if (!pA->isLValue()) throw TInvalidOperationException(err);
 
-                // set type to be that of a memory address (uint16)
-                this->setType( MEM_ADDR_TYPE );
+                this->setType( typeA );
+                this->getTypeRef().addEmptyPointer();
 
                 // tell child to be just its pointer without any array hints (to fix its size to that of a ptr)
                 typeA.clearArrayHints();
+                typeA.setForcedPointer(true); // prevent derefs from pushing values
                 pA->setType( typeA );
                 break;
             }
@@ -254,8 +255,17 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     this->setType( getDominantType(typeA, typeB) );
                 } else {
                     // one is a pointer
-                    if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
-                    if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
+                    // if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
+                    // if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
+
+                    // wipe immediate array hint
+                    if (typeA.isPointer()) {
+                        typeA.popPointer();
+                        typeA.addEmptyPointer();
+                    } else {
+                        typeB.popPointer();
+                        typeB.addEmptyPointer();
+                    }
 
                     // assume dominant type
                     this->setType( typeA.isPointer() ? typeA : typeB );
@@ -288,8 +298,20 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
 
                 if (typeA.isPointer() || typeB.isPointer()) {
+                    // wipe immediate array hint
+                    if (typeA.isPointer()) {
+                        typeA.popPointer();
+                        typeA.addEmptyPointer();
+                        pA->getTypeRef().setForcedPointer(true);
+                    } else {
+                        typeB.popPointer();
+                        typeB.addEmptyPointer();
+                        pB->getTypeRef().setForcedPointer(true);
+                    }
+
                     // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
+                    this->getTypeRef().setForcedPointer(true); // force as pointer
                 } else {
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );

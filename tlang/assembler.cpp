@@ -450,27 +450,33 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::ASTERISK: {
-                    OUT << "movw DX, BP\n"; // backup BP to DX
                     OUT << "movw BP, AX\n"; // dereference ptr whose address is stored in AX
 
                     // pass final result size
                     resultType = resultTypes[0];
                     resultType.popPointer();
 
-                    // move that value to the stack
-                    for (size_t k = 0; k < resultType.getSizeBytes(); ++k) {
-                        OUT << "push [BP+" << k << "]\n";
-                        scope.addPlaceholder();
+                    // if the pointer to this is desired (ie. chained &*, just push the ptr)
+                    if (desiredType.usesForcedPointer()) {
+                        // buffer to stack
+                        OUT << "pushw BP\n";
+                    } else {
+                        // move that value to the stack
+                        for (size_t k = 0; k < resultType.getSizeBytes(); ++k) {
+                            OUT << "push [BP+" << k << "]\n";
+                            scope.addPlaceholder();
+                        }
                     }
-
-                    OUT << "movw BP, DX\n"; // restore BP from DX
                     break;
                 }
                 case TokenType::AMPERSAND: {
-                    // buffer result from lvalue
+                    // add layer of indirection by pushing/buffering the address
                     OUT << "pushw AX\n";
                     scope.addPlaceholder(2);
-                    resultType = MEM_ADDR_TYPE;
+
+                    // update result type
+                    resultType = resultTypes[0];
+                    resultType.addEmptyPointer();
                     break;
                 }
                 case TokenType::SIZEOF: {
@@ -791,8 +797,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
             Type idenType = scope.getVariable(identifier.raw, identifier.err)->type;
 
-            const size_t numPointers = idenType.getPointers().size();
-            const size_t numSubscripts = identifier.getSubscripts().size();
+            const size_t numPointers = idenType.getNumPointers();
+            const size_t numSubscripts = identifier.getNumSubscripts();
 
             if (numSubscripts > numPointers)
                 throw TInvalidOperationException(identifier.err);
@@ -842,7 +848,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             // if lvalue, do nothing--address is on top of stack
             // if there are array pointers left, push the array's address (already on stack)
-            if (!identifier.isLValue() && idenType.getNumArrayHints() == 0) { // otherwise, push value
+            if (!identifier.isLValue() && idenType.getNumArrayHints() == 0 && !idenType.usesForcedPointer()) { // otherwise, push value
                 // pop address from stack to BP
                 OUT << "popw BP\n";
                 scope.pop(); scope.pop();
@@ -898,9 +904,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             resultType = static_cast<ASTArrayLiteral*>(&bodyNode)->getTypeRef();
             break;
         }
-        default: {
-            throw std::invalid_argument("Invalid node type in assembleExpression!");
-        }
+        default: throw TExpressionEvalException(bodyNode.err);
     }
 
     // implicit cast

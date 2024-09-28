@@ -514,8 +514,9 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         throw e;
     }
 
-    // verify only one child remains
-    if (pHead->size() != 1) throw TExpressionEvalException(pHead->err);
+
+    // verify only one child remains if top expression
+    if (isTopExpr && pHead->size() != 1) throw TExpressionEvalException(pHead->err);
 
     // if this is the top expression, double-check all lvalues
     if (isTopExpr) {
@@ -523,11 +524,16 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         return pHead;
     }
 
-    // base case, not the top expression; strip pHead of wrapper pExpr
-    ASTNode* pNewHead = pHead->at(0);
-    pHead->removeChild(0);
-    delete pHead;
-    return pNewHead;
+    // base case, not the top expression; strip pHead of wrapper pExpr if not multiple values
+    if (pHead->size() == 1) {
+        ASTNode* pNewHead = pHead->at(0);
+        pHead->removeChild(0);
+        delete pHead;
+        return pNewHead;
+    }
+
+    // base case, extract children from this subexpression
+    return pHead;
 }
 
 ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex, scope_stack_t& scopeStack) {

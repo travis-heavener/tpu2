@@ -20,7 +20,7 @@ class Type {
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& type) : primitiveType(type.primitiveType), pointers(type.pointers), _isUnsigned(type._isUnsigned), numArrayHints(type.numArrayHints) {};
+        Type(const Type& type) : primitiveType(type.primitiveType), pointers(type.pointers), _isUnsigned(type._isUnsigned), numArrayHints(type.numArrayHints), forceAsPointer(type.forceAsPointer) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
@@ -28,7 +28,7 @@ class Type {
 
         bool isUnsigned() const { return _isUnsigned; };
 
-        void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
+        void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); forceAsPointer = false; };
         void addHintPointer(size_t);
         void popPointer();
         size_t getNumPointers() const { return pointers.size(); };
@@ -62,6 +62,10 @@ class Type {
         // clones self but revokes all array hints (for getting the address of this type, hints must be gone to get size right)
         Type getAddressPointer() const;
         void clearArrayHints();
+
+        // used to fix pointer arithmetic
+        void setForcedPointer(bool u) { forceAsPointer = u; };
+        bool usesForcedPointer() const { return forceAsPointer; };
     private:
         TokenType primitiveType;
         std::vector<size_t> pointers;
@@ -70,6 +74,9 @@ class Type {
 
         // for arrays specifically
         size_t numArrayHints = 0;
+
+        // fix for pointer arithmetic
+        bool forceAsPointer = false;
 };
 
 #endif

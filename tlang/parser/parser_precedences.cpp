@@ -72,7 +72,22 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 pOp->push( pTypeCast );
                 pHead->push( pOp );
             } else { // found a subexpression
-                pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) ); // recurse
+                ASTNode* pSubExpr = parseExpression(tokens, start+1, i-1, scopeStack);
+
+                // append single child
+                if (pSubExpr->getNodeType() != ASTNodeType::EXPR) {
+                    pHead->push( pSubExpr );
+                } else {
+                    // extract & append multiple children
+                    ASTNode* pNewSub = pSubExpr->at(0);
+
+                    while (pNewSub->size() > 0) {
+                        pHead->push( pNewSub->at(0) );
+                        pNewSub->removeChild(0);
+                    }
+
+                    delete pSubExpr;
+                }
             }
         } else if (tokens[i].type == TokenType::LIT_INT) {
             pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
@@ -209,11 +224,10 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType != TokenType::AMPERSAND)
             continue;
 
-        // basically, unary can only work if it's after A) nothing or B) another operator
-        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB ||
-             opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) &&
-            !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
-                        pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
+        // prevent chaining of + or - unaries
+        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) && i != 0 &&
+            pHead->at(i-1)->getNodeType() != ASTNodeType::UNARY_OP &&
+            pHead->at(i-1)->getNodeType() != ASTNodeType::BIN_OP) {
             continue;
         }
 

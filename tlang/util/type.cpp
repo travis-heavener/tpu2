@@ -7,6 +7,7 @@ Type::Type(const Type&& B) {
     this->pointers = std::move(B.pointers);
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
+    this->forceAsPointer = B.forceAsPointer;
 }
 
 Type& Type::operator=(const Type& B) {
@@ -14,6 +15,7 @@ Type& Type::operator=(const Type& B) {
     this->pointers = B.pointers;
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
+    this->forceAsPointer = B.forceAsPointer;
     return *this;
 }
 
@@ -22,6 +24,7 @@ Type& Type::operator=(const Type&& B) {
     this->pointers = std::move(B.pointers);
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
+    this->forceAsPointer = B.forceAsPointer;
     return *this;
 }
 
@@ -31,6 +34,7 @@ void Type::addHintPointer(size_t n) {
     const size_t offset = pointers.size() - numArrayHints;
     pointers.insert(pointers.begin() + offset, n);
     ++numArrayHints;
+    forceAsPointer = false;
 }
 
 void Type::popPointer() {
@@ -38,10 +42,13 @@ void Type::popPointer() {
     if (*pointers.rbegin() != TYPE_EMPTY_PTR) --numArrayHints;
 
     pointers.pop_back();
+    forceAsPointer = false;
 }
 
 // get the total size taken up in memory by this type
 size_t Type::getSizeBytes() const {
+    if (forceAsPointer) return MEM_ADDR_SIZE;
+
     // get the size of the internal type (whatever is in an array)
     const size_t numPtrs = pointers.size();
     size_t size = (numPtrs > numArrayHints) ? MEM_ADDR_SIZE : getSizeOfType(this->primitiveType);
