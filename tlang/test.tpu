@@ -93,14 +93,17 @@ main:
     pushw 4
     pushw 5
     pushw 6
-    pushw 1
     movw CX, SP
-    sub CX, 14
+    sub CX, 12
     pushw CX
+    pushw 1
     popw BX
     popw AX
-    movw CX, 6
-    mul CX
+    pushw AX
+    movw AX, 6
+    mul BX
+    movw BX, AX
+    popw AX
     add AX, BX
     pushw AX
     popw AX
@@ -121,9 +124,10 @@ main:
     push [BP+0]
     push [BP+1]
     pop DL
-    mov [SP-12], DL
+    mov [SP-14], DL
     pop DL
-    mov [SP-12], DL
+    mov [SP-14], DL
+    popw
     popw
     popw
     popw

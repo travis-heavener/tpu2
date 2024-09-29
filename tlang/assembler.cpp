@@ -457,6 +457,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     if (desiredType.usesForcedPointer()) {
                         // buffer to stack
                         OUT << "pushw BP\n";
+                        scope.addPlaceholder(2);
                     } else {
                         // move that value to the stack
                         for (size_t k = 0; k < resultType.getSizeBytes(); ++k) {
