@@ -52,6 +52,8 @@ class Type {
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
 
+        bool isParamMatch(const Type&) const;
+
         bool isArray() const { return numArrayHints > 0; };
 
         size_t getNumArrayHints() const { return numArrayHints; };

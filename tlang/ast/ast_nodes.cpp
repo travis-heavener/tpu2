@@ -116,6 +116,13 @@ void ASTArrayLiteral::setTypeRecursive(const Type& type) {
     }
 }
 
+// used to load each parameter type to a vector
+void ASTFunction::loadParamTypes(std::vector<Type>& paramTypes) const {
+    for (ASTFuncParam* pParam : params) {
+        paramTypes.push_back(pParam->type);
+    }
+}
+
 /************************ START TYPE INFERS ************************/
 
 // base inferType method, just checks each child and finds the dominant type

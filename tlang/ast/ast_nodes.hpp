@@ -195,6 +195,9 @@ class ASTFunction : public ASTNode {
         Type getReturnType() const { return type; };
         ASTFuncParam* paramAt(size_t i) { return params[i]; };
         size_t getNumParams() const { return params.size(); };
+
+        // used to load each parameter type to a vector
+        void loadParamTypes(std::vector<Type>&) const;
     private:
         std::string name; // name of function
         Type type; // return type

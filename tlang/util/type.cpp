@@ -78,6 +78,27 @@ bool Type::operator==(const Type& t) const {
     return true;
 }
 
+bool Type::isParamMatch(const Type& t) const {
+    // check primitive
+    if (primitiveType != t.primitiveType) return false;
+    if (_isUnsigned != t._isUnsigned) return false;
+
+    // check num ptrs
+    if (pointers.size() != t.pointers.size()) return false;
+
+    // if this has specific array/pointer hints, verify they're valid
+    // if it doesn't, t can still decay from array to pointer no problem
+    if (this->numArrayHints > 0) {
+        // this has hints, so verify they match
+        for (size_t i = 0; i < pointers.size(); ++i) {
+            if (pointers[i] != t.pointers[i]) return false;
+        }
+    }
+
+    // base case, matches
+    return true;
+}
+
 inline unsigned char getPrimitiveTypeRank(TokenType prim, bool isUnsigned) {
     switch (prim) {
         case TokenType::TYPE_CHAR:  return 1 + isUnsigned;

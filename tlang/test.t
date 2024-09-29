@@ -2,13 +2,16 @@
 #include <string.t>
 
 int main() {
-    int mat[2][3] = {
-        {1, 2, 3+9+1},
-        {4, 5, 6}
-    };
+    char name[] = "Travis";
+    return strlen(name);
+
+    // int mat[2][3] = {
+    //     {1, 2, 3+9+1},
+    //     {4, 5, 6}
+    // };
 
     // return sizeof mat;
-    return sizeof (**mat);
+    // return sizeof (**mat);
 
     // return mat['\0']['\0'];
     // return (*(mat+1))[2];

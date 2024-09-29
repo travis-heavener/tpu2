@@ -15,10 +15,22 @@
 #define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
 #define TAB "    "
 
-// staic fields
+// static fields
 static size_t nextFuncLabelID = 0;
 static size_t nextJMPLabelID = 0;
 static label_map_t labelMap;
+
+AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& func) {
+    this->funcName = funcName;
+    this->startLabel = funcName == FUNC_MAIN_LABEL ? funcName :
+                       (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
+    this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
+    this->returnType = func.getReturnType();
+    this->paramTypes = std::vector<Type>();
+
+    // fill in param types
+    func.loadParamTypes(this->paramTypes);
+}
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
@@ -37,17 +49,16 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
 void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     // determine labelName
     const std::string funcName = funcNode.getName();
-    const std::string labelName = funcName == FUNC_MAIN_LABEL ?
-        FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
 
-    // record function name & return type
-    labelMap[funcName] = {labelName, labelName + FUNC_END_LABEL_SUFFIX, funcNode.getReturnType()};
+    // create new AssembledFunc to store name & return type
+    AssembledFunc asmFunc = AssembledFunc(funcName, funcNode);
+    labelMap.insert({funcName, asmFunc});
 
     // create a scope for this body
     Scope scope;
 
     // assemble this function into the file
-    outHandle << labelName << ":\n";
+    outHandle << asmFunc.getStartLabel() << ":\n";
 
     // if this is main, add return byte spacing on top of stack
     const size_t returnSize = funcNode.getReturnType().getSizeBytes();
@@ -65,15 +76,15 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
-    bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName, true, true);
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, asmFunc, true, true);
 
     // declare end of function label
     if (!hasReturned && returnSize > 0)
         throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
-    OUT << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
+    OUT << "jmp " << asmFunc.getEndLabel() << '\n';
 
     // write return label
-    OUT << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
+    OUT << asmFunc.getEndLabel() << ":\n";
 
     // stop clock after execution is done IF MAIN or return to previous label
     if (funcName == FUNC_MAIN_LABEL) {
@@ -89,10 +100,9 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope, const bool isTopScope) {
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const AssembledFunc& asmFunc, const bool isNewScope, const bool isTopScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
-    const std::string returnLabel = labelMap[funcName].returnLabel;
-    const Type desiredType = labelMap[funcName].returnType;
+    const Type& desiredType = asmFunc.getReturnType();
     const size_t returnSize = desiredType.getSizeBytes();
 
     // iterate over children of this node
@@ -133,7 +143,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
                 hasReturned = !isTopScope && hasReturnedLocal;
 
                 // jump back to the loopStartLabel
@@ -188,7 +198,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
                 hasReturned = !isTopScope && hasReturnedLocal;
 
                 // assemble third expression
@@ -247,7 +257,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body in a new scope
-                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, funcName);
+                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, asmFunc);
                     hasReturned = !isTopScope && hasReturnedLocal;
 
                     // jump to merge label
@@ -466,8 +476,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::SIZEOF: {
-                    // if this is actually an array pointer, correct the size
-                    if (resultTypes[0].isArray()) {
+                    // if this is a pointer TO an array, correct its size
+                    if (resultTypes[0].isArray() && *resultTypes[0].getPointers().rbegin() == TYPE_EMPTY_PTR) {
+                        // this is still just a pointer
+                        resultSize = MEM_ADDR_SIZE;
+                    } else if (resultTypes[0].isArray()) {
+                        // if this is actually an array pointer, correct the size
                         resultTypes[0].setForcedPointer(false);
                         resultSize = resultTypes[0].getSizeBytes();
                     }
@@ -848,7 +862,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             if (numSubscripts == 0 || numSubscripts == numPointers) {
                 // if lvalue, do nothing--address is on top of stack
                 // if there are array pointers left, push the array's address (already on stack)
-                if (!identifier.isLValue() && !idenType.usesForcedPointer()) { // otherwise, push value
+                if (!identifier.isLValue() && numPointers == 0 && !idenType.usesForcedPointer()) { // otherwise, push value
                     // pop address from stack to BP
                     OUT << "popw BP\n";
                     scope.pop(); scope.pop();
@@ -868,12 +882,36 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         case ASTNodeType::FUNCTION_CALL: {
             // lookup the function
             ASTFunctionCall& func = *static_cast<ASTFunctionCall*>(&bodyNode);
-            const std::string funcName = func.raw;
+            const std::string& funcName = func.raw;
             if (labelMap.count(funcName) == 0) throw TUnknownIdentifierException(func.err);
 
+            // find function and verify parameters match
+            AssembledFunc* pDestFunc = nullptr;
+            const size_t numParams = func.size();
+            auto [itr, end] = labelMap.equal_range(funcName);
+            for ((void)itr; itr != end; ++itr) {
+                // check if parameters match
+                const std::vector<Type>& paramTypes = itr->second.getParamTypes();
+                if (paramTypes.size() != func.size()) continue;
+
+                size_t j;
+                for (j = 0; j < numParams; ++j) {
+                    const Type& actualType = static_cast<ASTTypedNode*>(func.at(j))->getTypeRef();
+                    if (!paramTypes[j].isParamMatch(actualType)) break;
+                }
+
+                // if broken prematurely, a type didn't match
+                if (j == numParams) {
+                    pDestFunc = &itr->second;
+                    break;
+                }
+            }
+
+            if (pDestFunc == nullptr)
+                throw TUnknownIdentifierException(bodyNode.err);
+
             // allocate space on the stack for return bytes
-            assembled_func_t destFunc = labelMap[funcName];
-            size_t returnSize = destFunc.returnType.getSizeBytes();
+            size_t returnSize = pDestFunc->getReturnType().getSizeBytes();
 
             for (size_t i = 0; i < returnSize; i++) {
                 if (i+1 < returnSize) {
@@ -886,8 +924,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             scope.addPlaceholder(returnSize);
 
             // call the function
-            OUT << "call " << destFunc.labelName << '\n';
-            resultType = destFunc.returnType;
+            OUT << "call " << pDestFunc->getStartLabel() << '\n';
+            resultType = pDestFunc->getReturnType();
             break;
         }
         case ASTNodeType::EXPR:
@@ -917,9 +955,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             throw TInvalidOperationException(bodyNode.err);
 
         // address is on top of stack
-        // OUT << "popw CX\n";
-        // scope.pop(); scope.pop();
-
         for (ASTArraySubscript* pSub : pTypedBody->getSubscripts()) {
             // if this pointer is blank, push the pointer's pointed address
             if (*resultType.getPointers().rbegin() == TYPE_EMPTY_PTR) {

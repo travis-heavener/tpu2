@@ -7,9 +7,6 @@ __UF0:
     popw BP
     push [BP+0]
     push [BP+1]
-    popw BP
-    push [BP+0]
-    push [BP+1]
     movw CX, SP
     sub CX, 4
     pushw CX
@@ -78,43 +75,27 @@ __UF0:
     ret
 main:
     add SP, 2
-    pushw 1
-    pushw 2
-    pushw 3
-    pushw 9
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    pushw 1
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    pushw 4
-    pushw 5
-    pushw 6
+    push 84
+    push 114
+    push 97
+    push 118
+    push 105
+    push 115
+    push 0
     movw CX, SP
-    sub CX, 12
+    sub CX, 7
     pushw CX
-    popw AX
-    movw BP, AX
-    pushw BP
-    popw AX
-    movw BP, AX
-    pushw BP
-    popw AX
-    pushw 2
+    pushw 0
+    call __UF0
     pop DL
-    mov [SP-14], DL
+    mov [SP-11], DL
     pop DL
-    mov [SP-14], DL
+    mov [SP-11], DL
     popw
     popw
     popw
     popw
-    popw
-    popw
+    pop
     jmp mainE
     mainE:
     movw AX, 0x03
