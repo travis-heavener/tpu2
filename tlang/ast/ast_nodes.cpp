@@ -255,6 +255,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // verify non-void
                 if (typeA.isVoidNonPtr()) throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_INT) );
+                pA->getTypeRef().setForcedPointer(true);
                 pA->setIsLValue(false);
                 break;
             }

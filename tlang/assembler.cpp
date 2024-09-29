@@ -385,7 +385,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             }
 
             // pop in reverse (higher first, later first)
-            const size_t resultSize = resultTypes[0].getSizeBytes();
+            size_t resultSize = resultTypes[0].getSizeBytes();
             if (resultSize == 2) {
                 OUT << "popw AX\n";
                 scope.pop(); // additional pop
@@ -466,6 +466,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::SIZEOF: {
+                    // if this is actually an array pointer, correct the size
+                    if (resultTypes[0].isArray()) {
+                        resultTypes[0].setForcedPointer(false);
+                        resultSize = resultTypes[0].getSizeBytes();
+                    }
+
                     // push the size of whatever the result on the stack is (as uint)
                     OUT << "pushw " << resultSize << '\n';
                     scope.addPlaceholder(2);
