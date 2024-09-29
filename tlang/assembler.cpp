@@ -293,21 +293,27 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
             case ASTNodeType::RETURN: {
                 // assemble expression (first and only child of retNode is an ASTExpr*)
                 ASTReturn& retNode = *static_cast<ASTReturn*>(&child);
-                Type resultType = assembleExpression(*retNode.at(0), outHandle, scope);
 
-                // implicit cast result to desired size, if needed
-                if (resultType != desiredType)
-                    implicitCast(outHandle, resultType, desiredType, scope, retNode.err);
+                if (retNode.size() > 0) {
+                    Type resultType = assembleExpression(*retNode.at(0), outHandle, scope);
 
-                // move result bytes to their place earlier on the stack
-                for (size_t j = 0; j < returnSize; ++j) {
-                    // pop top of stack into DL
-                    OUT << "pop DL\n";
-                    scope.pop();
+                    if (desiredType.isVoidNonPtr() && !resultType.isVoidNonPtr())
+                        throw TVoidReturnException(retNode.err);
 
-                    // mov DL to return bytes location
-                    size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
-                    OUT << "mov [SP-" << index << "], DL\n";
+                    // implicit cast result to desired size, if needed
+                    if (resultType != desiredType)
+                        implicitCast(outHandle, resultType, desiredType, scope, retNode.err);
+
+                    // move result bytes to their place earlier on the stack
+                    for (size_t j = 0; j < returnSize; ++j) {
+                        // pop top of stack into DL
+                        OUT << "pop DL\n";
+                        scope.pop();
+
+                        // mov DL to return bytes location
+                        size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
+                        OUT << "mov [SP-" << index << "], DL\n";
+                    }
                 }
 
                 // jmp to the end label to finish closing the function
@@ -354,7 +360,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
             }
         }
     }
-    
+
     return hasReturned;
 }
 
@@ -1031,6 +1037,23 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
     // most importantly, if the two types are equal just return
     if (resultType == desiredType) return;
 
+    // if the desired type is void, just pop everything off
+    if (desiredType.isVoidNonPtr()) {
+        size_t resultSize = resultType.getSizeBytes();
+        while (resultSize > 0) {
+            if (resultSize > 1) {
+                OUT << "popw\n";
+                --resultSize;
+                scope.pop();
+            } else {
+                OUT << "pop\n";
+            }
+            scope.pop();
+            --resultSize;
+        }
+        return;
+    }
+
     // if both pointers, just pass through (the address doesn't change)
     if (resultType.isPointer() && desiredType.isPointer()) return;
 
@@ -1068,6 +1091,23 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
             const size_t startSize = getSizeOfType(primA);
             const size_t endSize = getSizeOfType(primB);
 
+            if (primB == TokenType::TYPE_BOOL) {
+                // if casting to a bool, enforce 1 or 0
+                const std::string regA = startSize == 2 ? "AX" : "AL";
+                OUT << (startSize == 2 ? "popw AX" : "pop AL") << '\n';
+
+                // buffer value
+                OUT << "buf " << regA << '\n';
+
+                // if non-zero, set to 1
+                const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                OUT << "jz " << mergeLabel << '\n';
+                OUT << (startSize == 2 ? "movw AX" : "mov AL") << ", 1\n";
+                OUT << "jmp " << mergeLabel << '\n';
+                OUT << mergeLabel << ":\n";
+                OUT << (startSize == 2 ? "pushw AX" : "push AL") << '\n';
+            }
+
             // preserve sign bit in AL
             if (!resultType.isUnsigned()) {
                 OUT << "mov AL, [SP-1]\n";
@@ -1082,6 +1122,7 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
                     OUT << "buf AL\n";
                     OUT << "jz " << mergeLabel << '\n';
                     OUT << "movw CX, 0xFFFF\n"; // set CX to 1
+                    OUT << "jmp " << mergeLabel << '\n';
                     OUT << mergeLabel << ":\n";
                 }
 

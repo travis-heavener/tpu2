@@ -75,44 +75,42 @@ __UF0:
     ret
 main:
     add SP, 2
-    pushw 2
+    pushw 0
     popw AX
-    not AX
-    add AX, 1
+    buf AX
+    jz __J3
+    movw AX, 1
+    jmp __J3
+    __J3:
     pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    pop
+    pop BL
+    or BL, AL
+    push BL
     movw CX, SP
-    sub CX, 2
+    sub CX, 1
     pushw CX
     popw BP
     push [BP+0]
-    push [BP+1]
-    pushw 65534
-    popw BX
-    popw AX
-    xor AX, BX
-    jz __J3
-    movw AX, 0
-    jmp __J4
-    __J3:
-    movw AX, 1
-    __J4:
-    push AL
     mov AL, [SP-1]
     and AL, 0x80
     movw CX, 0
     buf AL
-    jz __J5
+    jz __J4
     movw CX, 0xFFFF
-    __J5:
+    jmp __J4
+    __J4:
     push CL
     pop BL
     or BL, AL
     push BL
     pop DL
-    mov [SP-4], DL
+    mov [SP-3], DL
     pop DL
-    mov [SP-4], DL
-    popw
+    mov [SP-3], DL
+    pop
     jmp mainE
     mainE:
     movw AX, 0x03

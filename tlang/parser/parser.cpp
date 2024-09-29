@@ -32,7 +32,7 @@ AST* parseToAST(const std::vector<Token>& tokens) {
             if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED)
                 ++i;
 
-            if ( !isTokenTypeName(tokens[i].type) )
+            if ( !isTokenPrimitiveType(tokens[i].type, true) )
                 throw TInvalidTokenException(tokens[i].err);
             
             // skip over any pointers attached
@@ -257,7 +257,9 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                 if (endExpr > endIndex) throw TInvalidTokenException(tokens[i].err);
 
                 // append expression to pReturn
-                pReturn->push( parseExpression(tokens, i+1, endExpr-1, scopeStack, true) );
+                if (i+1 < endExpr) { // if there is an expression
+                    pReturn->push( parseExpression(tokens, i+1, endExpr-1, scopeStack, true) );
+                }
                 i = endExpr;
                 break;
             }
@@ -277,7 +279,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             case TokenType::SEMICOLON: break; // erroneous statement
             default: { // base case, parse as expression
                 // check for variable assignment
-                if (isTokenPrimitiveType(tokens[i].type) || tokens[i].type == TokenType::UNSIGNED ||
+                if (isTokenPrimitiveType(tokens[i].type, true) || tokens[i].type == TokenType::UNSIGNED ||
                     tokens[i].type == TokenType::SIGNED) {
                     
                     // if (un)signed, check for next token
@@ -302,6 +304,16 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                         type.addEmptyPointer();
                         ++i;
                     }
+
+                    // prevent trying to use an (un)signed bool or void
+                    if (isUnsigned &&
+                        (type.getPrimitiveType() == TokenType::TYPE_BOOL || type.getPrimitiveType() == TokenType::VOID)) {
+                        throw TSyntaxException(tokens[start].err);
+                    }
+
+                    // prevent non-pointer void
+                    if (type.isVoidNonPtr())
+                        throw TIllegalVoidUseException(tokens[start].err);
 
                     // get identifier
                     if (tokens[++i].type != TokenType::IDENTIFIER)
@@ -417,6 +429,12 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     }
 
     Type type(tokens[i].type, isReturnUnsigned);
+
+    // prevent trying to use an (un)signed bool or void
+    if (isReturnUnsigned &&
+        (tokens[i].type == TokenType::TYPE_BOOL || tokens[i].type == TokenType::VOID)) {
+        throw TSyntaxException(tokens[startIndex].err);
+    }
 
     // append any pointers
     while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {

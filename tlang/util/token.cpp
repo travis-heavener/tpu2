@@ -2,20 +2,6 @@
 
 #include "token.hpp"
 
-// returns true if the given TokenType is that of a type name (ex. TYPE_INT)
-bool isTokenTypeName(TokenType type) {
-    switch (type) {
-        case TokenType::TYPE_INT:
-        case TokenType::TYPE_FLOAT:
-        case TokenType::TYPE_CHAR:
-        case TokenType::TYPE_BOOL:
-        case TokenType::VOID:
-            return true;
-        default:
-            return false;
-    }
-}
-
 // true if the token is of TYPE_INT, TYPE_BOOL, etc.
 bool isTokenPrimitiveType(const TokenType type, const bool allowVoid) {
     return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || (type == VOID && allowVoid);
