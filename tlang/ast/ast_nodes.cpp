@@ -67,19 +67,6 @@ ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     return pOp;
 }
 
-// remove any extra lvalues
-void ASTTypedNode::reduceLValues() {
-    // iterate over all children, removing lvalue status for anything that isn't in an operator
-    for (ASTNode* pChild : this->children) {
-        ASTTypedNode* pTypedChild = static_cast<ASTTypedNode*>(pChild);
-        pTypedChild->reduceLValues();
-
-        // iterate over subscripts as well
-        for (ASTNode* pSubChild : pTypedChild->subscripts)
-            static_cast<ASTTypedNode*>(pSubChild)->reduceLValues();
-    }
-}
-
 void ASTVarDeclaration::updateType(const Type& type) {
     // update own type
     this->type = type;

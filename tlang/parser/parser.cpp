@@ -519,13 +519,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
     if (isTopExpr && pHead->size() != 1)
         throw TExpressionEvalException(pHead->err);
 
-    // if this is the top expression, double-check all lvalues
-    if (isTopExpr) {
-        pHead->reduceLValues();
-        return pHead;
-    }
-
-    // base case, extract children from this subexpression
     return pHead;
 }
 
