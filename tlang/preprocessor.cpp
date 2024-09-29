@@ -87,7 +87,7 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
         cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
 
         // tokenize
-        tokenize(inHandle, tokens, cwdStack);
+        tokenize(inHandle, tokens, cwdStack, inPathAbs.filename().string());
 
         // close file
         cwdStack.pop();

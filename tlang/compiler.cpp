@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
 
         // 1. tokenize file
         std::vector<Token> tokens;
-        tokenize(inHandle, tokens, cwdStack);
+        tokenize(inHandle, tokens, cwdStack, inPathAbs.filename().string());
         inHandle.close();
 
         // 2. parse to AST & syntax checking (semantic analysis)

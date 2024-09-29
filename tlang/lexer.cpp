@@ -20,7 +20,7 @@ bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset
 }
 
 // tokenize a document to a vector of Tokens
-void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cwdStack) {
+void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cwdStack, const std::string& filename) {
     // continuously read in the entire document, adding tokens
     std::string line;
 
@@ -31,12 +31,12 @@ void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cw
         if (*line.rbegin() == '\r') line.pop_back();
 
         // tokenize line
-        tokenizeLine(line, tokens, ++lineNumber, macrodefMap, cwdStack);
+        tokenizeLine(line, tokens, ++lineNumber, macrodefMap, cwdStack, filename);
     }
 }
 
 // tokenize a particular line
-void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack) {
+void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack, const std::string& filename) {
     if (line.size() == 0) return;
 
     // if in a multiline comment, look for closing char
@@ -55,7 +55,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
 
     // run preprocessor for this line
     if (!isInMultilineComment) {
-        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack, ErrInfo(lineNumber, 0));
+        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack, ErrInfo(lineNumber, 0, filename));
 
         // skip lines used by the preprocessor
         if (hasPreprocessed) return;
@@ -69,7 +69,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
 
         // reset buffer & prepare error info object
         buffer.clear();
-        ErrInfo err(lineNumber, i+1);
+        ErrInfo err(lineNumber, i+1, filename);
 
         // handle the current character
         // break on single line comments

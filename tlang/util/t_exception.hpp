@@ -2,6 +2,7 @@
 #define __T_EXCEPTION_HPP
 
 #include <stdexcept>
+#include <string>
 
 // for error handling
 typedef unsigned long long line_t; // for line/col numbering
@@ -9,8 +10,9 @@ typedef unsigned long long line_t; // for line/col numbering
 // store where a token is from in its original file
 class ErrInfo {
     public:
-        ErrInfo(line_t line, line_t col) : line(line), col(col) {};
+        ErrInfo(line_t line, line_t col, const std::string& file) : line(line), col(col), file(file) {};
         line_t line, col;
+        const std::string file;
 };
 
 // shorthand for making exceptions
@@ -21,13 +23,13 @@ class ErrInfo {
 
 class TException {
     public:
-        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 0;};
+        TException(ErrInfo err) : err(err), msg("Base TException.") {};
 
         // virtual toString method
         virtual const std::string& toString() const { return msg; };
         
         // to get line/col info
-        const std::string getTrace() const { return "at line " + std::to_string(err.line) + ":" + std::to_string(err.col); };
+        const std::string getTrace() const { return "\n  " + err.file + ":" + std::to_string(err.line) + ":" + std::to_string(err.col); };
     protected:
         ErrInfo err;
         std::string msg;

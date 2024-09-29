@@ -15,14 +15,5 @@ int main() {
         {4, 5, 6}
     };
 
-    // works
-    // return mat[1][2];
-    // return mat[1];
-    // return *mat[1];
     return *(*(mat+1)+2);
-    // return mat[1][1];
-    // return *(mat+1) + 1;
-    // return (*(mat+1))+1;
-    // return *(*(mat+1) + 2);
-    // return (*(mat+6));
 }
