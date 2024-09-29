@@ -1,0 +1,106 @@
+__UF0:
+    pushw 0
+    __J0:
+    movw CX, SP
+    sub CX, 6
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    ;;;;;;;;
+    movw CX, SP
+    sub CX, 4
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    ;;;;;;;;
+    popw AX
+    popw CX
+    movw BX, 1
+    mul BX
+    add CX, AX
+    pushw CX
+    popw BP
+    push [BP+0]
+    push 0
+    xor BH, BH
+    pop BL
+    xor AH, AH
+    pop AL
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    jmp __J2
+    __J2:
+    push AL
+    xor AH, AH
+    pop AL
+    buf AX
+    jz __J1
+    movw CX, SP
+    sub CX, 2
+    pushw CX
+    movw CX, SP
+    sub CX, 4
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    popw
+    jmp __J0
+    __J1:
+    movw CX, SP
+    sub CX, 2
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    popw
+    jmp __UF0E
+    __UF0E:
+    ret
+main:
+    add SP, 2
+    pushw 9
+    movw CX, SP
+    sub CX, 2
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw AX
+    pushw AX
+    popw
+    movw CX, SP
+    sub CX, 2
+    pushw CX
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    popw
+    jmp mainE
+    mainE:
+    movw AX, 0x03
+    popw BX
+    syscall
+    hlt

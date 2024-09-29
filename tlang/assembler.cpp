@@ -942,6 +942,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             resultType = static_cast<ASTArrayLiteral*>(&bodyNode)->getTypeRef();
             break;
         }
+        case ASTNodeType::LIT_VOID: throw TIllegalVoidUseException(bodyNode.err);
         default: throw TExpressionEvalException(bodyNode.err);
     }
 
@@ -961,6 +962,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
 // implicitly converts a value pushed to the top of the stack to the given type
 void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desiredType, Scope& scope, const ErrInfo err) {
+    if (resultType.isVoidNonPtr() && !desiredType.isVoidNonPtr()) throw TIllegalVoidUseException(err);
+
     // most importantly, if the two types are equal just return
     if (resultType == desiredType) return;
 

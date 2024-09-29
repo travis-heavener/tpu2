@@ -2,7 +2,6 @@
  * Extension of the "T Standard Library" for string support.
  */
 
-
 int strlen(char* str) {
     int i = 0;
 

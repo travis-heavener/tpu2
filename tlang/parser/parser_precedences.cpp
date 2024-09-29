@@ -49,7 +49,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                     if (subExprStart != i)
                         pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
                 }
-            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type)) { // check for typecast
+            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type, true)) { // check for typecast
                 // grab type (only allow pointer asterisk or typename)
                 Type type( tokens[start+1].type );
 

@@ -17,8 +17,8 @@ bool isTokenTypeName(TokenType type) {
 }
 
 // true if the token is of TYPE_INT, TYPE_BOOL, etc.
-bool isTokenPrimitiveType(const TokenType type) {
-    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT;
+bool isTokenPrimitiveType(const TokenType type, const bool allowVoid) {
+    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || (type == VOID && allowVoid);
 }
 
 // true if the token is an unary operator (ex. ~, !)

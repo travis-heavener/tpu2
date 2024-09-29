@@ -41,7 +41,7 @@ class Token {
 bool isTokenTypeName(TokenType);
 
 // token helpers
-bool isTokenPrimitiveType(const TokenType);
+bool isTokenPrimitiveType(const TokenType, const bool=false);
 bool isTokenUnaryOp(const TokenType);
 bool isTokenBinaryOp(const TokenType);
 bool isTokenLiteral(const TokenType);

@@ -369,7 +369,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (!pA->isLValue()) throw TInvalidOperationException(err);
 
                 // verify right arg is not void
-                if (typeB.isVoidNonPtr()) throw TInvalidOperationException(err);
+                if (typeB.isVoidNonPtr()) throw TIllegalVoidUseException(err);
 
                 // assume type of left argument
                 this->setType( typeA );

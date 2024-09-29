@@ -514,7 +514,6 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         throw e;
     }
 
-
     // verify only one child remains if top expression
     if (isTopExpr && pHead->size() != 1)
         throw TExpressionEvalException(pHead->err);
