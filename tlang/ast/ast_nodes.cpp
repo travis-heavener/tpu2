@@ -3,6 +3,10 @@
 #include "../util/token.hpp"
 #include "../util/t_exception.hpp"
 
+void ASTNode::insert(ASTNode* pNode, unsigned int i) {
+    this->children.insert(children.begin() + i, pNode);
+}
+
 // base destructor
 ASTNode::~ASTNode() {
     for (ASTNode* pChild : this->children)
@@ -52,6 +56,15 @@ ASTFunction::~ASTFunction() {
 ASTTypedNode::~ASTTypedNode() {
     for (ASTNode* pSub : subscripts)
         delete pSub;
+}
+
+ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
+    // turn this node into an operator
+    ASTOperator* pOp = new ASTOperator(token, true);
+    pOp->push(pChild);
+    pOp->setUnaryType( ASTUnaryType::TYPE_CAST );
+    pOp->setType(this->getTypeRef());
+    return pOp;
 }
 
 // remove any extra lvalues
@@ -228,17 +241,10 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // handle typecast unary
                 if (unaryType == ASTUnaryType::TYPE_CAST) {
                     // verify not typecasting a void
-                    ASTTypedNode* pB = static_cast<ASTTypedNode*>(children[1]);
-                    Type typeB = pB->getTypeRef();
-                    if (typeB.isVoidNonPtr())
+                    if (typeA.isVoidNonPtr())
                         throw TInvalidOperationException(err);
 
-                    // set type to typecast
-                    this->setType( typeA );
-                    pB->setIsLValue(false); // revoke lvalue status
-
-                    // if typecasting to a pointer, mark as lvalue AFTER setting type
-                    this->setIsLValue(typeA.isPointer());
+                    pA->setIsLValue(false); // revoke lvalue status
                     break;
                 }
 

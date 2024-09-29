@@ -376,9 +376,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
     size_t numChildren = bodyNode.size();
     std::vector<Type> resultTypes;
     for (size_t i = 0; i < numChildren; ++i) {
-        // prevent parsing typecasts
-        if (bodyNode.at(i)->getNodeType() == ASTNodeType::TYPE_CAST) continue;
-
         resultTypes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope) );
     }
 

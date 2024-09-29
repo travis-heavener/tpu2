@@ -62,15 +62,10 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                     type.addEmptyPointer();
                 }
 
-                // append typecast as unary
-                ASTOperator* pOp = new ASTOperator(tokens[start], true);
-                pOp->setUnaryType(ASTUnaryType::TYPE_CAST);
-                
+                // append typecast
                 ASTTypeCast* pTypeCast = new ASTTypeCast(tokens[start]);
+                pHead->push( pTypeCast );
                 pTypeCast->setType( type );
-                
-                pOp->push( pTypeCast );
-                pHead->push( pOp );
             } else { // found a subexpression
                 pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
             }
@@ -196,8 +191,24 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     // precedence 2 (R -> L)
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
+        if (currentNode.getNodeType() == ASTNodeType::TYPE_CAST) { // handle typecasts
+            // confirm there is a token after this
+            if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+
+            ASTTypeCast* pTypeCast = static_cast<ASTTypeCast*>(&currentNode);
+            ASTOperator* pOp = pTypeCast->toOperator(pHead->at(i+1));
+            pHead->removeChild(i+1);
+
+            // replace self in parent
+            pHead->insert(pOp, i);
+            pHead->removeChild(i+1);
+            delete pTypeCast;
+            continue;
+        }
+
+        // handle other unaries
         if (currentNode.getNodeType() != ASTNodeType::UNARY_OP && currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
-        
+
         // verify there aren't already children from recursing
         if (currentNode.size() != 0) continue;
 

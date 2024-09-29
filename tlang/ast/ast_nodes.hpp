@@ -38,6 +38,7 @@ class ASTNode {
         virtual ASTNodeType getNodeType() const { return ASTNodeType::NODE; };
 
         ASTNode* at(unsigned int i) const { return children[i]; };
+        void insert(ASTNode*, unsigned int);
         size_t size() const { return children.size(); };
         ASTNode* lastChild() const { return this->size() > 0 ? children[this->size()-1] : nullptr; };
 
@@ -282,8 +283,12 @@ class ASTVoidLiteral : public ASTTypedNode {
 
 class ASTTypeCast : public ASTTypedNode {
     public:
-        ASTTypeCast(const Token& token) : ASTTypedNode(token) {};
+        ASTTypeCast(const Token& token) : ASTTypedNode(token), token(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::TYPE_CAST; };
+
+        ASTOperator* toOperator(ASTNode*);
+    private:
+        Token token;
 };
 
 #endif

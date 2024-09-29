@@ -42,25 +42,18 @@ int main() {
     // works backwards and should only add the internal size instead of 2
     // return *(mat+6)[2];
 
-    int a = 1;
-    int b = 2;
-    int c = 3+9+1;
-    int d = 4;
-    int e = 5;
-    int f = 6;
-
-    int* pMat = &a;
-    return *(pMat + 2);
-
-    // int A = 'T';
-    // int B = 'r';
-    // int C = 'a';
-    // int D = 'v';
-    // int E = 'i';
-    // int F = 's';
-    // int G = '\0';
-    // int* pA = &A;
+    char A = 'T';
+    char B = 'r';
+    char C = 'a';
+    char D = 'v';
+    char E = 'i';
+    char F = 's';
+    char G = '\0';
+    char* pA = &A;
     // return pA[0];
+    // return *(int*)pA;
+    int c = 4098;
+    return *(int*)4098;
 
     // int j = 12;
     // int* c = &j;
