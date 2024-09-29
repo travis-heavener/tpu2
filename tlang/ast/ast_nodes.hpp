@@ -120,6 +120,7 @@ class ASTTypedNode : public ASTNode {
         // infer this node's type from any children
         virtual void inferType(scope_stack_t&);
         void inferChildTypes(scope_stack_t&);
+        void inferSubscriptTypes(scope_stack_t&);
 
         Type& getTypeRef() { return type; };
         Type getType() const { return type; };

@@ -364,10 +364,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             throw TSyntaxException(bodyNode.err);
     }
 
-    if (bodyNode.getNodeType() == ASTNodeType::ARR_SUBSCRIPT) {
-        OUT << ";;;;;;;;\n";
-    }
-
     // get desired expression type
     const Type desiredType = static_cast<ASTTypedNode*>(&bodyNode)->getType();
 
@@ -845,58 +841,26 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             OUT << "pushw CX\n";
             scope.addPlaceholder(2);
 
-            // apply any subscripts
-            auto subItr = identifier.getSubscripts().cbegin();
-            const auto subItrEnd = identifier.getSubscripts().cend();
-            for ((void)subItr; subItr != subItrEnd; ++subItr) {
-                ASTArraySubscript* pSubscript = *subItr;
-
-                // if this pointer is blank, push the pointer's pointed address
-                if (*idenType.getPointers().rbegin() == TYPE_EMPTY_PTR) {
-                    OUT << "popw BP\n";
-                    OUT << "push [BP+0]\n";
-                    OUT << "push [BP+1]\n";
-                }
-
-                // determine the size of the rest of the object
-                idenType.popPointer();
-                size_t chunkSize = idenType.getSizeBytes();
-
-                // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
-                assembleExpression(*pSubscript, outHandle, scope);
-
-                OUT << "popw AX\n"; // pop subscript off stack
-                scope.pop(); scope.pop();
-
-                OUT << "popw CX\n"; // pop address back into CX
-                scope.pop(); scope.pop();
-
-                OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
-                OUT << "mul BX\n"; // scale by chunk size
-
-                OUT << "add CX, AX\n"; // add the chunk to the pointer
-
-                OUT << "pushw CX\n"; // put address back onto stack
-                scope.addPlaceholder(2);
-            }
-
-            // if lvalue, do nothing--address is on top of stack
-            // if there are array pointers left, push the array's address (already on stack)
-            if (!identifier.isLValue() && idenType.getNumArrayHints() == 0 && !idenType.usesForcedPointer()) { // otherwise, push value
-                // pop address from stack to BP
-                OUT << "popw BP\n";
-                scope.pop(); scope.pop();
-
-                // push bytes (lowest-first)
-                for (size_t j = 0; j < idenType.getSizeBytes(); ++j) {
-                    OUT << "push [BP+" << j << "]\n";
-                    scope.addPlaceholder();
-                }
-            }
-
             // if there are still array hints left, force as pointer
             if (idenType.getNumArrayHints() > 0)
                 idenType.setForcedPointer(true);
+
+            // if this is being subscripted, leave the address
+            if (numSubscripts == 0 || numSubscripts == numPointers) {
+                // if lvalue, do nothing--address is on top of stack
+                // if there are array pointers left, push the array's address (already on stack)
+                if (!identifier.isLValue() && !idenType.usesForcedPointer()) { // otherwise, push value
+                    // pop address from stack to BP
+                    OUT << "popw BP\n";
+                    scope.pop(); scope.pop();
+
+                    // push bytes (lowest-first)
+                    for (size_t j = 0; j < idenType.getSizeBytes(); ++j) {
+                        OUT << "push [BP+" << j << "]\n";
+                        scope.addPlaceholder();
+                    }
+                }
+            }
 
             // update result type
             resultType = idenType;
@@ -927,14 +891,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             resultType = destFunc.returnType;
             break;
         }
-        case ASTNodeType::ARR_SUBSCRIPT: { // passthrough subscript's type
-            if (resultTypes[0] != Type(TokenType::TYPE_INT)) // force int type
-                throw TInvalidOperationException(bodyNode.err);
-            resultType = resultTypes[0];
-            OUT << ";;;;;;;;\n";
-            break;
-        }
-        case ASTNodeType::EXPR: { // top-most expression, pass through
+        case ASTNodeType::EXPR:
+        case ASTNodeType::ARR_SUBSCRIPT: { // passthrough
             resultType = resultTypes[0];
             break;
         }
@@ -944,6 +902,72 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         }
         case ASTNodeType::LIT_VOID: throw TIllegalVoidUseException(bodyNode.err);
         default: throw TExpressionEvalException(bodyNode.err);
+    }
+
+    // handle any subscripts
+    ASTTypedNode* pTypedBody = dynamic_cast<ASTTypedNode*>(&bodyNode);
+    if (pTypedBody != nullptr && pTypedBody->getNumSubscripts() > 0) {
+        // grab address off stack
+        if (!resultType.isPointer())
+            throw TInvalidOperationException(bodyNode.err);
+
+        const size_t numPointers = resultType.getNumPointers();
+        const size_t numSubscripts = pTypedBody->getNumSubscripts();
+
+        if (numSubscripts > numPointers)
+            throw TInvalidOperationException(bodyNode.err);
+
+        // address is on top of stack
+        // OUT << "popw CX\n";
+        // scope.pop(); scope.pop();
+
+        for (ASTArraySubscript* pSub : pTypedBody->getSubscripts()) {
+            // if this pointer is blank, push the pointer's pointed address
+            if (*resultType.getPointers().rbegin() == TYPE_EMPTY_PTR) {
+                OUT << "popw BP\n";
+                OUT << "push [BP+0]\n";
+                OUT << "push [BP+1]\n";
+            }
+
+            // determine the size of the rest of the object
+            resultType.popPointer();
+            size_t chunkSize = resultType.getSizeBytes();
+
+            // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
+            assembleExpression(*pSub, outHandle, scope);
+
+            OUT << "popw AX\n"; // pop subscript off stack
+            scope.pop(); scope.pop();
+            OUT << "popw CX\n"; // pop address back into CX
+            scope.pop(); scope.pop();
+
+            OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
+            OUT << "mul BX\n"; // scale by chunk size
+            OUT << "add CX, AX\n"; // add the chunk to the pointer
+            OUT << "pushw CX\n"; // put address back onto stack
+            scope.addPlaceholder(2);
+        }
+
+        // if this is being subscripted, leave the address
+        if (numSubscripts == 0 || numSubscripts == numPointers) {
+            // if lvalue, do nothing--address is on top of stack
+            // if there are array pointers left, push the array's address (already on stack)
+            if (resultType.getNumArrayHints() == 0 && !resultType.usesForcedPointer()) { // otherwise, push value
+                // pop address from stack to BP
+                OUT << "popw BP\n";
+                scope.pop(); scope.pop();
+
+                // push bytes (lowest-first)
+                for (size_t j = 0; j < resultType.getSizeBytes(); ++j) {
+                    OUT << "push [BP+" << j << "]\n";
+                    scope.addPlaceholder();
+                }
+            }
+        }
+
+        // if there are still array hints left, force as pointer
+        if (resultType.getNumArrayHints() > 0)
+            resultType.setForcedPointer(true);
     }
 
     // implicit cast

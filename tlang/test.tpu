@@ -7,14 +7,15 @@ __UF0:
     popw BP
     push [BP+0]
     push [BP+1]
-    ;;;;;;;;
+    popw BP
+    push [BP+0]
+    push [BP+1]
     movw CX, SP
     sub CX, 4
     pushw CX
     popw BP
     push [BP+0]
     push [BP+1]
-    ;;;;;;;;
     popw AX
     popw CX
     movw BX, 1
@@ -77,16 +78,14 @@ __UF0:
     ret
 main:
     add SP, 2
-    pushw 9
-    movw CX, SP
-    sub CX, 2
-    pushw CX
-    popw BP
-    push [BP+0]
-    push [BP+1]
+    push 0
+    xor AH, AH
+    pop AL
+    push AL
+    push 0
     popw AX
+    not AX
     pushw AX
-    popw
     movw CX, SP
     sub CX, 2
     pushw CX

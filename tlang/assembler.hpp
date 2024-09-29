@@ -15,8 +15,8 @@
 #define OUT outHandle << TAB
 
 // shorthand used by most binary expressions in assembleExpression
-#define OUT_BIN_OP_1A(inst) OUT << #inst << regA << '\n'
-#define OUT_BIN_OP_1B(inst) OUT << #inst << regB << '\n'
+#define OUT_BIN_OP_1A(inst) OUT << #inst << ' ' << regA << '\n'
+#define OUT_BIN_OP_1B(inst) OUT << #inst << ' ' << regB << '\n'
 #define OUT_BIN_OP_2(inst) OUT << #inst << ' ' << regA << ", " << regB << '\n'
 
 // shorthand used in all boolean returns for assembleExpression

@@ -64,6 +64,14 @@ ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     pOp->push(pChild);
     pOp->setUnaryType( ASTUnaryType::TYPE_CAST );
     pOp->setType(this->getTypeRef());
+
+    // append subscripts
+    for (ASTArraySubscript* pSub : subscripts)
+        pOp->addSubscript(pSub);
+    
+    // append children (shouldn't be used but just in case)
+    for (ASTNode* pChild : children)
+        pOp->push(pChild);
     return pOp;
 }
 
@@ -120,6 +128,9 @@ void ASTTypedNode::inferType(scope_stack_t& scopeStack) {
         ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
         this->type = getDominantType( this->type, pChild->type );
     }
+
+    // infer subscripts
+    this->inferSubscriptTypes(scopeStack);
 }
 
 // used to infer each child's type
@@ -136,6 +147,14 @@ void ASTTypedNode::inferChildTypes(scope_stack_t& scopeStack) {
                 pNode->removeChild(0);
             }
 
+            // copy subscripts to last child
+            ASTTypedNode* pTypedNode = static_cast<ASTTypedNode*>(pNode);
+            ASTTypedNode* pLastChild = static_cast<ASTTypedNode*>(this->lastChild());
+            while (pTypedNode->getNumSubscripts() > 0) {
+                pLastChild->addSubscript( pTypedNode->subscripts[0] );
+                pTypedNode->subscripts.erase(pTypedNode->subscripts.begin()+0);
+            }
+
             delete pNode;
             --i;
         } else {
@@ -144,6 +163,21 @@ void ASTTypedNode::inferChildTypes(scope_stack_t& scopeStack) {
             pChild->inferType(scopeStack);
         }
     }
+}
+
+void ASTTypedNode::inferSubscriptTypes(scope_stack_t& scopeStack) {
+    // infer subscripts' types
+    if (this->subscripts.size() == 0) return;
+
+    if (!this->type.isPointer())
+        throw TInvalidOperationException(this->subscripts[0]->err);
+
+    for (ASTArraySubscript* pSub : subscripts) {
+        pSub->inferType(scopeStack);
+    }
+
+    // unset lvalue status if pointers are all gone
+    this->setIsLValue(subscripts.size() == type.getNumPointers());
 }
 
 // sets the value to be an lvalue IF it is a valid lvalue itself
@@ -379,6 +413,9 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
             default: throw TTypeInferException(err);
         }
     }
+
+    // infer subscripts
+    ASTTypedNode::inferSubscriptTypes(scopeStack);
 }
 
 void ASTFunctionCall::inferType(scope_stack_t& scopeStack) {
@@ -387,6 +424,9 @@ void ASTFunctionCall::inferType(scope_stack_t& scopeStack) {
 
     // get this node's return type from scope
     this->setType( lookupParserVariable(scopeStack, this->raw, this->err) );
+
+    // infer subscripts
+    this->inferSubscriptTypes(scopeStack);
 }
 
 void ASTArraySubscript::inferType(scope_stack_t& scopeStack) {
@@ -395,6 +435,9 @@ void ASTArraySubscript::inferType(scope_stack_t& scopeStack) {
 
     // set own type to int
     this->setType( Type(TokenType::TYPE_INT) );
+
+    // infer subscripts
+    this->inferSubscriptTypes(scopeStack);
 }
 
 void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
@@ -409,6 +452,9 @@ void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
 
     // add pointer since this is an array
     this->getTypeRef().addHintPointer( this->children.size() );
+
+    // infer subscripts
+    this->inferSubscriptTypes(scopeStack);
 }
 
 /******** NODES BELOW DON'T HAVE CHILDREN ********/
@@ -417,7 +463,7 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // lookup the variable from the scope
     Type type = lookupParserVariable(scopeStack, this->raw, this->err);
 
-    // handle any subscripts
+    // infer subscripts
     size_t numSubscripts = this->subscripts.size();
     for (size_t i = 0; i < numSubscripts; ++i) {
         // infer the subscript's type

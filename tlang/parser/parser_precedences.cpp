@@ -162,18 +162,14 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             // verify closing bracket is found
             if (bracketsOpen > 0) throw TUnclosedGroupException(tokens[startIndex].err);
 
-            // get previous identifier
+            // get previous node
+            if (pHead->size() == 0) throw TInvalidOperationException(tokens[startBracket].err);
             ASTTypedNode* pLastNode = dynamic_cast<ASTTypedNode*>(pHead->lastChild());
             if (pLastNode == nullptr) // failed to cast to subscriptable type
                 throw TInvalidOperationException(tokens[startIndex].err);
 
-            // infer the last thing's type
-            pLastNode->inferType(scopeStack);
-            if (!pLastNode->getTypeRef().isPointer())
-                throw TInvalidOperationException(tokens[startIndex].err);
-
             // parse expression for subscript
-            ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startIndex]);
+            ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startBracket]);
             pLastNode->addSubscript( pArrSub );
             pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack, true) );
 
@@ -228,6 +224,10 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
             }
 
             // verify the previous node is an operator (if not, it's a binary op)
+            if (pPrev == nullptr) continue;
+        } else if (opType == TokenType::ASTERISK && i > 0) {
+            // verify the previous node is an operator (if not, it's a binary op)
+            ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
             if (pPrev == nullptr) continue;
         }
 
