@@ -225,7 +225,7 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
 
             // verify the previous node is an operator (if not, it's a binary op)
             if (pPrev == nullptr) continue;
-        } else if (opType == TokenType::ASTERISK && i > 0) {
+        } else if ((opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) && i > 0) {
             // verify the previous node is an operator (if not, it's a binary op)
             ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
             if (pPrev == nullptr) continue;
