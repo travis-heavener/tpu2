@@ -10,32 +10,19 @@ int main() {
     // };
     // return 19 + ~(((((mat[0][2])))));
 
-    // int mat[2][3] = {
-    //     {1, 2, 3+9+1},
-    //     {4, 5, 6}
-    // };
+    int mat[2][3] = {
+        {1, 2, 3+9+1},
+        {4, 5, 6}
+    };
 
     // works
     // return mat[1][2];
     // return mat[1];
     // return *mat[1];
-    // return *(*(mat+1)+2);
+    return *(*(mat+1)+2);
     // return mat[1][1];
     // return *(mat+1) + 1;
     // return (*(mat+1))+1;
     // return *(*(mat+1) + 2);
     // return (*(mat+6));
-
-    // int x = 18;
-    // int* pX = &x;
-    // int** ppX = &pX;
-    // return &*&*&ppX;
-    // return &*ppX == ppX;
-    // return **&*&ppX;
-    // return &ppX;
-    // return *&*&*&ppX;
-    // return &*&ppX == &ppX;
-    // return ppX;
-    // return *&*&*&*ppX;
-    // return &*&ppX;
 }

@@ -77,36 +77,58 @@ __UF0:
     ret
 main:
     add SP, 2
-    push 84
-    push 114
-    push 97
-    push 118
-    push 105
-    push 115
-    push 0
+    pushw 1
+    pushw 2
+    pushw 3
+    pushw 9
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 4
+    pushw 5
+    pushw 6
+    pushw 1
     movw CX, SP
-    sub CX, 7
+    sub CX, 14
     pushw CX
+    popw BX
+    popw AX
+    movw CX, 6
+    mul CX
+    add AX, BX
+    pushw AX
+    popw AX
+    movw BP, AX
+    pushw BP
+    pushw 2
+    popw BX
     popw AX
     pushw AX
-    pushw 4098
-    pushw 4098
+    movw AX, 2
+    mul BX
+    movw BX, AX
     popw AX
+    add AX, BX
     pushw AX
     popw AX
     movw BP, AX
     push [BP+0]
     push [BP+1]
     pop DL
-    mov [SP-13], DL
+    mov [SP-12], DL
     pop DL
-    mov [SP-13], DL
+    mov [SP-12], DL
     popw
     popw
     popw
     popw
     popw
-    pop
     jmp mainE
     mainE:
     movw AX, 0x03
