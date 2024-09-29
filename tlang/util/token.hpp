@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "err_info.hpp"
+#include "t_exception.hpp"
 
 // token types
 enum TokenType {

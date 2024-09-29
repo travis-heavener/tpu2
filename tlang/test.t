@@ -1,8 +1,8 @@
 #include <stdlib.t>
 
 int main() {
-    // int name[] = "Travis";
-    // return strlen(name);
+    char name[] = "Travis";
+    return strlen(name);
 
     // int mat[2][3] = {
     //     {1, 2, 3+9+1},

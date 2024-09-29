@@ -5,9 +5,9 @@
 #include <map>
 #include <string>
 
-#include "util/err_info.hpp"
 #include "util/scope.hpp"
 #include "util/type.hpp"
+#include "util/t_exception.hpp"
 #include "ast/ast.hpp"
 #include "ast/ast_nodes.hpp"
 

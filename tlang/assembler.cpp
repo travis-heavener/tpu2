@@ -8,7 +8,6 @@
 #include "util/token.hpp"
 #include "util/type.hpp"
 #include "util/t_exception.hpp"
-#include "util/err_info.hpp"
 
 #define FUNC_MAIN_LABEL "main"
 #define FUNC_LABEL_PREFIX "__UF" // for "user function"

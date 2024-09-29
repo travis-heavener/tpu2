@@ -2,7 +2,6 @@
 
 #include "scope_stack.hpp"
 #include "type.hpp"
-#include "err_info.hpp"
 #include "t_exception.hpp"
 
 // lookup variable from scope stack

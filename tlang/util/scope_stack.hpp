@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "type.hpp"
-#include "err_info.hpp"
+#include "t_exception.hpp"
 
 // for parser scope stacks
 typedef std::map<std::string, Type> parser_scope_t;

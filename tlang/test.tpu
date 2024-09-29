@@ -17,20 +17,20 @@ __UF0:
     ;;;;;;;;
     popw AX
     popw CX
-    movw BX, 2
+    movw BX, 1
     mul BX
     add CX, AX
     pushw CX
     popw BP
     push [BP+0]
-    push [BP+1]
     push 0
     xor BH, BH
     pop BL
-    popw AX
-    xor AX, BX
+    xor AH, AH
+    pop AL
+    xor AL, BL
     jz __J2
-    movw AX, 1
+    mov AL, 1
     jmp __J2
     __J2:
     push AL
@@ -77,62 +77,27 @@ __UF0:
     ret
 main:
     add SP, 2
-    pushw 1
-    pushw 2
-    pushw 3
-    pushw 9
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    pushw 1
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    pushw 4
-    pushw 5
-    pushw 6
+    push 84
+    push 114
+    push 97
+    push 118
+    push 105
+    push 115
+    push 0
     movw CX, SP
-    sub CX, 12
+    sub CX, 7
     pushw CX
-    pushw 1
-    popw BX
-    popw AX
-    pushw AX
-    movw AX, 6
-    mul BX
-    movw BX, AX
-    popw AX
-    add AX, BX
-    pushw AX
-    popw AX
-    movw BP, AX
-    pushw BP
-    pushw 2
-    popw BX
-    popw AX
-    pushw AX
-    movw AX, 2
-    mul BX
-    movw BX, AX
-    popw AX
-    add AX, BX
-    pushw AX
-    popw AX
-    movw BP, AX
-    push [BP+0]
-    push [BP+1]
+    pushw 0
+    call __UF0
     pop DL
-    mov [SP-14], DL
+    mov [SP-11], DL
     pop DL
-    mov [SP-14], DL
+    mov [SP-11], DL
     popw
     popw
     popw
     popw
-    popw
-    popw
+    pop
     jmp mainE
     mainE:
     movw AX, 0x03

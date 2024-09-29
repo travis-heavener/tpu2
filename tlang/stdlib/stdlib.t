@@ -4,8 +4,8 @@
 
 #define NULL 0
 
-int strlen(int str[]) {
-    int i;
+int strlen(char* str) {
+    int i = 0;
 
     while (str[i] != '\0') {
         i = i + 1;

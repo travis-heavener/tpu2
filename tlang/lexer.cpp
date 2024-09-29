@@ -55,7 +55,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
 
     // run preprocessor for this line
     if (!isInMultilineComment) {
-        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack);
+        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack, ErrInfo(lineNumber, 0));
 
         // skip lines used by the preprocessor
         if (hasPreprocessed) return;

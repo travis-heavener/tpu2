@@ -9,8 +9,9 @@
 #include "preprocessor.hpp"
 #include "util/token.hpp"
 #include "util/toolbox.hpp"
+#include "util/t_exception.hpp"
 
-#define STDLIB_LOC "stdlib/stdlib.t"
+#define STDLIB_DIR "stdlib/"
 
 // break apart a string into its keywords from spaces
 void breakKeywords(const std::string& line, std::vector<std::string>& kwds) {
@@ -25,7 +26,7 @@ void breakKeywords(const std::string& line, std::vector<std::string>& kwds) {
     }
 }
 
-bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>& tokens, cwd_stack& cwdStack) {
+bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>& tokens, cwd_stack& cwdStack, const ErrInfo err) {
     // trim the line
     trimString(line);
 
@@ -40,7 +41,7 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
 
     if (macroType == "define") { // define something
         if (kwds.size() < 3)
-            throw std::runtime_error("Malformed macro define.");
+            throw TIllegalMacroDefinitionException(err);
 
         std::string defStr;
         for (size_t i = 2; i < kwds.size(); i++) {
@@ -51,19 +52,19 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
         macroMap[kwds[1]] = defStr;
         return true;
     } else if (macroType == "include") { // include something
-        if (kwds.size() != 2) throw std::runtime_error("Malformed macro include.");
+        if (kwds.size() != 2) throw TInvalidMacroIncludeException(err);
 
         bool isLocalInclude;
         if (kwds[1][0] == '"') {
             if (*kwds[1].rbegin() != '"')
-                throw std::runtime_error("Malformed macro include.");
+                throw TInvalidMacroIncludeException(err);
             isLocalInclude = true;
         } else if (kwds[1][0] == '<') {
             if (*kwds[1].rbegin() != '>')
-                throw std::runtime_error("Malformed macro include.");
+                throw TInvalidMacroIncludeException(err);
             isLocalInclude = false;
         } else {
-            throw std::runtime_error("Malformed macro include.");
+            throw TInvalidMacroIncludeException(err);
         }
 
         // get the desired file
@@ -73,14 +74,14 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
         if (isLocalInclude) {
             inPathAbs = cwdStack.top() / std::filesystem::path(inPath);
         } else {
-            inPathAbs = std::filesystem::path(STDLIB_LOC);
+            inPathAbs = std::filesystem::path(STDLIB_DIR) / inPath;
         }
 
         // load the file, tokenize
         std::ifstream inHandle(inPathAbs);
 
         if (!inHandle.is_open())
-            throw std::runtime_error("Failed to open included file: " + inPath);
+            throw TInvalidMacroIncludeException(err);
 
         // set CWD
         cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );

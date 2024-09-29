@@ -3,7 +3,15 @@
 
 #include <stdexcept>
 
-#include "err_info.hpp"
+// for error handling
+typedef unsigned long long line_t; // for line/col numbering
+
+// store where a token is from in its original file
+class ErrInfo {
+    public:
+        ErrInfo(line_t line, line_t col) : line(line), col(col) {};
+        line_t line, col;
+};
 
 // shorthand for making exceptions
 #define MAKE_EXCEPTION(name) class T##name##Exception : public TException { \
@@ -41,5 +49,7 @@ MAKE_EXCEPTION(VoidReturn)
 MAKE_EXCEPTION(IllegalArraySize)
 MAKE_EXCEPTION(IllegalImplicitCast)
 MAKE_EXCEPTION(ExpressionEval)
+MAKE_EXCEPTION(IllegalMacroDefinition)
+MAKE_EXCEPTION(InvalidMacroInclude)
 
 #endif
