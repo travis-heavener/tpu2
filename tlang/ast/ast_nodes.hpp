@@ -118,7 +118,7 @@ class ASTTypedNode : public ASTNode {
 
         // infer this node's type from any children
         virtual void inferType(scope_stack_t&);
-        void inferChildTypes(scope_stack_t&) const;
+        void inferChildTypes(scope_stack_t&);
 
         // remove any extra lvalues
         virtual void reduceLValues();

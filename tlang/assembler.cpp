@@ -539,13 +539,50 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             const TokenType opType = binOp.getOpTokenType();
             switch (opType) {
-                case TokenType::OP_ADD: case TokenType::OP_SUB:
+                case TokenType::OP_ADD: case TokenType::OP_SUB: { // add/sub AX/AL to/from BX/BL
+                    // handle pointer arithmetic
+                    Type typeA = resultTypes[0], typeB = resultTypes[1];
+                    
+                    if (typeA.isPointer()) {
+                        typeA.popPointer(); // get internal size, also removes forced ptr status so we get accurate size
+                        const size_t chunkSize = typeA.getSizeBytes();
+
+                        // mul needs AX register, so move it temporarily (don't need to do scope.pop/addPlaceholder)
+                        OUT << "pushw AX\n";
+                        OUT << "movw AX, " << chunkSize << '\n';
+                        OUT << "mul BX\n"; // other operand is in BX already
+                        OUT << "movw BX, AX\n"; // save new operand
+                        OUT << "popw AX\n"; // move AX back
+                    } else if (typeB.isPointer()) {
+                        typeB.popPointer(); // get internal size, also removes forced ptr status so we get accurate size
+                        const size_t chunkSize = typeB.getSizeBytes();
+
+                        // operand already in AX; move chunk size into CX
+                        OUT << "movw CX, " << chunkSize << '\n';
+                        OUT << "mul CX\n"; // other operand is in BX already
+                    }
+
+                    // perform add or sub
+                    if (opType == TokenType::OP_ADD)
+                        OUT_BIN_OP_2(add);
+                    else
+                        OUT_BIN_OP_2(sub);
+
+                    // push result to stack (lowest-first)
+                    if (opType == TokenType::OP_MOD) // uses AX as result and DX as remainder in 16-bit mode
+                        OUT << (dominantSize == 2 ? "pushw DX\n" : "push AH\n");
+                    else
+                        OUT << (dominantSize == 2 ? "pushw AX\n" : "push AL\n");
+
+                    // record push
+                    scope.addPlaceholder(dominantSize);
+                    resultType = dominantType;
+                    break;
+                }
                 case TokenType::ASTERISK: case TokenType::OP_DIV: case TokenType::OP_MOD:
                 case TokenType::OP_BIT_OR: case TokenType::AMPERSAND: case TokenType::OP_BIT_XOR: {
                     // all use similar/the same process, so combined them here
                     switch (opType) {
-                        case TokenType::OP_ADD:     OUT_BIN_OP_2(add); break; // add AX/AL to BX/BL
-                        case TokenType::OP_SUB:     OUT_BIN_OP_2(sub); break; // sub AX/AL from BX/BL
                         case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break; // mul AX/AL by BX/BL
                         case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break; // div AX/AL by BX/BL
                         case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break; // mod AX/AL by BX/BL

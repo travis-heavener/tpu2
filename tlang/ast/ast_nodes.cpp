@@ -123,11 +123,26 @@ void ASTTypedNode::inferType(scope_stack_t& scopeStack) {
 }
 
 // used to infer each child's type
-void ASTTypedNode::inferChildTypes(scope_stack_t& scopeStack) const {
-    for (ASTNode* pNode : this->children) {
-        // infer type of child
-        ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
-        pChild->inferType(scopeStack);
+void ASTTypedNode::inferChildTypes(scope_stack_t& scopeStack) {
+    for (size_t i = 0; i < this->children.size(); ++i) {
+        ASTNode* pNode = this->children[i];
+
+        // if this is an expr, remove the wrapper
+        if (pNode->getNodeType() == ASTNodeType::EXPR) {
+            this->removeChild(i);
+
+            while (pNode->size() > 0) {
+                this->push( pNode->at(0) );
+                pNode->removeChild(0);
+            }
+
+            delete pNode;
+            --i;
+        } else {
+            // infer type of child
+            ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
+            pChild->inferType(scopeStack);
+        }
     }
 }
 
@@ -261,19 +276,15 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     this->setType( getDominantType(typeA, typeB) );
                 } else {
                     // one is a pointer
-                    // if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
-                    // if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
-
-                    // wipe immediate array hint
-                    if (typeA.isPointer()) {
-                        typeA.popPointer();
-                        typeA.addEmptyPointer();
-                    } else {
-                        typeB.popPointer();
-                        typeB.addEmptyPointer();
+                    if (typeA.isArray()) {
+                        typeA.setForcedPointer(true);
+                        pA->getTypeRef().setForcedPointer(true);
+                    } else if (typeB.isArray()) {
+                        typeB.setForcedPointer(true);
+                        pB->getTypeRef().setForcedPointer(true);
                     }
 
-                    // assume dominant type
+                    // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
                 }
 
@@ -299,13 +310,12 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     throw TInvalidOperationException(err);
 
                 if (typeA.isPointer() || typeB.isPointer()) {
-                    // wipe immediate array hint
                     if (typeA.isArray()) {
                         typeA.setForcedPointer(true);
-                        pA->setType( MEM_ADDR_TYPE );
+                        pA->getTypeRef().setForcedPointer(true);
                     } else if (typeB.isArray()) {
                         typeB.setForcedPointer(true);
-                        pB->setType( MEM_ADDR_TYPE );
+                        pB->getTypeRef().setForcedPointer(true);
                     }
 
                     // set type to pointer
@@ -408,6 +418,8 @@ void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
     this->getTypeRef().addHintPointer( this->children.size() );
 }
 
+/******** NODES BELOW DON'T HAVE CHILDREN ********/
+
 void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // lookup the variable from the scope
     Type type = lookupParserVariable(scopeStack, this->raw, this->err);
@@ -428,8 +440,6 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // set identifier's type
     this->setType( type );
 }
-
-/******** NODES BELOW DON'T HAVE CHILDREN ********/
 
 void ASTIntLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_INT));  }
 void ASTCharLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_CHAR));  }
