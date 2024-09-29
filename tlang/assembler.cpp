@@ -266,15 +266,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 const size_t typeSize = varType.getSizeBytes();
 
                 // get the value of the assignment
-                if (pVarChild->pExpr == nullptr) { // no assignment, set to 0
-                    for (size_t j = 0; j < typeSize; j++) {
-                        if (j+1 < typeSize) {
-                            OUT << "pushw 0\n";
-                            ++j;
-                        } else {
-                            OUT << "push 0\n";
-                        }
-                    }
+                if (pVarChild->pExpr == nullptr) { // no assignment
+                    OUT << "add SP, " << typeSize << '\n';
                 } else { // has assignment, assemble its expression
                     assembleExpression(*pVarChild->pExpr, outHandle, scope);
 
