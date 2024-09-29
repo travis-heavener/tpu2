@@ -73,46 +73,9 @@ __UF0:
     jmp __UF0E
     __UF0E:
     ret
-main:
-    add SP, 2
-    pushw 0
-    popw AX
-    buf AX
-    jz __J3
-    movw AX, 1
-    jmp __J3
-    __J3:
-    pushw AX
-    mov AL, [SP-1]
-    and AL, 0x80
-    pop
-    pop BL
-    or BL, AL
-    push BL
-    movw CX, SP
-    sub CX, 1
-    pushw CX
-    popw BP
-    push [BP+0]
-    mov AL, [SP-1]
-    and AL, 0x80
-    movw CX, 0
-    buf AL
-    jz __J4
-    movw CX, 0xFFFF
-    jmp __J4
-    __J4:
-    push CL
-    pop BL
-    or BL, AL
-    push BL
-    pop DL
-    mov [SP-3], DL
-    pop DL
-    mov [SP-3], DL
-    pop
-    jmp mainE
-    mainE:
+__UF1:
+    jmp __UF1E
+    __UF1E:
     movw AX, 0x03
     popw BX
     syscall

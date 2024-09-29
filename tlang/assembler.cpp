@@ -23,14 +23,19 @@ static label_map_t labelMap;
 
 AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& func) {
     this->funcName = funcName;
-    this->startLabel = funcName == FUNC_MAIN_LABEL ? funcName :
-                       (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
-    this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
-    this->returnType = func.getReturnType();
-    this->paramTypes = std::vector<Type>();
 
+    // determine if this is the main function
+    this->paramTypes = std::vector<Type>();
+    this->returnType = func.getReturnType();
+    
     // fill in param types
     func.loadParamTypes(this->paramTypes);
+
+    bool isMain = funcName == FUNC_MAIN_LABEL && paramTypes.size() == 0 && returnType == Type(TokenType::TYPE_INT);
+
+    // determine labels
+    this->startLabel = isMain ? funcName : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
+    this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
 }
 
 // generate TPU assembly code from the AST
