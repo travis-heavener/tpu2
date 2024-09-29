@@ -1,3 +1,4 @@
+#include <bitset>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -414,10 +415,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             switch (opType) {
                 case TokenType::OP_SUB:
                 case TokenType::OP_BIT_NOT: {
-                    if (opType == TokenType::OP_SUB) // negate AX (A ^ 0b10000000 flips sign bit)
-                        OUT << "xor " << regA << ", " << (resultSize > 1 ? "0x8000" : "0x80") << '\n';
-                    else // flip all bits
-                        OUT << "not " << regA << '\n';
+                    OUT << "not " << regA << '\n'; // flip all bits
+                    if (opType == TokenType::OP_SUB) // add 1 (2's complement)
+                        OUT << "add " << regA << ", 1\n";
 
                     // push values to stack
                     OUT << (resultSize == 2 ? "pushw AX\n" : "push AL\n");
@@ -809,25 +809,28 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         }
         case ASTNodeType::LIT_INT: {
             // get value & size of literal
-            int value = static_cast<ASTIntLiteral*>(&bodyNode)->val;
-            resultType = Type(TokenType::TYPE_INT);
-            OUT << "pushw " << (value & 0xFFFF) << '\n';
+            ASTIntLiteral* pLit = static_cast<ASTIntLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFFFF;
+            resultType = pLit->getTypeRef();
+            OUT << "pushw " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
         case ASTNodeType::LIT_BOOL: {
             // get value & size of literal
-            bool value = static_cast<ASTBoolLiteral*>(&bodyNode)->val;
-            resultType = Type(TokenType::TYPE_BOOL);
-            OUT << "push " << (value & 0xFF) << '\n';
+            ASTBoolLiteral* pLit = static_cast<ASTBoolLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFF;
+            resultType = pLit->getTypeRef();
+            OUT << "push " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
         case ASTNodeType::LIT_CHAR: {
             // get value & size of literal
-            char value = static_cast<ASTCharLiteral*>(&bodyNode)->val;
-            resultType = Type(TokenType::TYPE_CHAR);
-            OUT << "push " << (value & 0xFF) << '\n';
+            ASTCharLiteral* pLit = static_cast<ASTCharLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFF;
+            resultType = pLit->getTypeRef();
+            OUT << "push " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
@@ -1004,6 +1007,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             resultType.setForcedPointer(true);
     }
 
+    // update any signed values for signed arithmetic
+    // if (resultType.is)
+
     // implicit cast
     if (resultType != desiredType) {
         implicitCast(outHandle, resultType, desiredType, scope, bodyNode.err);
@@ -1062,13 +1068,30 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
             const size_t startSize = getSizeOfType(primA);
             const size_t endSize = getSizeOfType(primB);
 
+            // preserve sign bit in AL
+            if (!resultType.isUnsigned()) {
+                OUT << "mov AL, [SP-1]\n";
+                OUT << "and AL, 0x80\n"; // get sign bit
+            }
+
             if (startSize < endSize) { // pad bytes
+                // if signed and negative, push 0xFFFFs, otherwise push 0s
+                OUT << "movw CX, 0\n";
+                if (!resultType.isUnsigned()) {
+                    const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    OUT << "buf AL\n";
+                    OUT << "jz " << mergeLabel << '\n';
+                    OUT << "movw CX, 0xFFFF\n"; // set CX to 1
+                    OUT << mergeLabel << ":\n";
+                }
+
+                // add padding bytes
                 for (size_t i = startSize; i < endSize; ++i) {
                     if (i+1 < endSize) {
-                        OUT << "pushw 0\n";
+                        OUT << "pushw CX\n";
                         ++i;
                     } else {
-                        OUT << "push 0\n";
+                        OUT << "push CL\n";
                     }
                 }
                 scope.addPlaceholder(endSize - startSize);
@@ -1083,6 +1106,13 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
                     }
                     scope.pop();
                 }
+            }
+
+            // re-add sign bit
+            if (!resultType.isUnsigned()) {
+                OUT << "pop BL\n";
+                OUT << "or BL, AL\n";
+                OUT << "push BL\n";
             }
         }
 

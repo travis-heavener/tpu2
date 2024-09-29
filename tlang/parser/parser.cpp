@@ -29,6 +29,9 @@ AST* parseToAST(const std::vector<Token>& tokens) {
             size_t startIndex = i, endIndex = i;
 
             // verify return type is specified
+            if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED)
+                ++i;
+
             if ( !isTokenTypeName(tokens[i].type) )
                 throw TInvalidTokenException(tokens[i].err);
             
@@ -274,14 +277,27 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             case TokenType::SEMICOLON: break; // erroneous statement
             default: { // base case, parse as expression
                 // check for variable assignment
-                if (isTokenPrimitiveType(tokens[i].type)) {
+                if (isTokenPrimitiveType(tokens[i].type) || tokens[i].type == TokenType::UNSIGNED ||
+                    tokens[i].type == TokenType::SIGNED) {
+                    
+                    // if (un)signed, check for next token
+                    bool isUnsigned = false;
+                    if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED) {
+                        if (i+1 > endIndex || !isTokenPrimitiveType(tokens[i+1].type))
+                            throw TInvalidTokenException(tokens[i].err);
+
+                        // base case, is valid
+                        isUnsigned = tokens[i].type == TokenType::UNSIGNED;
+                        ++i; // skip to primitive
+                    }
+
                     size_t start = i;
 
                     // verify not end of input
                     if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
 
                     // get type
-                    Type type(tokens[start].type);
+                    Type type(tokens[start].type, isUnsigned);
                     while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
                         type.addEmptyPointer();
                         ++i;
@@ -391,11 +407,18 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 }
 
 ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
+    size_t i = startIndex;
+
     // get return type
-    Type type(tokens[startIndex].type);
+    bool isReturnUnsigned = false;
+    if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED) {
+        isReturnUnsigned = tokens[i].type == TokenType::UNSIGNED;
+        ++i;
+    }
+
+    Type type(tokens[i].type, isReturnUnsigned);
 
     // append any pointers
-    size_t i = startIndex;
     while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
         type.addEmptyPointer();
         ++i;

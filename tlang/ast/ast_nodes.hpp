@@ -253,10 +253,10 @@ class ASTBoolLiteral : public ASTTypedNode {
 
 class ASTCharLiteral : public ASTTypedNode {
     public:
-        ASTCharLiteral(char val, const Token& token) : ASTTypedNode(token), val(val) {};
+        ASTCharLiteral(short val, const Token& token) : ASTTypedNode(token), val(val) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_CHAR; };
         void inferType(scope_stack_t&);
-        char val;
+        short val;
 };
 
 class ASTFloatLiteral : public ASTTypedNode {

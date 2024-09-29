@@ -176,6 +176,17 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             continue;
         }
 
+        // unsigned & signed keywords
+        if (isKwdPresent("unsigned", line, i)) {
+            i += 7; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "unsigned", TokenType::UNSIGNED));
+            continue;
+        } else if (isKwdPresent("signed", line, i)) {
+            i += 5; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "signed", TokenType::SIGNED));
+            continue;
+        }
+
         // check for individual characters that can't be a part of a larger operator or anything
         #define ADD_SINGLE_CHAR_TOKEN(c, type) tokens.push_back(Token(err, c, type)); continue;
         switch (line[i]) {
