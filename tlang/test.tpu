@@ -1,55 +1,100 @@
-__UF0:
+main:
+    add SP, 2
     pushw 0
-    __J0:
-    movw CX, SP
-    sub CX, 6
-    pushw CX
-    popw BP
-    push [BP+0]
-    push [BP+1]
-    movw CX, SP
-    sub CX, 4
-    pushw CX
-    popw BP
-    push [BP+0]
-    push [BP+1]
-    popw AX
-    popw CX
-    movw BX, 1
-    mul BX
-    add CX, AX
-    pushw CX
-    popw BP
-    push [BP+0]
-    push 0
-    xor BH, BH
-    pop BL
-    xor AH, AH
-    pop AL
-    xor AL, BL
-    jz __J2
-    mov AL, 1
-    jmp __J2
-    __J2:
-    push AL
-    xor AH, AH
-    pop AL
-    buf AX
-    jz __J1
-    movw CX, SP
-    sub CX, 2
-    pushw CX
-    movw CX, SP
-    sub CX, 4
-    pushw CX
-    popw BP
-    push [BP+0]
-    push [BP+1]
     pushw 1
     popw BX
     popw AX
     add AX, BX
     pushw AX
+    pushw 1
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 2
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 3
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 4
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    pushw 5
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    movw CX, SP
+    sub CX, 12
+    pushw CX
+    pushw 1
+    popw BX
+    popw AX
+    pushw AX
+    movw AX, 6
+    mul BX
+    movw BX, AX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw AX
+    movw BP, AX
+    pushw BP
+    pushw 2
+    popw BX
+    popw AX
+    pushw AX
+    movw AX, 2
+    mul BX
+    movw BX, AX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw AX
+    movw BP, AX
+    pushw BP
+    movw CX, SP
+    sub CX, 14
+    pushw CX
+    pushw 1
+    popw BX
+    popw AX
+    pushw AX
+    movw AX, 6
+    mul BX
+    movw BX, AX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw AX
+    movw BP, AX
+    pushw BP
+    pushw 1
+    popw BX
+    popw AX
+    pushw AX
+    movw AX, 2
+    mul BX
+    movw BX, AX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw AX
+    movw BP, AX
+    push [BP+0]
+    push [BP+1]
     popw BX
     popw AX
     movw BP, AX
@@ -57,25 +102,38 @@ __UF0:
     mov [BP+1], BH
     pushw BX
     popw
-    jmp __J0
-    __J1:
     movw CX, SP
-    sub CX, 2
+    sub CX, 12
+    pushw CX
+    pushw 1
+    popw AX
+    popw CX
+    movw BX, 6
+    mul BX
+    add CX, AX
+    pushw CX
+    pushw 2
+    popw AX
+    popw CX
+    movw BX, 2
+    mul BX
+    add CX, AX
     pushw CX
     popw BP
     push [BP+0]
     push [BP+1]
     pop DL
-    mov [SP-4], DL
+    mov [SP-14], DL
     pop DL
-    mov [SP-4], DL
+    mov [SP-14], DL
     popw
-    jmp __UF0E
-    __UF0E:
-    ret
-__UF1:
-    jmp __UF1E
-    __UF1E:
+    popw
+    popw
+    popw
+    popw
+    popw
+    jmp mainE
+    mainE:
     movw AX, 0x03
     popw BX
     syscall

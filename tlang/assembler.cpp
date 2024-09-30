@@ -138,8 +138,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                     OUT << "pop AX\n"; // load value to AH
                     scope.pop();
                 } else {
-                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                     OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                 }
                 scope.pop();
                 OUT << "buf AX\n"; // test ZF flag
@@ -193,8 +193,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                     OUT << "popw AX\n"; // load value to AH
                     scope.pop();
                 } else {
-                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                     OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                 }
                 scope.pop();
                 OUT << "buf AX\n"; // test ZF flag
@@ -251,8 +251,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                         assembleExpression(*pExpr, outHandle, scope);
 
                         // pop the result off the stack to AL
-                        OUT << "xor AH, AH\n"; // clear AH since no value is put there
                         OUT << "pop AL\n"; // pop to AL
+                        OUT << "xor AH, AH\n"; // clear AH since no value is put there
                         scope.pop();
 
                         // if false, jump to next condition
@@ -411,8 +411,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 OUT << "popw AX\n";
                 scope.pop(); // additional pop
             } else if (resultSize == 1) {
-                OUT << "xor AH, AH\n"; // zero out AH
                 OUT << "pop AL\n";
+                OUT << "xor AH, AH\n"; // zero out AH
             } else {
                 throw TInvalidOperationException(bodyNode.err);
             }
@@ -534,8 +534,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 OUT << "popw BX\n";
                 scope.pop();
             } else { // pop to BL and zero BH
-                OUT << "xor BH, BH\n";
                 OUT << "pop BL\n";
+                OUT << "xor BH, BH\n";
             }
             scope.pop();
 
@@ -544,8 +544,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 OUT << "popw AX\n";
                 scope.pop(); scope.pop();
             } else if (resultTypes[0].getSizeBytes() == 1) { // pop to AL and zero AH
-                OUT << "xor AH, AH\n";
                 OUT << "pop AL\n";
+                OUT << "xor AH, AH\n";
                 scope.pop();
             }
 
@@ -798,8 +798,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << "movw BP, AX\n"; // move address to BP
 
                     // move the rvalue to the lvalue's address
-                    const size_t desiredSize = desiredType.getSizeBytes();
-                    if (desiredSize == 2) {
+                    const size_t rvalueSize = resultTypes[1].getSizeBytes();
+                    if (rvalueSize == 2) {
                         OUT << "mov [BP+0], BL" << '\n';
                         OUT << "mov [BP+1], BH" << '\n';
                     } else {
@@ -807,9 +807,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     }
 
                     // push the value of the variable onto the stack (lowest-first)
-                    OUT << (desiredSize == 2 ? "pushw BX\n" : "push BL\n");
-                    scope.addPlaceholder(desiredSize);
-                    resultType = desiredType;
+                    OUT << (rvalueSize == 2 ? "pushw BX\n" : "push BL\n");
+                    scope.addPlaceholder(rvalueSize);
+                    resultType = resultTypes[1];
                     break;
                 }
                 default:
@@ -821,7 +821,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             // get value & size of literal
             ASTIntLiteral* pLit = static_cast<ASTIntLiteral*>(&bodyNode);
             unsigned short value = pLit->val & 0xFFFF;
-            resultType = pLit->getTypeRef();
+            resultType = Type(TokenType::TYPE_INT);
             OUT << "pushw " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
@@ -830,7 +830,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             // get value & size of literal
             ASTBoolLiteral* pLit = static_cast<ASTBoolLiteral*>(&bodyNode);
             unsigned short value = pLit->val & 0xFF;
-            resultType = pLit->getTypeRef();
+            resultType = Type(TokenType::TYPE_BOOL);
             OUT << "push " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
@@ -839,7 +839,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             // get value & size of literal
             ASTCharLiteral* pLit = static_cast<ASTCharLiteral*>(&bodyNode);
             unsigned short value = pLit->val & 0xFF;
-            resultType = pLit->getTypeRef();
+            resultType = Type(TokenType::TYPE_CHAR);
             OUT << "push " << value << '\n';
             scope.addPlaceholder(resultType.getSizeBytes());
             break;
@@ -999,7 +999,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         if (numSubscripts == 0 || numSubscripts == numPointers) {
             // if lvalue, do nothing--address is on top of stack
             // if there are array pointers left, push the array's address (already on stack)
-            if (resultType.getNumArrayHints() == 0 && !resultType.usesForcedPointer()) { // otherwise, push value
+            if (!pTypedBody->isLValue() && resultType.getNumArrayHints() == 0 && !resultType.usesForcedPointer()) { // otherwise, push value
                 // pop address from stack to BP
                 OUT << "popw BP\n";
                 scope.pop(); scope.pop();
@@ -1013,12 +1013,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         }
 
         // if there are still array hints left, force as pointer
-        if (resultType.getNumArrayHints() > 0)
+        if (resultType.getNumArrayHints() > 0 || pTypedBody->isLValue())
             resultType.setForcedPointer(true);
     }
-
-    // update any signed values for signed arithmetic
-    // if (resultType.is)
 
     // implicit cast
     if (resultType != desiredType) {
