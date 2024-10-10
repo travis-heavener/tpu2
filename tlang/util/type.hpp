@@ -21,7 +21,7 @@ class Type {
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), forceAsPointer(t.forceAsPointer), _isReferencePointer(t._isReferencePointer) {};
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
@@ -29,7 +29,7 @@ class Type {
 
         bool isUnsigned() const { return _isUnsigned; };
 
-        void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); forceAsPointer = false; };
+        void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
         void addHintPointer(size_t);
         void popPointer();
         size_t getNumPointers() const { return pointers.size(); };
@@ -66,10 +66,6 @@ class Type {
         Type getAddressPointer() const;
         void clearArrayHints();
 
-        // used to force an address to be printed (ie. for lvalues, array identifier use)
-        void setForcedPointer(bool u) { forceAsPointer = u; };
-        bool usesForcedPointer() const { return forceAsPointer; };
-
         // used to handle reference pointers in function arguments
         bool isReferencePointer() const { return _isReferencePointer; };
         void setIsReferencePointer(bool i) { _isReferencePointer = i; };
@@ -81,9 +77,6 @@ class Type {
 
         // for arrays specifically
         size_t numArrayHints = 0;
-
-        // fix for pointer arithmetic
-        bool forceAsPointer = false;
 
         // for handling reference pointers
         bool _isReferencePointer = false;

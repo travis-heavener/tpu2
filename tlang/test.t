@@ -1,9 +1,10 @@
-// #include <stdlib.t>
+#include <stdlib.t>
 // #include <string.t>
 #include <stdio.t>
 
 int main() {
     char msg[] = "Hello world!\n";
-    print(msg);
-    return 0;
+    return sizeof msg;
+    // print(msg);
+    // return EXIT_SUCCESS;
 }

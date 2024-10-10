@@ -103,13 +103,13 @@ main:
     movw BP, SP
     sub BP, 14
     pushw BP
-    call __UF1
-    pushw 0
+    popw AX
+    pushw 14
     pop DL
-    mov [SP-18], DL
+    mov [SP-16], DL
     pop DL
-    mov [SP-18], DL
-    sub SP, 16
+    mov [SP-16], DL
+    sub SP, 14
     jmp mainE
     mainE:
     movw AX, 0x03

@@ -458,8 +458,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         // this is still just a pointer
                         resultSize = MEM_ADDR_SIZE;
                     } else if (resultTypes[0].isArray()) {
-                        // if this is actually an array pointer, correct the size
-                        resultTypes[0].setForcedPointer(false);
                         resultSize = resultTypes[0].getSizeBytes();
                     }
 
@@ -1075,10 +1073,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         implicitCast(outHandle, resultType, desiredType, scope, bodyNode.err);
         resultType = desiredType; // update type to match
     }
-
-    // fix any forced pointers (not part of typecast)
-    if (resultType.usesForcedPointer() != desiredType.usesForcedPointer())
-        resultType.setForcedPointer(desiredType.usesForcedPointer());
 
     // mark this node as assembled
     bodyNode.isAssembled = true;
