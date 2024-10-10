@@ -100,11 +100,7 @@ main:
     push 33
     push 10
     push 0
-    movw BP, SP
-    sub BP, 14
-    pushw BP
-    popw AX
-    pushw 14
+    pushw 1
     pop DL
     mov [SP-16], DL
     pop DL

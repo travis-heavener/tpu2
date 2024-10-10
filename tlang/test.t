@@ -4,7 +4,6 @@
 
 int main() {
     char msg[] = "Hello world!\n";
-    return sizeof msg;
     // print(msg);
-    // return EXIT_SUCCESS;
+    return EXIT_FAILURE;
 }

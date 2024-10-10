@@ -9,6 +9,7 @@
 #include "util/t_exception.hpp"
 
 static bool isInMultilineComment = false;
+static macrodef_map macrodefMap;
 
 // returns true if the keyword is present and is not part of an identifier
 bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset) {
@@ -25,18 +26,17 @@ void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cw
     std::string line;
 
     line_t lineNumber = 0;
-    macrodef_map macrodefMap;
     while (std::getline(inHandle, line)) {
         // remove trailing \r if present (CRLF for Windows systems)
         if (*line.rbegin() == '\r') line.pop_back();
 
         // tokenize line
-        tokenizeLine(line, tokens, ++lineNumber, macrodefMap, cwdStack, filename, isStdlib);
+        tokenizeLine(line, tokens, ++lineNumber, cwdStack, filename, isStdlib);
     }
 }
 
 // tokenize a particular line
-void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack, const std::string& filename, const bool isStdlib) {
+void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, cwd_stack& cwdStack, const std::string& filename, const bool isStdlib) {
     if (line.size() == 0) return;
 
     // if in a multiline comment, look for closing char
