@@ -1,5 +1,6 @@
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -12,6 +13,8 @@
 #include "util/t_exception.hpp"
 
 #define STDLIB_DIR "stdlib/"
+
+static std::set<std::string> includedPaths;
 
 // break apart a string into its keywords from spaces
 void breakKeywords(const std::string& line, std::vector<std::string>& kwds) {
@@ -26,6 +29,7 @@ void breakKeywords(const std::string& line, std::vector<std::string>& kwds) {
     }
 }
 
+// returns true when the line has been preprocessed (and shouldn't be tokenized)
 bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>& tokens, cwd_stack& cwdStack, const ErrInfo err) {
     // trim the line
     trimString(line);
@@ -78,6 +82,10 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
             isStdlib = true;
             inPathAbs = std::filesystem::path(STDLIB_DIR) / inPath;
         }
+
+        // prevent reincluding a file twice
+        if (includedPaths.count(inPathAbs.string()) > 0) return true;
+        includedPaths.insert(inPathAbs.string());
 
         // load the file, tokenize
         std::ifstream inHandle(inPathAbs);

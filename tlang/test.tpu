@@ -1,16 +1,140 @@
-main:
-    add SP, 2
+__UF0:
+    pushw 0
+    __J0:
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    movw BX, 1
+    mul BX
+    add CX, AX
+    pushw CX
+    popw BP
+    push [BP+0]
+    push 0
+    pop BL
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    jmp __J2
+    __J2:
+    push AL
+    pop AL
+    xor AH, AH
+    buf AX
+    jz __J1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
     pushw 1
-    pushw 2
-    pushw 3
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __J0
+    __J1:
+    push [SP-2]
+    push [SP-2]
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    sub SP, 2
+    jmp __UF0E
+    __UF0E:
+    ret
+__UF1:
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    pushw 0
+    call __UF0
     movw BP, SP
     sub BP, 6
     pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 4
+    jmp __UF1E
+    __UF1E:
+    ret
+__UF2:
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw AX
+    movw BP, AX
+    pushw BP
+    movw BP, SP
+    sub BP, 4
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw AX
+    movw BP, AX
+    push [BP+0]
+    push [BP+1]
+    pushw 2
+    popw BX
+    popw AX
+    mul BX
+    pushw AX
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __UF2E
+    __UF2E:
+    ret
+main:
+    add SP, 2
+    pushw 10
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    popw AX
+    pushw AX
+    call __UF2
+    push [SP-4]
+    push [SP-4]
     pop DL
-    mov [SP-8], DL
+    mov [SP-6], DL
     pop DL
-    mov [SP-8], DL
-    sub SP, 6
+    mov [SP-6], DL
+    sub SP, 4
     jmp mainE
     mainE:
     movw AX, 0x03
