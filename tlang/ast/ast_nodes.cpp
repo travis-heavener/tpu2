@@ -209,6 +209,13 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     throw TInvalidOperationException(err);
                 this->setType(typeA);
                 pA->setIsLValue(false); // revoke lvalue status
+
+                // nullify chained operations that cancel
+                ASTOperator* pAOp = dynamic_cast<ASTOperator*>(pA);
+                if (pAOp != nullptr && !pAOp->_isNullified && pAOp->opType == opType) {
+                    this->setIsNullified(true);
+                    pAOp->setIsNullified(true);
+                }
                 break;
             }
             case TokenType::OP_BOOL_NOT: {
@@ -216,6 +223,13 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_BOOL) );
                 pA->setIsLValue(false); // revoke lvalue status
+
+                // if pA is also OP_BOOL_NOT, nullify
+                ASTOperator* pAOp = dynamic_cast<ASTOperator*>(pA);
+                if (pAOp != nullptr && !pAOp->_isNullified && pAOp->opType == opType) {
+                    this->setIsNullified(true);
+                    pAOp->setIsNullified(true);
+                }
                 break;
             }
             case TokenType::ASTERISK: {
