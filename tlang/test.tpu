@@ -59,6 +59,31 @@ __UF0:
     jmp __UF0E
     __UF0E:
     ret
+__UF1:
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    pushw 0
+    call __UF0
+    movw BP, SP
+    sub BP, 6
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 4
+    jmp __UF1E
+    __UF1E:
+    ret
 main:
     add SP, 2
     push 72
@@ -78,8 +103,8 @@ main:
     movw BP, SP
     sub BP, 14
     pushw BP
+    call __UF1
     pushw 0
-    call __UF0
     pop DL
     mov [SP-18], DL
     pop DL

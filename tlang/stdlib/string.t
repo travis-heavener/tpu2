@@ -1,5 +1,7 @@
 /**
  * Extension of the "T Standard Library" for string support.
+ * 
+ * @author: Travis Heavener
  */
 
 int strlen(char str[]) {

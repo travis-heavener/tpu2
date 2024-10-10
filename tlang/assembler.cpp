@@ -311,8 +311,10 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 const size_t resultSize = resultType.getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                OUT << "sub SP, " << resultSize << '\n';
-                scope.pop(resultSize);
+                if (resultSize > 0) {
+                    OUT << "sub SP, " << resultSize << '\n';
+                    scope.pop(resultSize);
+                }
                 break;
             }
             default: {
@@ -985,7 +987,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         throw TInvalidOperationException(pInst->err);
 
                     // pad bytes
-                    if (resultSize == 1) OUT << "push 0\n";
+                    if (resultSize == 1) {
+                        OUT << "push 0\n";
+                        scope.addPlaceholder(1);
+                    }
 
                     // move value into register
                     const std::string reg = instType == TokenType::ASM_LOAD_AX ? "AX" :
@@ -993,6 +998,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                                             instType == TokenType::ASM_LOAD_CX ? "CX" : "DX";
 
                     OUT << "popw " << reg << '\n';
+                    scope.pop(2);
                     break;
                 }
                 default: throw TSyntaxException(pInst->err);
@@ -1091,8 +1097,10 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
     // if the desired type is void, just pop everything off
     if (desiredType.isVoidNonPtr()) {
         size_t resultSize = resultType.getSizeBytes();
-        OUT << "sub SP, " << resultSize << '\n';
-        scope.pop(resultSize);
+        if (resultSize > 0) {
+            OUT << "sub SP, " << resultSize << '\n';
+            scope.pop(resultSize);
+        }
         return;
     }
 
