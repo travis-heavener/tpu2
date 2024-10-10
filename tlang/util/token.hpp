@@ -25,6 +25,8 @@ enum TokenType {
     OP_EQ, OP_NEQ, // ==, !=
     SIZEOF,
 
+    ASM, ASM_LOAD_AX, ASM_LOAD_BX, ASM_LOAD_CX, ASM_LOAD_DX,
+
     // assignment operators
     ASSIGN
 };
@@ -39,9 +41,6 @@ class Token {
         TokenType type;
 };
 
-// returns true if the given TokenType is that of a type name (ex. TYPE_INT)
-bool isTokenTypeName(TokenType);
-
 // token helpers
 bool isTokenPrimitiveType(const TokenType, const bool=false);
 bool isTokenUnaryOp(const TokenType);
@@ -50,6 +49,7 @@ bool isTokenLiteral(const TokenType);
 bool isTokenCompOp(const TokenType);
 bool isTokenAssignOp(const TokenType);
 bool isNonValueType(const TokenType);
+bool isTokenProtectedASM(const TokenType);
 
 // returns the size of a primitive type in bytes
 unsigned char getSizeOfType(TokenType type);

@@ -26,7 +26,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
 
             if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
-            // check for function call
+            // A. check for function call
             if (start - 1 >= startIndex && tokens[start-1].type == TokenType::IDENTIFIER) {
                 // create function call node
                 ASTFunctionCall* pCall = new ASTFunctionCall(tokens[start-1]);
@@ -49,7 +49,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                     if (subExprStart != i)
                         pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
                 }
-            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type, true)) { // check for typecast
+            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type, true)) { // B. check for typecast
                 // grab type (only allow pointer asterisk or typename)
                 Type type( tokens[start+1].type );
 
@@ -66,8 +66,13 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 ASTTypeCast* pTypeCast = new ASTTypeCast(tokens[start]);
                 pHead->push( pTypeCast );
                 pTypeCast->setType( type );
-            } else { // found a subexpression
-                pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+            } else { // C. found a subexpression
+                // if the previous node is a protected asm instruction, append to that instead
+                if (pHead->size() > 0 && pHead->lastChild()->getNodeType() == ASTNodeType::ASM_INST) {
+                    pHead->lastChild()->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+                } else {
+                    pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+                }
             }
         } else if (tokens[i].type == TokenType::LIT_INT) {
             pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
@@ -176,6 +181,20 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             // force subscript to have int type
             ASTExpr* pSubExpr = static_cast<ASTExpr*>(pArrSub->lastChild());
             pSubExpr->setType( Type(TokenType::TYPE_INT) );
+        } else if (tokens[i].type == TokenType::ASM) {
+            // create an inline asm node and parse the attached string
+            if (i+3 > endIndex || tokens[i+1].type != TokenType::LPAREN
+                || tokens[i+2].type != TokenType::LIT_STRING || tokens[i+3].type != TokenType::RPAREN)
+                throw TSyntaxException(tokens[i+1].err);
+
+            // evaluate the inline assembly
+            const std::string inlineASM = tokens[i+2].raw.substr(1, tokens[i+2].raw.size()-2);
+
+            // create node
+            pHead->push( new ASTInlineASM(tokens[i], inlineASM) );
+            i += 3;
+        } else if (isTokenProtectedASM(tokens[i].type)) {
+            pHead->push( new ASMProtectedInstruction(tokens[i]) );
         } else {
             throw TInvalidTokenException(tokens[i].err);
         }

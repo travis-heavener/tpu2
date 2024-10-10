@@ -8,6 +8,7 @@ Type::Type(const Type&& B) {
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
     this->forceAsPointer = B.forceAsPointer;
+    this->_isReferencePointer = B._isReferencePointer;
 }
 
 Type& Type::operator=(const Type& B) {
@@ -39,18 +40,23 @@ void Type::addHintPointer(size_t n) {
 
 void Type::popPointer() {
     // decrement number of stored array hints
-    if (*pointers.rbegin() != TYPE_EMPTY_PTR) --numArrayHints;
-
+    if (numArrayHints > 0) --numArrayHints;
     pointers.pop_back();
     forceAsPointer = false;
 }
 
 // get the total size taken up in memory by this type
-size_t Type::getSizeBytes() const {
+size_t Type::getSizeBytes(const int opts) const {
+    if (isArray() && opts == SIZE_ARR_AS_PTR) return MEM_ADDR_SIZE;
     if (forceAsPointer) return MEM_ADDR_SIZE;
 
     // get the size of the internal type (whatever is in an array)
     const size_t numPtrs = pointers.size();
+
+    // if this is a POINTER TO AN ARRAY, return a pointer size
+    if (numPtrs > 0 && *pointers.rbegin() == TYPE_EMPTY_PTR)
+        return MEM_ADDR_SIZE;
+
     size_t size = (numPtrs > numArrayHints) ? MEM_ADDR_SIZE : getSizeOfType(this->primitiveType);
 
     for (size_t i = 0; i < numPtrs; ++i)
@@ -86,13 +92,10 @@ bool Type::isParamMatch(const Type& t) const {
     // check num ptrs
     if (pointers.size() != t.pointers.size()) return false;
 
-    // if this has specific array/pointer hints, verify they're valid
-    // if it doesn't, t can still decay from array to pointer no problem
-    if (this->numArrayHints > 0) {
-        // this has hints, so verify they match
-        for (size_t i = 0; i < pointers.size(); ++i) {
-            if (pointers[i] != t.pointers[i]) return false;
-        }
+    // allow first pointer to be blank, but all others must match
+    for (size_t i = pointers.size(); i >= 1; --i) {
+        if (pointers[i-1] != t.pointers[i-1] && i < pointers.size())
+            return false;
     }
 
     // base case, matches
@@ -142,8 +145,8 @@ Type getDominantType(const Type& A, const Type& B) {
 
 void Type::clearArrayHints() {
     // revoke hints
-    for (size_t i = 0; i < numArrayHints; ++i)
-        setArrayHint(i, TYPE_EMPTY_PTR);
+    for (size_t i = 0; i < pointers.size(); ++i)
+        pointers[i] = TYPE_EMPTY_PTR;
     numArrayHints = 0;
 }
 

@@ -11,9 +11,9 @@
 #include "util/token.hpp"
 
 // tokenize a document to a vector of Tokens
-void tokenize(std::ifstream&, std::vector<Token>&, cwd_stack&, const std::string&);
+void tokenize(std::ifstream&, std::vector<Token>&, cwd_stack&, const std::string&, const bool=false);
 
 // tokenize a particular line
-void tokenizeLine(std::string&, std::vector<Token>&, line_t, macrodef_map&, cwd_stack&, const std::string&);
+void tokenizeLine(std::string&, std::vector<Token>&, line_t, macrodef_map&, cwd_stack&, const std::string&, const bool=false);
 
 #endif

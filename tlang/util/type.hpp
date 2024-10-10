@@ -7,6 +7,7 @@
 #include "token.hpp"
 
 #define TYPE_EMPTY_PTR 0
+#define SIZE_ARR_AS_PTR 1 // used in getSizeBytes to force arrays to be handled as pointers
 
 // used to compare and implicitly cast types
 class Type; // fwd dec
@@ -20,7 +21,7 @@ class Type {
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& type) : primitiveType(type.primitiveType), pointers(type.pointers), _isUnsigned(type._isUnsigned), numArrayHints(type.numArrayHints), forceAsPointer(type.forceAsPointer) {};
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), forceAsPointer(t.forceAsPointer), _isReferencePointer(t._isReferencePointer) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
@@ -36,7 +37,7 @@ class Type {
         void clearPtrs() { pointers.clear(); };
 
         const std::vector<size_t>& getPointers() const { return pointers; };
-        size_t getSizeBytes() const;
+        size_t getSizeBytes(const int=0) const;
 
         TokenType getPrimitiveType() const { return primitiveType; };
 
@@ -65,9 +66,13 @@ class Type {
         Type getAddressPointer() const;
         void clearArrayHints();
 
-        // used to fix pointer arithmetic
+        // used to force an address to be printed (ie. for lvalues, array identifier use)
         void setForcedPointer(bool u) { forceAsPointer = u; };
         bool usesForcedPointer() const { return forceAsPointer; };
+
+        // used to handle reference pointers in function arguments
+        bool isReferencePointer() const { return _isReferencePointer; };
+        void setIsReferencePointer(bool i) { _isReferencePointer = i; };
     private:
         TokenType primitiveType;
         std::vector<size_t> pointers;
@@ -79,6 +84,9 @@ class Type {
 
         // fix for pointer arithmetic
         bool forceAsPointer = false;
+
+        // for handling reference pointers
+        bool _isReferencePointer = false;
 };
 
 #endif

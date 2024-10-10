@@ -12,7 +12,7 @@ enum class ASTNodeType {
     FUNCTION, FUNCTION_CALL, VAR_DECLARATION, IDENTIFIER, RETURN,
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
-    EXPR, UNARY_OP, BIN_OP, TYPE_CAST, SIZEOF,
+    EXPR, UNARY_OP, BIN_OP, TYPE_CAST, SIZEOF, ASM, ASM_INST,
     LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_ARR, ARR_SUBSCRIPT
 };
 
@@ -162,10 +162,35 @@ class ASTOperator : public ASTTypedNode {
         ASTUnaryType getUnaryType() const { return this->unaryType; };
         
         void inferType(scope_stack_t&);
+
+        void setIsNullified(bool i) { _isNullified = i; };
+        bool isNullified() const { return _isNullified; };
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;
         TokenType opType;
         bool isUnary;
+        bool _isNullified = false; // if this is chained to another operator and cancels out
+};
+
+class ASTInlineASM : public ASTTypedNode {
+    public:
+        ASTInlineASM(const Token& token, const std::string& raw) : ASTTypedNode(token), raw(raw) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::ASM; }
+        void inferType() { this->setType( Type(TokenType::VOID) ); };
+
+        const std::string& getRaw() const { return raw; };
+    private:
+        std::string raw;
+};
+
+class ASMProtectedInstruction : public ASTTypedNode {
+    public:
+        ASMProtectedInstruction(const Token& token) : ASTTypedNode(token), instType(token.type) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::ASM_INST; }
+        void inferType(scope_stack_t&);
+        TokenType getInstType() const { return instType; };
+    private:
+        const TokenType instType;
 };
 
 /************* LITERALS & IDENTIFIERS *************/

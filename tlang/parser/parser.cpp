@@ -488,7 +488,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
                         throw TInvalidTokenException(tokens[i+1].err);
 
                     // add empty array modifier if first bracket pair
-                    type.addEmptyPointer();
+                    type.addHintPointer( TYPE_EMPTY_PTR ); // don't use addEmptyPointer, this adds in reverse order
                     i += 2;
                 }
                 numHints++;

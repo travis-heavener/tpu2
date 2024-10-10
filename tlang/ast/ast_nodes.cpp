@@ -182,9 +182,6 @@ void ASTTypedNode::inferSubscriptTypes(scope_stack_t& scopeStack) {
     for (ASTArraySubscript* pSub : subscripts) {
         pSub->inferType(scopeStack);
     }
-
-    // unset lvalue status if pointers are all gone
-    this->setIsLValue(subscripts.size() == type.getNumPointers());
 }
 
 // sets the value to be an lvalue IF it is a valid lvalue itself
@@ -222,28 +219,30 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 break;
             }
             case TokenType::ASTERISK: {
-                if (typeA.getNumPointers() == 0) // check for pointers
+                /**
+                 * child:   lvalue/rvalue (pointer)
+                 * result:  rvalue (can be lvalue)
+                 */
+                if (typeA.getNumPointers() == 0 || typeA.isVoidPtr()) // check for pointers
                     throw TInvalidOperationException(err);
 
-                // if dereferencing an array, force as a pointer
-                if (typeA.isArray())
-                    pA->getTypeRef().setForcedPointer(true);
-
-                typeA.popPointer(); // pop a pointer off and set type
-                if (typeA.isArray()) // recheck forced ptr status after popping a ptr
-                    typeA.setForcedPointer(true);
-
-                if (typeA.isVoidNonPtr()) // check for dereferenced void pointer
-                    throw TInvalidOperationException(err);
-
-                this->setType( typeA );
-                pA->setIsLValue(false); // revoke lvalue status from child
-                this->setIsLValue(true); // force lvalue status on this (NOT CHILD)
+                this->setType(typeA);
+                this->getTypeRef().popPointer();
+                pA->setIsLValue(false); // revoke lvalue status
                 break;
             }
             case TokenType::AMPERSAND: {
+                /**
+                 * child:   lvalue
+                 * result:  rvalue
+                 */
                 // set left arg to lvalue if identifier
                 if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
+                    pA->setIsLValue(true);
+                
+                // if dereferenced value, set as lvalue
+                if (pA->getNodeType() == ASTNodeType::UNARY_OP &&
+                    static_cast<ASTOperator*>(pA)->getOpTokenType() == TokenType::ASTERISK)
                     pA->setIsLValue(true);
 
                 // verify lvalue
@@ -252,18 +251,21 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 this->setType( typeA );
                 this->getTypeRef().addEmptyPointer();
 
-                // tell child to be just its pointer without any array hints (to fix its size to that of a ptr)
-                typeA.clearArrayHints();
-                typeA.setForcedPointer(true); // prevent derefs from pushing values
-                pA->setType( typeA );
+                // if getting the address of something dereferenced, nullify this and pA
+                if (pA->getNodeType() == ASTNodeType::UNARY_OP) {
+                    ASTOperator* pAOp = static_cast<ASTOperator*>(pA);
+                    if (pAOp->getOpTokenType() == TokenType::ASTERISK) {
+                        pAOp->setIsNullified(true);
+                        this->setIsNullified(true);
+                    }
+                }
                 break;
             }
             case TokenType::SIZEOF: {
                 // verify non-void
                 if (typeA.isVoidNonPtr()) throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_INT) );
-                pA->getTypeRef().setForcedPointer(true);
-                pA->setIsLValue(false);
+                pA->setIsLValue(true);
                 break;
             }
             default: {
@@ -273,7 +275,14 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     if (typeA.isVoidNonPtr())
                         throw TInvalidOperationException(err);
 
-                    pA->setIsLValue(false); // revoke lvalue status
+                    // if this is an array, the desired type is now a pointer TO the array
+                    if (typeA.isArray()) {
+                        pA->setIsLValue(true); // force lvalue
+                        typeA.addEmptyPointer();
+                        pA->setType(typeA);
+                    } else {
+                        pA->setIsLValue(false); // revoke lvalue status from child
+                    }
                     break;
                 }
 
@@ -309,16 +318,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
 
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );
-                } else {
-                    // one is a pointer
-                    if (typeA.isArray()) {
-                        typeA.setForcedPointer(true);
-                        pA->getTypeRef().setForcedPointer(true);
-                    } else if (typeB.isArray()) {
-                        typeB.setForcedPointer(true);
-                        pB->getTypeRef().setForcedPointer(true);
-                    }
-
+                } else { // one is a pointer
                     // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
                 }
@@ -345,14 +345,6 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     throw TInvalidOperationException(err);
 
                 if (typeA.isPointer() || typeB.isPointer()) {
-                    if (typeA.isArray()) {
-                        typeA.setForcedPointer(true);
-                        pA->getTypeRef().setForcedPointer(true);
-                    } else if (typeB.isArray()) {
-                        typeB.setForcedPointer(true);
-                        pB->getTypeRef().setForcedPointer(true);
-                    }
-
                     // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
                 } else {
@@ -407,15 +399,18 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
                     pA->setIsLValue(true);
 
-                // verify left arg is lvalue
-                if (!pA->isLValue()) throw TInvalidOperationException(err);
+                // if dereferenced value, set as lvalue
+                if (pA->getNodeType() == ASTNodeType::UNARY_OP &&
+                    static_cast<ASTOperator*>(pA)->getOpTokenType() == TokenType::ASTERISK)
+                    pA->setIsLValue(true);
+
+                // verify left arg is lvalue and isn't still an array (is fully subscripted/dereferenced)
+                if (!pA->isLValue() || typeA.isArray()) throw TInvalidOperationException(err);
 
                 // verify right arg is not void
                 if (typeB.isVoidNonPtr()) throw TIllegalVoidUseException(err);
 
-                // assume type of left argument
-                this->setType( typeA );
-                pA->getTypeRef().setForcedPointer(true);
+                this->setType( typeA ); // take type of left argument
                 pB->setIsLValue(false); // revoke lvalue status from child
                 break;
             }
@@ -466,6 +461,14 @@ void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
     this->inferSubscriptTypes(scopeStack);
 }
 
+void ASMProtectedInstruction::inferType(scope_stack_t& scopeStack) {
+    // infer childrens' types
+    this->inferChildTypes(scopeStack);
+
+    // set own type to void
+    this->setType( Type(TokenType::VOID) );
+}
+
 /******** NODES BELOW DON'T HAVE CHILDREN ********/
 
 void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
@@ -484,6 +487,10 @@ void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
         else
             throw TSyntaxException(this->err);
     }
+
+    // if this is an array and isn't fully dereferenced, force it as a pointer
+    if (type.isArray() && numSubscripts < type.getNumPointers())
+        this->setIsLValue(true);
 
     // set identifier's type
     this->setType( type );

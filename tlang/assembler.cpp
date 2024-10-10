@@ -71,7 +71,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         OUT << "add SP, " << returnSize << '\n';
 
     // add function args to scope (args on top of stack below return bytes)
-    for (size_t i = 0; i < funcNode.getNumParams(); i++) { // add the variable to the scope
+    for (size_t i = 0; i < funcNode.getNumParams(); ++i) { // add the variable to the scope
         ASTFuncParam* pArg = funcNode.paramAt(i);
         scope.declareFunctionParam(pArg->type, pArg->name, funcNode.err);
     }
@@ -165,16 +165,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 size_t resultSize = assembleExpression(*loop.pExprA, outHandle, scope).getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    if (j+1 < resultSize) {
-                        OUT << "popw\n";
-                        j++;
-                        scope.pop(); // additional pop
-                    } else {
-                        OUT << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << resultSize << '\n';
+                scope.pop(resultSize);
 
                 // create label for the start of the loop body (here)
                 const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
@@ -210,22 +202,11 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 resultSize = assembleExpression(*loop.pExprC, outHandle, scope).getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    if (j+1 < resultSize) {
-                        OUT << "popw\n";
-                        j++;
-                        scope.pop(); // additional pop
-                    } else {
-                        OUT << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << resultSize << '\n';
+                scope.pop(resultSize);
 
-                // jump back to the loopStartLabel
-                OUT << "jmp " << loopStartLabel << '\n';
-
-                // add merge label
-                OUT << mergeLabel << ":\n";
+                OUT << "jmp " << loopStartLabel << '\n'; // jump back to the loopStartLabel
+                OUT << mergeLabel << ":\n"; // add merge label
                 break;
             }
             case ASTNodeType::CONDITIONAL: {
@@ -330,16 +311,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 const size_t resultSize = resultType.getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; ++j) {
-                    if (j+1 < resultSize) {
-                        OUT << "popw\n";
-                        scope.pop(); // additional pop
-                        ++j;
-                    } else {
-                        OUT << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << resultSize << '\n';
+                scope.pop(resultSize);
                 break;
             }
             default: {
@@ -350,18 +323,12 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
     // remove extra scope variables after the scope closes
     if (isNewScope || hasReturned) {
-        size_t sizeFreed = 0;
-        while (scope.size() > startingScopeSize)
-            sizeFreed += scope.pop();
+        size_t sizeFreed = scope.size() - startingScopeSize;
 
         // move back SP
-        for (size_t i = 0; i < sizeFreed; ++i) {
-            if (i+1 < sizeFreed) {
-                OUT << "popw\n";
-                ++i;
-            } else {
-                OUT << "pop\n";
-            }
+        if (sizeFreed > 0) {
+            OUT << "sub SP, " << sizeFreed << '\n';
+            scope.pop(sizeFreed);
         }
     }
 
@@ -370,14 +337,6 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
 // assembles an expression, returning the type of the value pushed to the stack
 Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope) {
-    // if this is a literal array without a type (ie. not part of an assignment), yell at the user (LOUDLY)
-    // literal arrays are ONLY allowed during assignment
-    if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
-        ASTArrayLiteral* pArr = static_cast<ASTArrayLiteral*>(&bodyNode);
-        if (pArr->getType().getPrimitiveType() == TokenType::VOID) // unset
-            throw TSyntaxException(bodyNode.err);
-    }
-
     // get desired expression type
     const Type desiredType = static_cast<ASTTypedNode*>(&bodyNode)->getType();
 
@@ -390,10 +349,15 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
     // assemble this node
     Type resultType;
-    bodyNode.isAssembled = true;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::UNARY_OP: {
             ASTOperator& unaryOp = *static_cast<ASTOperator*>(&bodyNode);
+
+            // passthrough nullified operators
+            if (unaryOp.isNullified()) {
+                resultType = desiredType;
+                break;
+            }
 
             // move argument into AX
             if (resultTypes.size() != 1)
@@ -406,7 +370,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             }
 
             // pop in reverse (higher first, later first)
-            size_t resultSize = resultTypes[0].getSizeBytes();
+            size_t resultSize = resultTypes[0].getSizeBytes(SIZE_ARR_AS_PTR);
             if (resultSize == 2) {
                 OUT << "popw AX\n";
                 scope.pop(); // additional pop
@@ -461,8 +425,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     resultType = resultTypes[0];
                     resultType.popPointer();
 
-                    // if the pointer to this is desired (ie. chained &*, just push the ptr)
-                    if (desiredType.usesForcedPointer()) {
+                    // if lvalue OR this is a pointer and the top subscript is an array hint, pass the address
+                    if (unaryOp.isLValue() ||
+                        (resultType.isPointer() && resultType.getPointers().back() != TYPE_EMPTY_PTR)) {
                         // buffer to stack
                         OUT << "pushw BP\n";
                         scope.addPlaceholder(2);
@@ -487,7 +452,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 }
                 case TokenType::SIZEOF: {
                     // if this is a pointer TO an array, correct its size
-                    if (resultTypes[0].isArray() && *resultTypes[0].getPointers().rbegin() == TYPE_EMPTY_PTR) {
+                    if (resultTypes[0].isArray() && resultTypes[0].getPointers().back() == TYPE_EMPTY_PTR) {
                         // this is still just a pointer
                         resultSize = MEM_ADDR_SIZE;
                     } else if (resultTypes[0].isArray()) {
@@ -518,6 +483,13 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         }
         case ASTNodeType::BIN_OP: {
             ASTOperator& binOp = *static_cast<ASTOperator*>(&bodyNode);
+            const TokenType opType = binOp.getOpTokenType();
+
+            // passthrough nullified operators
+            if (binOp.isNullified()) {
+                resultType = desiredType;
+                break;
+            }
 
             // move both arguments into AX & BX
             if (resultTypes.size() != 2)
@@ -525,7 +497,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             // get dominant type
             const Type dominantType = getDominantType(resultTypes[0], resultTypes[1]);
-            const unsigned char dominantSize = dominantType.getSizeBytes();
+            const size_t dominantSize = dominantType.getSizeBytes(SIZE_ARR_AS_PTR);
 
             // pop in reverse (higher first, later first)
             if (dominantSize < 1 || dominantSize > 2) throw TSyntaxException(bodyNode.err);
@@ -540,27 +512,32 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             scope.pop();
 
             // ignore popping to the AL/AX register if nothing was pushed from the stack (for assignments)
-            if (resultTypes[0].getSizeBytes() == 2) { // pop to AX
+            if (isTokenAssignOp(opType)) {
+                // force assignment to pop the address
                 OUT << "popw AX\n";
-                scope.pop(); scope.pop();
-            } else if (resultTypes[0].getSizeBytes() == 1) { // pop to AL and zero AH
-                OUT << "pop AL\n";
-                OUT << "xor AH, AH\n";
-                scope.pop();
+                scope.pop(2);
+            } else {
+                if (resultTypes[0].getSizeBytes(SIZE_ARR_AS_PTR) == 2) { // pop to AX
+                    OUT << "popw AX\n";
+                    scope.pop(2);
+                } else { // pop to AL and zero AH
+                    OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n";
+                    scope.pop();
+                }
             }
 
             // determine output registers
             const std::string regA = dominantSize == 1 ? "AL" : "AX";
             const std::string regB = dominantSize == 1 ? "BL" : "BX";
 
-            const TokenType opType = binOp.getOpTokenType();
             switch (opType) {
                 case TokenType::OP_ADD: case TokenType::OP_SUB: { // add/sub AX/AL to/from BX/BL
                     // handle pointer arithmetic
                     Type typeA = resultTypes[0], typeB = resultTypes[1];
                     
                     if (typeA.isPointer()) {
-                        typeA.popPointer(); // get internal size, also removes forced ptr status so we get accurate size
+                        typeA.popPointer(); // get internal size, also removes forced ptr status for accurate size
                         const size_t chunkSize = typeA.getSizeBytes();
 
                         // mul needs AX register, so move it temporarily (don't need to do scope.pop/addPlaceholder)
@@ -570,7 +547,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         OUT << "movw BX, AX\n"; // save new operand
                         OUT << "popw AX\n"; // move AX back
                     } else if (typeB.isPointer()) {
-                        typeB.popPointer(); // get internal size, also removes forced ptr status so we get accurate size
+                        typeB.popPointer(); // get internal size, also removes forced ptr status for accurate size
                         const size_t chunkSize = typeB.getSizeBytes();
 
                         // operand already in AX; move chunk size into CX
@@ -853,38 +830,74 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
             Type idenType = scope.getVariable(identifier.raw, identifier.err)->type;
 
-            const size_t numPointers = idenType.getNumPointers();
-            const size_t numSubscripts = identifier.getNumSubscripts();
+            // if there aren't any subscripts, handle the value here
+            if (identifier.getNumSubscripts() == 0) {
+                if (idenType.isPointer()) { // handle pointers
+                    // push the address onto the stack
+                    OUT << "movw BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
+                    OUT << "sub BP, " << stackOffset << '\n';
+                    OUT << "pushw BP\n";
+                    scope.addPlaceholder(2);
 
-            if (numSubscripts > numPointers)
-                throw TInvalidOperationException(identifier.err);
+                    // if this is a reference pointer (ie. array passed as an argument), dereference it
+                    if (idenType.isReferencePointer()) {
+                        // doesn't need to be a reference pointer anymore
+                        OUT << "popw BP\n"; // move address back into BP
+                        idenType.setIsReferencePointer(false);
+                        scope.pop(2);
 
-            // factor in the stack offset of the variable's start
-            OUT << "movw CX, SP\n"; // move SP into CX for manipulation
-            OUT << "sub CX, " << stackOffset << '\n';
-
-            // temp store the identifier's address on stack for arith manipulation
-            OUT << "pushw CX\n";
-            scope.addPlaceholder(2);
-
-            // if there are still array hints left, force as pointer
-            if (idenType.getNumArrayHints() > 0)
-                idenType.setForcedPointer(true);
-
-            // if this is being subscripted, leave the address
-            if (numSubscripts == 0 || numSubscripts == numPointers) {
-                // if lvalue, do nothing--address is on top of stack
-                // if there are array pointers left, push the array's address (already on stack)
-                if (!identifier.isLValue() && numPointers == 0 && !idenType.usesForcedPointer()) { // otherwise, push value
-                    // pop address from stack to BP
-                    OUT << "popw BP\n";
-                    scope.pop(); scope.pop();
-
-                    // push bytes (lowest-first)
-                    for (size_t j = 0; j < idenType.getSizeBytes(); ++j) {
-                        OUT << "push [BP+" << j << "]\n";
-                        scope.addPlaceholder();
+                        // push the referenced value
+                        const size_t typeSize = idenType.getSizeBytes();
+                        for (size_t k = 0; k < typeSize; ++k)
+                            OUT << "push [BP+" << k << "]\n";
+                        scope.addPlaceholder(typeSize);
                     }
+
+                    // if this is an lvalue, leave the address on the stack
+                    if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
+                        const size_t typeSize = idenType.getSizeBytes();
+                        OUT << "popw BP\n"; // pop address back into BP
+                        scope.pop(2);
+
+                        for (size_t k = 0; k < typeSize; ++k)
+                            OUT << "push [BP+" << k << "]\n";
+                        scope.addPlaceholder(typeSize);
+                    }
+                } else { // handle primitives
+                    // if this is an lvalue, pass the address
+                    if (identifier.isLValue()) {
+                        // push the address onto the stack
+                        OUT << "movw BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
+                        OUT << "sub BP, " << stackOffset << '\n';
+                        OUT << "pushw BP\n";
+                        scope.addPlaceholder(2);
+                    } else { // this is an rvalue, push the value onto the stack
+                        const size_t typeSize = idenType.getSizeBytes();
+                        for (size_t j = 0; j < typeSize; ++j) {
+                            OUT << "push [SP-" << stackOffset << "]\n";
+                            scope.addPlaceholder();
+                        }
+                    }
+                }
+            } else {
+                // push the address onto the stack
+                OUT << "movw BP, SP\n"; // store the SP in BP for manipulation w/o affecting SP directly
+                OUT << "sub BP, " << stackOffset << '\n';
+
+                // if this is a reference pointer (ie. array passed as an argument), dereference it
+                if (idenType.isReferencePointer()) {
+                    // doesn't need to be a reference pointer anymore
+                    idenType.setIsReferencePointer(false);
+
+                    // push the referenced value
+                    const size_t typeSize = idenType.getSizeBytes();
+                    for (size_t k = 0; k < typeSize; ++k)
+                        OUT << "push [BP+" << k << "]\n";
+                    scope.addPlaceholder(typeSize);
+                } else {
+                    // not a reference pointer, push the address
+                    OUT << "pushw BP\n"; // push the address of this identifier
+                    scope.addPlaceholder(2);
                 }
             }
 
@@ -950,6 +963,44 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             resultType = static_cast<ASTArrayLiteral*>(&bodyNode)->getTypeRef();
             break;
         }
+        case ASTNodeType::ASM: {
+            // paste inline assembly to file
+            ASTInlineASM* pASM = static_cast<ASTInlineASM*>(&bodyNode);
+            OUT << pASM->getRaw() << '\n';
+            resultType = pASM->getTypeRef();
+            break;
+        }
+        case ASTNodeType::ASM_INST: {
+            // handle the custom assembly instruction
+            ASMProtectedInstruction* pInst = static_cast<ASMProtectedInstruction*>(&bodyNode);
+            const size_t resultSize = resultTypes[0].getSizeBytes();
+            const TokenType instType = pInst->getInstType();
+
+            switch (instType) {
+                case TokenType::ASM_LOAD_AX:
+                case TokenType::ASM_LOAD_BX:
+                case TokenType::ASM_LOAD_CX:
+                case TokenType::ASM_LOAD_DX: {
+                    if (resultSize > 2 || resultSize == 0)
+                        throw TInvalidOperationException(pInst->err);
+
+                    // pad bytes
+                    if (resultSize == 1) OUT << "push 0\n";
+
+                    // move value into register
+                    const std::string reg = instType == TokenType::ASM_LOAD_AX ? "AX" :
+                                            instType == TokenType::ASM_LOAD_BX ? "BX" :
+                                            instType == TokenType::ASM_LOAD_CX ? "CX" : "DX";
+
+                    OUT << "popw " << reg << '\n';
+                    break;
+                }
+                default: throw TSyntaxException(pInst->err);
+            }
+
+            resultType = pInst->getTypeRef();
+            break;
+        }
         case ASTNodeType::LIT_VOID: throw TIllegalVoidUseException(bodyNode.err);
         default: throw TExpressionEvalException(bodyNode.err);
     }
@@ -963,58 +1014,54 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
         const size_t numPointers = resultType.getNumPointers();
         const size_t numSubscripts = pTypedBody->getNumSubscripts();
+        const std::vector<ASTArraySubscript*>& subscripts = pTypedBody->getSubscripts();
+        const bool isLValue = pTypedBody->isLValue();
 
         if (numSubscripts > numPointers)
             throw TInvalidOperationException(bodyNode.err);
 
-        // address is on top of stack
-        for (ASTArraySubscript* pSub : pTypedBody->getSubscripts()) {
-            // if this pointer is blank, push the pointer's pointed address
-            if (*resultType.getPointers().rbegin() == TYPE_EMPTY_PTR) {
+        // handle subscripts
+        for (size_t j = 0; j < numSubscripts; ++j) {
+            const size_t lastPtrSize = resultType.getPointers().back();
+            const bool isImplicitArrayHint = resultType.getNumArrayHints() > 0 && lastPtrSize == TYPE_EMPTY_PTR;
+            ASTArraySubscript* pSub = subscripts[j];
+            resultType.popPointer();
+
+            // determine the size of the rest of the object
+            size_t chunkSize = resultType.getSizeBytes();
+
+            // if this is a pointer (not an array), dereference and get its address
+            if (lastPtrSize == TYPE_EMPTY_PTR && !isImplicitArrayHint) {
+                // pop address into BP
                 OUT << "popw BP\n";
                 OUT << "push [BP+0]\n";
                 OUT << "push [BP+1]\n";
             }
 
-            // determine the size of the rest of the object
-            resultType.popPointer();
-            size_t chunkSize = resultType.getSizeBytes();
-
             // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
             assembleExpression(*pSub, outHandle, scope);
 
             OUT << "popw AX\n"; // pop subscript off stack
-            scope.pop(); scope.pop();
             OUT << "popw CX\n"; // pop address back into CX
-            scope.pop(); scope.pop();
-
             OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
             OUT << "mul BX\n"; // scale by chunk size
             OUT << "add CX, AX\n"; // add the chunk to the pointer
             OUT << "pushw CX\n"; // put address back onto stack
-            scope.addPlaceholder(2);
+            scope.pop(2); // 4 pops - 2 pushes = 2 net pops
         }
 
-        // if this is being subscripted, leave the address
-        if (numSubscripts == 0 || numSubscripts == numPointers) {
-            // if lvalue, do nothing--address is on top of stack
-            // if there are array pointers left, push the array's address (already on stack)
-            if (!pTypedBody->isLValue() && resultType.getNumArrayHints() == 0 && !resultType.usesForcedPointer()) { // otherwise, push value
-                // pop address from stack to BP
-                OUT << "popw BP\n";
-                scope.pop(); scope.pop();
+        // if this isn't an array and isn't an lvalue, dereference the final address on the stack
+        if (!isLValue && (resultType.getNumPointers() == 0 || resultType.getPointers().back() == TYPE_EMPTY_PTR)) {
+            // dereference final address on stack
+            OUT << "popw BP\n"; // move address back into BP
+            scope.pop(2);
 
-                // push bytes (lowest-first)
-                for (size_t j = 0; j < resultType.getSizeBytes(); ++j) {
-                    OUT << "push [BP+" << j << "]\n";
-                    scope.addPlaceholder();
-                }
-            }
+            // push the referenced value
+            const size_t typeSize = resultType.getSizeBytes();
+            for (size_t k = 0; k < typeSize; ++k)
+                OUT << "push [BP+" << k << "]\n";
+            scope.addPlaceholder(typeSize);
         }
-
-        // if there are still array hints left, force as pointer
-        if (resultType.getNumArrayHints() > 0 || pTypedBody->isLValue())
-            resultType.setForcedPointer(true);
     }
 
     // implicit cast
@@ -1026,6 +1073,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
     // fix any forced pointers (not part of typecast)
     if (resultType.usesForcedPointer() != desiredType.usesForcedPointer())
         resultType.setForcedPointer(desiredType.usesForcedPointer());
+
+    // mark this node as assembled
+    bodyNode.isAssembled = true;
 
     // result type now matches desired type
     return resultType;
@@ -1041,17 +1091,8 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
     // if the desired type is void, just pop everything off
     if (desiredType.isVoidNonPtr()) {
         size_t resultSize = resultType.getSizeBytes();
-        while (resultSize > 0) {
-            if (resultSize > 1) {
-                OUT << "popw\n";
-                --resultSize;
-                scope.pop();
-            } else {
-                OUT << "pop\n";
-            }
-            scope.pop();
-            --resultSize;
-        }
+        OUT << "sub SP, " << resultSize << '\n';
+        scope.pop(resultSize);
         return;
     }
 
@@ -1138,16 +1179,8 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
                 }
                 scope.addPlaceholder(endSize - startSize);
             } else if (startSize > endSize) { // pop bytes
-                for (size_t i = startSize; i > endSize; --i) {
-                    if (i-1 > endSize) {
-                        OUT << "popw\n";
-                        --i;
-                        scope.pop();
-                    } else {
-                        OUT << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << (startSize - endSize) << '\n';
+                scope.pop(startSize - endSize);
             }
 
             // re-add sign bit

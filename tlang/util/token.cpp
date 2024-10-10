@@ -39,6 +39,10 @@ bool isTokenAssignOp(const TokenType type) {
     return type == ASSIGN;
 }
 
+bool isTokenProtectedASM(const TokenType type) {
+    return type == ASM_LOAD_AX || type == ASM_LOAD_BX || type == ASM_LOAD_CX || type == ASM_LOAD_DX;
+}
+
 // returns the size of a primitive type in bytes
 unsigned char getSizeOfType(TokenType type) {
     switch (type) {
