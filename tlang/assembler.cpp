@@ -339,6 +339,14 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
 // assembles an expression, returning the type of the value pushed to the stack
 Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope) {
+    // if this is a literal array without a type (ie. not part of an assignment), yell at the user (LOUDLY)
+    // literal arrays are ONLY allowed during assignment
+    if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
+        ASTArrayLiteral* pArr = static_cast<ASTArrayLiteral*>(&bodyNode);
+        if (pArr->getType().getPrimitiveType() == TokenType::VOID) // unset
+            throw TSyntaxException(bodyNode.err);
+    }
+
     // get desired expression type
     const Type desiredType = static_cast<ASTTypedNode*>(&bodyNode)->getType();
 

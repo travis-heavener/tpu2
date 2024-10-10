@@ -1,9 +1,8 @@
-#include <stdlib.t>
+// #include <stdlib.t>
 // #include <string.t>
-#include <stdio.t>
+// #include <stdio.t>
 
 int main() {
-    char msg[] = "Hello world!\n";
-    // print(msg);
-    return EXIT_FAILURE;
+    int arr[] = {1, 2, 3};
+    return arr;
 }

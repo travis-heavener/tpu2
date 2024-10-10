@@ -1,111 +1,16 @@
-__UF0:
-    pushw 0
-    __J0:
-    movw BP, SP
-    sub BP, 6
-    push [BP+0]
-    push [BP+1]
-    push [SP-4]
-    push [SP-4]
-    popw AX
-    popw CX
-    movw BX, 1
-    mul BX
-    add CX, AX
-    pushw CX
-    popw BP
-    push [BP+0]
-    push 0
-    pop BL
-    xor BH, BH
-    pop AL
-    xor AH, AH
-    xor AL, BL
-    jz __J2
-    mov AL, 1
-    jmp __J2
-    __J2:
-    push AL
-    pop AL
-    xor AH, AH
-    buf AX
-    jz __J1
-    movw BP, SP
-    sub BP, 2
-    pushw BP
-    push [SP-4]
-    push [SP-4]
-    pushw 1
-    popw BX
-    popw AX
-    add AX, BX
-    pushw AX
-    popw BX
-    popw AX
-    movw BP, AX
-    mov [BP+0], BL
-    mov [BP+1], BH
-    pushw BX
-    sub SP, 2
-    jmp __J0
-    __J1:
-    push [SP-2]
-    push [SP-2]
-    pop DL
-    mov [SP-4], DL
-    pop DL
-    mov [SP-4], DL
-    sub SP, 2
-    jmp __UF0E
-    __UF0E:
-    ret
-__UF1:
-    movw BP, SP
-    sub BP, 2
-    pushw BP
-    popw BP
-    push [BP+0]
-    push [BP+1]
-    pushw 0
-    call __UF0
-    movw BP, SP
-    sub BP, 6
-    pushw BP
-    popw BP
-    push [BP+0]
-    push [BP+1]
-    popw BX
-    push [SP-2]
-    push [SP-2]
-    popw CX
-    movw AX, 0x0
-    syscall
-    sub SP, 4
-    jmp __UF1E
-    __UF1E:
-    ret
 main:
     add SP, 2
-    push 72
-    push 101
-    push 108
-    push 108
-    push 111
-    push 32
-    push 119
-    push 111
-    push 114
-    push 108
-    push 100
-    push 33
-    push 10
-    push 0
     pushw 1
+    pushw 2
+    pushw 3
+    movw BP, SP
+    sub BP, 6
+    pushw BP
     pop DL
-    mov [SP-16], DL
+    mov [SP-8], DL
     pop DL
-    mov [SP-16], DL
-    sub SP, 14
+    mov [SP-8], DL
+    sub SP, 6
     jmp mainE
     mainE:
     movw AX, 0x03
