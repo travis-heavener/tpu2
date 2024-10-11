@@ -4,18 +4,31 @@
 
 #include "assembler.hpp"
 #include "ast/ast.hpp"
-#include "util/util.hpp"
+#include "util/toolbox.hpp"
+#include "util/token.hpp"
+#include "util/type.hpp"
+#include "util/t_exception.hpp"
+#include "util/config.hpp"
 
-#define FUNC_MAIN_LABEL "main"
-#define FUNC_LABEL_PREFIX "__UF" // for "user function"
-#define FUNC_END_LABEL_SUFFIX "E" // added to the end of a function label to mark where a function ends
-#define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
-#define TAB "    "
-
-// staic fields
+// static fields
 static size_t nextFuncLabelID = 0;
 static size_t nextJMPLabelID = 0;
 static label_map_t labelMap;
+
+AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& func) {
+    this->funcName = funcName;
+
+    // determine if this is the main function
+    this->paramTypes = std::vector<Type>();
+    this->returnType = func.getReturnType();
+    
+    // fill in param types
+    func.loadParamTypes(this->paramTypes);
+
+    // determine labels
+    this->startLabel = func.isMainFunction() ? funcName : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
+    this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
+}
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
@@ -34,29 +47,25 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
 void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     // determine labelName
     const std::string funcName = funcNode.getName();
-    const std::string labelName = funcName == FUNC_MAIN_LABEL ?
-        FUNC_MAIN_LABEL : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
 
-    // record function name & return type
-    labelMap[funcName] = {labelName, labelName + FUNC_END_LABEL_SUFFIX, funcNode.getReturnType()};
+    // create new AssembledFunc to store name & return type
+    AssembledFunc asmFunc = AssembledFunc(funcName, funcNode);
+    labelMap.insert({funcName, asmFunc});
 
     // create a scope for this body
     Scope scope;
 
     // assemble this function into the file
-    outHandle << labelName << ":\n";
+    outHandle << asmFunc.getStartLabel() << ":\n";
 
     // if this is main, add return byte spacing on top of stack
     const size_t returnSize = funcNode.getReturnType().getSizeBytes();
     if (funcName == FUNC_MAIN_LABEL && returnSize > 0)
-        outHandle << TAB << "add SP, " << returnSize << '\n';
+        OUT << "add SP, " << returnSize << '\n';
 
     // add function args to scope (args on top of stack below return bytes)
-    for (size_t i = 0; i < funcNode.getNumParams(); i++) { // add the variable to the scope
+    for (size_t i = 0; i < funcNode.getNumParams(); ++i) { // add the variable to the scope
         ASTFuncParam* pArg = funcNode.paramAt(i);
-        // doesn't currently support implied array dimensions in arguments
-        if (pArg->type.hasEmptyArrayModifiers())
-            throw TSyntaxException(funcNode.err);
         scope.declareFunctionParam(pArg->type, pArg->name, funcNode.err);
     }
 
@@ -65,34 +74,34 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
-    bool hasReturned = assembleBody(&funcNode, outHandle, scope, funcName, true, true);
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, asmFunc, true, true);
 
     // declare end of function label
     if (!hasReturned && returnSize > 0)
         throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
-    outHandle << TAB << "jmp " << labelName + FUNC_END_LABEL_SUFFIX << '\n';
+    OUT << "jmp " << asmFunc.getEndLabel() << '\n';
 
     // write return label
-    outHandle << TAB << labelName + FUNC_END_LABEL_SUFFIX << ":\n";
+    OUT << asmFunc.getEndLabel() << ":\n";
 
     // stop clock after execution is done IF MAIN or return to previous label
     if (funcName == FUNC_MAIN_LABEL) {
         // handle return status
-        outHandle << TAB << "movw AX, 0x03\n"; // specify syscall type
-        outHandle << TAB << "popw BX\n"; // pop return status to AX
-        outHandle << TAB << "syscall\n"; // trigger syscall
-        outHandle << TAB << "hlt\n";
+        OUT << "movw AX, 0x03\n"; // specify syscall type
+        OUT << "popw BX\n"; // pop return status to AX
+        OUT << "syscall\n"; // trigger syscall
+        OUT << "hlt\n";
     } else { // return to previous label from call instruction
-        outHandle << TAB << "ret\n";
+        OUT << "ret\n";
     }
 }
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const std::string& funcName, const bool isNewScope, const bool isTopScope) {
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const AssembledFunc& asmFunc, const bool isNewScope, const bool isTopScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
-    const size_t returnSize = labelMap[funcName].returnType.getSizeBytes();
-    const std::string returnLabel = labelMap[funcName].returnLabel;
+    const Type& desiredType = asmFunc.getReturnType();
+    const size_t returnSize = desiredType.getSizeBytes();
 
     // iterate over children of this node
     bool hasReturned = false;
@@ -112,53 +121,45 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
                 // append loopStartLabel
-                outHandle << TAB << loopStartLabel << ":\n";
+                OUT << loopStartLabel << ":\n";
 
                 // check condition
-                size_t resultSize = assembleExpression(*loop.pExpr, outHandle, scope);
+                size_t resultSize = assembleExpression(*loop.pExpr, outHandle, scope).getSizeBytes();
 
                 // load result to AL/AX
                 if (resultSize == 2) {
-                    outHandle << TAB << "pop AX\n"; // load value to AH
+                    OUT << "pop AX\n"; // load value to AH
                     scope.pop();
                 } else {
-                    outHandle << TAB << "xor AH, AH\n"; // clear AH if no value is there
-                    outHandle << TAB << "pop AL\n";
+                    OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                 }
                 scope.pop();
-                outHandle << TAB << "buf AX\n"; // test ZF flag
+                OUT << "buf AX\n"; // test ZF flag
 
                 // if the result sets the ZF flag, it's false so jmp to mergeLabel
-                outHandle << TAB << "jz " << mergeLabel << "\n";
+                OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
                 hasReturned = !isTopScope && hasReturnedLocal;
 
                 // jump back to the loopStartLabel
-                outHandle << TAB << "jmp " << loopStartLabel << '\n';
+                OUT << "jmp " << loopStartLabel << '\n';
 
                 // add merge label
-                outHandle << TAB << mergeLabel << ":\n";
+                OUT << mergeLabel << ":\n";
                 break;
             }
             case ASTNodeType::FOR_LOOP: {
                 ASTForLoop& loop = *static_cast<ASTForLoop*>(&child);
 
                 // assemble first expression in current scope
-                size_t resultSize = assembleExpression(*loop.pExprA, outHandle, scope);
+                size_t resultSize = assembleExpression(*loop.pExprA, outHandle, scope).getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    if (j+1 < resultSize) {
-                        outHandle << TAB << "popw\n";
-                        j++;
-                        scope.pop(); // additional pop
-                    } else {
-                        outHandle << TAB << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << resultSize << '\n';
+                scope.pop(resultSize);
 
                 // create label for the start of the loop body (here)
                 const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
@@ -167,49 +168,38 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
                 // append loopStartLabel
-                outHandle << TAB << loopStartLabel << ":\n";
+                OUT << loopStartLabel << ":\n";
 
                 // check condition
-                resultSize = assembleExpression(*loop.pExprB, outHandle, scope);
+                resultSize = assembleExpression(*loop.pExprB, outHandle, scope).getSizeBytes();
 
                 // load result to AL/AX
-                if (resultSize > 1) {
-                    outHandle << TAB << "pop AH\n"; // load value to AH
+                if (resultSize == 2) {
+                    OUT << "popw AX\n"; // load value to AH
                     scope.pop();
                 } else {
-                    outHandle << TAB << "xor AH, AH\n"; // clear AH if no value is there
+                    OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n"; // clear AH if no value is there
                 }
-                outHandle << TAB << "pop AL\n";
                 scope.pop();
-                outHandle << TAB << "buf AX\n"; // test ZF flag
+                OUT << "buf AX\n"; // test ZF flag
 
                 // if the result sets the ZF flag, it's false so jmp to mergeLabel
-                outHandle << TAB << "jz " << mergeLabel << "\n";
+                OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, funcName);
+                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
                 hasReturned = !isTopScope && hasReturnedLocal;
 
                 // assemble third expression
-                resultSize = assembleExpression(*loop.pExprC, outHandle, scope);
+                resultSize = assembleExpression(*loop.pExprC, outHandle, scope).getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    if (j+1 < resultSize) {
-                        outHandle << TAB << "popw\n";
-                        j++;
-                        scope.pop(); // additional pop
-                    } else {
-                        outHandle << TAB << "pop\n";
-                    }
-                    scope.pop();
-                }
+                OUT << "sub SP, " << resultSize << '\n';
+                scope.pop(resultSize);
 
-                // jump back to the loopStartLabel
-                outHandle << TAB << "jmp " << loopStartLabel << '\n';
-
-                // add merge label
-                outHandle << TAB << mergeLabel << ":\n";
+                OUT << "jmp " << loopStartLabel << '\n'; // jump back to the loopStartLabel
+                OUT << mergeLabel << ":\n"; // add merge label
                 break;
             }
             case ASTNodeType::CONDITIONAL: {
@@ -232,73 +222,76 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                         else // else if branch
                             pExpr = static_cast<ASTElseIfCondition*>(conditional.at(j))->pExpr;
 
-                        assembleExpression(*pExpr, outHandle, scope, getSizeOfType(TokenType::TYPE_BOOL));
+                        assembleExpression(*pExpr, outHandle, scope);
 
                         // pop the result off the stack to AL
-                        outHandle << TAB << "xor AH, AH\n"; // clear AH since no value is put there
-                        outHandle << TAB << "pop AL\n"; // pop to AL
+                        OUT << "pop AL\n"; // pop to AL
+                        OUT << "xor AH, AH\n"; // clear AH since no value is put there
                         scope.pop();
 
                         // if false, jump to next condition
-                        outHandle << TAB << "buf AX\n"; // set ZF if false
-                        outHandle << TAB << "jz " << nextLabel << '\n';
+                        OUT << "buf AX\n"; // set ZF if false
+                        OUT << "jz " << nextLabel << '\n';
                     }
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body in a new scope
-                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, funcName);
+                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, asmFunc);
                     hasReturned = !isTopScope && hasReturnedLocal;
 
                     // jump to merge label
-                    outHandle << TAB << "jmp " << mergeLabel << '\n';
+                    OUT << "jmp " << mergeLabel << '\n';
 
                     // write next label
-                    outHandle << TAB << nextLabel << ":\n";
+                    OUT << nextLabel << ":\n";
                 }
 
                 break;
             }
             case ASTNodeType::VAR_DECLARATION: {
                 // create space on stack
-                ASTVarDeclaration& varChild = *static_cast<ASTVarDeclaration*>(&child);
-                const Type varType = varChild.getType();
+                ASTVarDeclaration* pVarChild = static_cast<ASTVarDeclaration*>(&child);
+                const Type varType = pVarChild->getType();
                 const size_t typeSize = varType.getSizeBytes();
 
                 // get the value of the assignment
-                if (varChild.pExpr == nullptr) { // no assignment, set to 0
-                    for (size_t j = 0; j < typeSize; j++) {
-                        if (j+1 < typeSize) {
-                            outHandle << TAB << "pushw 0\n";
-                            ++j;
-                        } else {
-                            outHandle << TAB << "push 0\n";
-                        }
-                    }
+                if (pVarChild->pExpr == nullptr) { // no assignment
+                    OUT << "add SP, " << typeSize << '\n';
                 } else { // has assignment, assemble its expression
-                    assembleExpression(*varChild.pExpr, outHandle, scope, typeSize);
+                    assembleExpression(*pVarChild->pExpr, outHandle, scope);
 
                     // remove any placeholders
                     for (size_t j = 0; j < typeSize; j++) scope.pop();
                 }
 
                 // add variable to scope
-                scope.declareVariable(varType, varChild.pIdentifier->raw, varChild.pIdentifier->err);
+                scope.declareVariable(varType, pVarChild->pIdentifier->raw, pVarChild->pIdentifier->err);
                 break;
             }
             case ASTNodeType::RETURN: {
                 // assemble expression (first and only child of retNode is an ASTExpr*)
                 ASTReturn& retNode = *static_cast<ASTReturn*>(&child);
-                size_t resultSize = assembleExpression(*retNode.at(0), outHandle, scope, returnSize);
 
-                // move result bytes to their place earlier on the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    // pop top of stack into DL
-                    outHandle << TAB << "pop DL\n";
-                    scope.pop();
+                if (retNode.size() > 0) {
+                    Type resultType = assembleExpression(*retNode.at(0), outHandle, scope);
 
-                    // mov DL to return bytes location
-                    size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (resultSize - 1 - j);
-                    outHandle << TAB << "mov [SP-" << index << "], DL\n";
+                    if (desiredType.isVoidNonPtr() && !resultType.isVoidNonPtr())
+                        throw TVoidReturnException(retNode.err);
+
+                    // implicit cast result to desired size, if needed
+                    if (resultType != desiredType)
+                        implicitCast(outHandle, resultType, desiredType, scope, retNode.err);
+
+                    // move result bytes to their place earlier on the stack
+                    for (size_t j = 0; j < returnSize; ++j) {
+                        // pop top of stack into DL
+                        OUT << "pop DL\n";
+                        scope.pop();
+
+                        // mov DL to return bytes location
+                        size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
+                        OUT << "mov [SP-" << index << "], DL\n";
+                    }
                 }
 
                 // jmp to the end label to finish closing the function
@@ -307,18 +300,13 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
             }
             case ASTNodeType::EXPR: {
                 // assemble expression
-                size_t resultSize = assembleExpression(child, outHandle, scope);
+                Type resultType = assembleExpression(child, outHandle, scope);
+                const size_t resultSize = resultType.getSizeBytes();
 
                 // nothing from the expression is handled so pop the result off the stack
-                for (size_t j = 0; j < resultSize; j++) {
-                    if (j+1 < resultSize) {
-                        outHandle << TAB << "popw\n";
-                        scope.pop(); // additional pop
-                        ++j;
-                    } else {
-                        outHandle << TAB << "pop\n";
-                    }
-                    scope.pop();
+                if (resultSize > 0) {
+                    OUT << "sub SP, " << resultSize << '\n';
+                    scope.pop(resultSize);
                 }
                 break;
             }
@@ -330,26 +318,20 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
     // remove extra scope variables after the scope closes
     if (isNewScope || hasReturned) {
-        size_t sizeFreed = 0;
-        while (scope.size() > startingScopeSize)
-            sizeFreed += scope.pop();
+        size_t sizeFreed = scope.size() - startingScopeSize;
 
         // move back SP
-        for (size_t i = 0; i < sizeFreed; ++i) {
-            if (i+1 < sizeFreed) {
-                outHandle << TAB << "popw\n";
-                ++i;
-            } else {
-                outHandle << TAB << "pop\n";
-            }
+        if (sizeFreed > 0) {
+            OUT << "sub SP, " << sizeFreed << '\n';
+            scope.pop(sizeFreed);
         }
     }
-    
+
     return hasReturned;
 }
 
-// assembles an expression, returning the number of bytes the result uses on the stack
-size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope, long long desiredSize, const bool isLValue) {
+// assembles an expression, returning the type of the value pushed to the stack
+Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scope) {
     // if this is a literal array without a type (ie. not part of an assignment), yell at the user (LOUDLY)
     // literal arrays are ONLY allowed during assignment
     if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
@@ -358,109 +340,66 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
             throw TSyntaxException(bodyNode.err);
     }
 
-    // get the desired size of any subexpression, in bytes
-    size_t desiredSubSize = -1;
-    bool isSubLValue = isLValue; // allow to pass through
-    bool isSubSizeOnlyFirstChild = false;
-    switch (bodyNode.getNodeType()) {
-        case ASTNodeType::LIT_ARR: {
-            ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
-            Type subType = arr.getType();
-            subType.popArrayModifier();
-            desiredSubSize = subType.getSizeBytes(); // the size of each element
-            break;
-        }
-        case ASTNodeType::EXPR: {
-            ASTExpr& expr = *static_cast<ASTExpr*>(&bodyNode);
-            // prevent array identifiers from having set sizes (they're passed as ptrs to functions)
-            if (!expr.type.isArray())
-                desiredSubSize = expr.type.getSizeBytes();
-            break;
-        }
-        case ASTNodeType::UNARY_OP: {
-            // check for dereference
-            ASTOperator& op = *static_cast<ASTOperator*>(&bodyNode);
-            if (op.getOpTokenType() == TokenType::ASTERISK) {
-                desiredSubSize = op.getResultType().getSizeBytes();
-                isSubSizeOnlyFirstChild = true;
-            } else if (op.getOpTokenType() == TokenType::AMPERSAND) { // check for address-of operator
-                // check for lvalue
-                if (!op.getResultType().getIsLValue()) throw TSyntaxException(op.err);
-                desiredSubSize = 2; // size of mem address
-                isSubLValue = true;
-            }
-            break;
-        }
-        default: break;
-    }
+    // get desired expression type
+    const Type desiredType = static_cast<ASTTypedNode*>(&bodyNode)->getType();
 
     // recurse this expression's children, bottom-up
     size_t numChildren = bodyNode.size();
-    std::vector<size_t> resultSizes;
+    std::vector<Type> resultTypes;
     for (size_t i = 0; i < numChildren; ++i) {
-        if (isSubSizeOnlyFirstChild && i > 0) desiredSubSize = -1;
-
-        // prevent parsing typecasts
-        if (bodyNode.at(i)->getNodeType() == ASTNodeType::TYPE_CAST) continue;
-
-        resultSizes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope, desiredSubSize, isSubLValue) );
+        resultTypes.push_back( assembleExpression(*bodyNode.at(i), outHandle, scope) );
     }
 
     // assemble this node
-    long long finalResultSize = 0;
-    bodyNode.isAssembled = true;
+    Type resultType;
     switch (bodyNode.getNodeType()) {
         case ASTNodeType::UNARY_OP: {
             ASTOperator& unaryOp = *static_cast<ASTOperator*>(&bodyNode);
 
+            // passthrough nullified operators
+            if (unaryOp.isNullified()) {
+                resultType = desiredType;
+                break;
+            }
+
             // move argument into AX
-            if (resultSizes.size() != 1)
-                throw std::runtime_error("Invalid number of resultSizes, expected 1 for unary operation.");
+            if (resultTypes.size() != 1)
+                throw std::runtime_error("Invalid number of resultTypes, expected 1 for unary operation.");
 
             // ignore OP_ADD since it's really a buffer (passthrough)
             if (unaryOp.getOpTokenType() == TokenType::OP_ADD) {
-                finalResultSize = resultSizes[0];
+                resultType = resultTypes[0];
                 break;
             }
 
             // pop in reverse (higher first, later first)
-            const size_t resultSize = resultSizes[0];
+            size_t resultSize = resultTypes[0].getSizeBytes(SIZE_ARR_AS_PTR);
             if (resultSize == 2) {
-                outHandle << TAB << "popw AX\n";
+                OUT << "popw AX\n";
                 scope.pop(); // additional pop
+            } else if (resultSize == 1) {
+                OUT << "pop AL\n";
+                OUT << "xor AH, AH\n"; // zero out AH
             } else {
-                outHandle << TAB << "xor AH, AH\n"; // zero out AH
-                outHandle << TAB << "pop AL\n";
+                throw TInvalidOperationException(bodyNode.err);
             }
             scope.pop();
 
+            // determine output register
             const std::string regA = resultSize == 1 ? "AL" : "AX";
+            const TokenType opType = unaryOp.getOpTokenType();
 
-            switch (unaryOp.getOpTokenType()) {
-                case TokenType::OP_SUB: {
-                    // negate AX (A ^ 0b10000000 flips sign bit)
-                    outHandle << TAB << "xor " << regA << ", " << (resultSize > 1 ? "0x8000" : "0x80") << '\n';
-                    
-                    // push values to stack
-                    if (resultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(resultSize);
-                    finalResultSize = resultSize;
-                    break;
-                }
+            switch (opType) {
+                case TokenType::OP_SUB:
                 case TokenType::OP_BIT_NOT: {
-                    // flip all bits
-                    outHandle << TAB << "not " << regA << '\n';
-                    
+                    OUT << "not " << regA << '\n'; // flip all bits
+                    if (opType == TokenType::OP_SUB) // add 1 (2's complement)
+                        OUT << "add " << regA << ", 1\n";
+
                     // push values to stack
-                    if (resultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
+                    OUT << (resultSize == 2 ? "pushw AX\n" : "push AL\n");
                     scope.addPlaceholder(resultSize);
-                    finalResultSize = resultSize;
+                    resultType = resultTypes[0];
                     break;
                 }
                 case TokenType::OP_BOOL_NOT: {
@@ -468,74 +407,74 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
                     const std::string labelZero = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerge = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
-                    outHandle << TAB << "add " << regA << ", 0\n";
-                    outHandle << TAB << "jz " << labelZero << '\n'; // zero, set to 1
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // currently non-zero, set to 0
-                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // currently non-zero, set to 0
-                    outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
+                    OUT << "add " << regA << ", 0\n";
+                    OUT << "jz " << labelZero << '\n'; // zero, set to 1
+                    OUT << (regA[1] == 'X' ? "movw " : "mov ") << regA << ", 0\n"; // currently non-zero, set to 0
+                    OUT << "jmp " << labelMerge << '\n'; // reconvene branches
 
-                    outHandle << TAB << labelZero << ":\n"; // currently zero, set to 1
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
-                    else                outHandle << TAB << "mov " << regA << ", 1\n";
-                    outHandle << TAB << "jmp " << labelMerge << '\n'; // reconvene branches
-                    outHandle << TAB << labelMerge << ":\n"; // reconvene branches
+                    OUT << labelZero << ":\n"; // currently zero, set to 1
+                    OUT << (regA[1] == 'X' ? "movw " : "mov ") << regA << ", 1\n";
+                    OUT << "jmp " << labelMerge << '\n'; // reconvene branches
+                    OUT << labelMerge << ":\n"; // reconvene branches
 
                     // push values to stack
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::ASTERISK: {
-                    // backup BP to DX
-                    outHandle << TAB << "movw DX, BP\n";
-
-                    // dereference the pointer whose value is stored in AX
-                    outHandle << TAB << "movw BP, AX\n";
+                    OUT << "movw BP, AX\n"; // dereference ptr whose address is stored in AX
 
                     // pass final result size
-                    finalResultSize = desiredSize;
+                    resultType = resultTypes[0];
+                    resultType.popPointer();
 
-                    // move that value to the stack
-                    for (long long k = 0; k < finalResultSize; ++k) {
-                        outHandle << TAB << "push [BP+" << k << "]\n";
-                        scope.addPlaceholder();
+                    // if lvalue OR this is a pointer and the top subscript is an array hint, pass the address
+                    if (unaryOp.isLValue() ||
+                        (resultType.isPointer() && resultType.getPointers().back() != TYPE_EMPTY_PTR)) {
+                        // buffer to stack
+                        OUT << "pushw BP\n";
+                        scope.addPlaceholder(2);
+                    } else {
+                        // move that value to the stack
+                        for (size_t k = 0; k < resultType.getSizeBytes(); ++k) {
+                            OUT << "push [BP+" << k << "]\n";
+                            scope.addPlaceholder();
+                        }
                     }
-
-                    // restore BP from DX
-                    outHandle << TAB << "movw BP, DX\n";
                     break;
                 }
                 case TokenType::AMPERSAND: {
-                    // buffer result
-                    outHandle << TAB << "pushw AX\n";
+                    // add layer of indirection by pushing/buffering the address
+                    OUT << "pushw AX\n";
                     scope.addPlaceholder(2);
-                    finalResultSize = 2;
+
+                    // update result type
+                    resultType = resultTypes[0];
+                    resultType.addEmptyPointer();
                     break;
                 }
                 case TokenType::SIZEOF: {
-                    // push the size of whatever the result on the stack is (as int16)
-                    outHandle << TAB << "pushw " << resultSize << '\n';
+                    // if this is a pointer TO an array, correct its size
+                    if (resultTypes[0].isArray() && resultTypes[0].getPointers().back() == TYPE_EMPTY_PTR) {
+                        // this is still just a pointer
+                        resultSize = MEM_ADDR_SIZE;
+                    } else if (resultTypes[0].isArray()) {
+                        resultSize = resultTypes[0].getSizeBytes();
+                    }
+
+                    // push the size of whatever the result on the stack is (as uint)
+                    OUT << "pushw " << resultSize << '\n';
                     scope.addPlaceholder(2);
-                    finalResultSize = 2;
+                    resultType = MEM_ADDR_TYPE;
                     break;
                 }
                 default: {
                     // handle typecast unary
                     if (unaryOp.getUnaryType() == ASTUnaryType::TYPE_CAST) {
-                        // typecast the value presented (for now, just adjust the size of bytes)
-                        ASTTypeCast& typeCast = *static_cast<ASTTypeCast*>(unaryOp.left());
-                        
-                        if (desiredSize == -1)
-                            desiredSize = typeCast.type.getSizeBytes();
-
-                        // buffer the value to the stack
-                        if (resultSize == 2)
-                            outHandle << TAB << "pushw AX\n";
-                        else
-                            outHandle << TAB << "push AL\n";
+                        // just use the value from the top of the stack (operand)
+                        OUT << (resultSize == 2 ? "pushw AX\n" : "push AL\n");
                         scope.addPlaceholder(resultSize);
-                        finalResultSize = resultSize;
+                        resultType = resultTypes[0];
                         break;
                     }
                     throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
@@ -545,379 +484,310 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
         }
         case ASTNodeType::BIN_OP: {
             ASTOperator& binOp = *static_cast<ASTOperator*>(&bodyNode);
+            const TokenType opType = binOp.getOpTokenType();
+
+            // passthrough nullified operators
+            if (binOp.isNullified()) {
+                resultType = desiredType;
+                break;
+            }
 
             // move both arguments into AX & BX
-            if (resultSizes.size() != 2)
+            if (resultTypes.size() != 2)
                 throw std::runtime_error("Invalid number of resultSizes, expected 2 for binary operation.");
-            unsigned char maxResultSize = std::max(resultSizes[0], resultSizes[1]);
+
+            // get dominant type
+            const Type dominantType = getDominantType(resultTypes[0], resultTypes[1]);
+            const size_t dominantSize = dominantType.getSizeBytes(SIZE_ARR_AS_PTR);
 
             // pop in reverse (higher first, later first)
-            if (maxResultSize < 1 || maxResultSize > 2) throw TSyntaxException(bodyNode.err);
+            if (dominantSize < 1 || dominantSize > 2) throw TSyntaxException(bodyNode.err);
 
-            if (maxResultSize == 2) {
-                if (resultSizes[1] == 2) { // there's a value here
-                    outHandle << TAB << "popw BX\n";
-                    scope.pop(); // additional pop
-                } else { // no value, but zero the top half of the register to prevent miscalculations
-                    outHandle << TAB << "xor BH, BH\n";
-                    outHandle << TAB << "pop BL\n";
-                }
-            } else {
-                outHandle << TAB << "pop BL\n";
+            if (resultTypes[1].getSizeBytes() == 2) { // pop to BX
+                OUT << "popw BX\n";
+                scope.pop();
+            } else { // pop to BL and zero BH
+                OUT << "pop BL\n";
+                OUT << "xor BH, BH\n";
             }
             scope.pop();
 
             // ignore popping to the AL/AX register if nothing was pushed from the stack (for assignments)
-            if (resultSizes[0] > 0) {
-                if (maxResultSize == 2) {
-                    if (resultSizes[0] == 2) { // there's a value here
-                        outHandle << TAB << "popw AX\n";
-                        scope.pop(); // additional pop
-                    } else { // no value, but zero the top half of the register to prevent miscalculations
-                        outHandle << TAB << "xor AH, AH\n";
-                        outHandle << TAB << "pop AL\n";
-                    }
-                } else {
-                    outHandle << TAB << "pop AL\n";
+            if (isTokenAssignOp(opType)) {
+                // force assignment to pop the address
+                OUT << "popw AX\n";
+                scope.pop(2);
+            } else {
+                if (resultTypes[0].getSizeBytes(SIZE_ARR_AS_PTR) == 2) { // pop to AX
+                    OUT << "popw AX\n";
+                    scope.pop(2);
+                } else { // pop to AL and zero AH
+                    OUT << "pop AL\n";
+                    OUT << "xor AH, AH\n";
+                    scope.pop();
                 }
-                scope.pop();
             }
 
-            const std::string regA = maxResultSize == 1 ? "AL" : "AX";
-            const std::string regB = maxResultSize == 1 ? "BL" : "BX";
+            // determine output registers
+            const std::string regA = dominantSize == 1 ? "AL" : "AX";
+            const std::string regB = dominantSize == 1 ? "BL" : "BX";
 
-            switch (binOp.getOpTokenType()) {
-                case TokenType::OP_ADD: {
-                    // add AX/AL to BX/BL
-                    outHandle << TAB << "add " << regA << ", " << regB << '\n';
+            switch (opType) {
+                case TokenType::OP_ADD: case TokenType::OP_SUB: { // add/sub AX/AL to/from BX/BL
+                    // handle pointer arithmetic
+                    Type typeA = resultTypes[0], typeB = resultTypes[1];
+                    
+                    if (typeA.isPointer()) {
+                        typeA.popPointer(); // get internal size, also removes forced ptr status for accurate size
+                        const size_t chunkSize = typeA.getSizeBytes();
+
+                        // mul needs AX register, so move it temporarily (don't need to do scope.pop/addPlaceholder)
+                        OUT << "pushw AX\n";
+                        OUT << "movw AX, " << chunkSize << '\n';
+                        OUT << "mul BX\n"; // other operand is in BX already
+                        OUT << "movw BX, AX\n"; // save new operand
+                        OUT << "popw AX\n"; // move AX back
+                    } else if (typeB.isPointer()) {
+                        typeB.popPointer(); // get internal size, also removes forced ptr status for accurate size
+                        const size_t chunkSize = typeB.getSizeBytes();
+
+                        // operand already in AX; move chunk size into CX
+                        OUT << "movw CX, " << chunkSize << '\n';
+                        OUT << "mul CX\n"; // other operand is in BX already
+                    }
+
+                    // perform add or sub
+                    if (opType == TokenType::OP_ADD)
+                        OUT_BIN_OP_2(add);
+                    else
+                        OUT_BIN_OP_2(sub);
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
+                    if (opType == TokenType::OP_MOD) // uses AX as result and DX as remainder in 16-bit mode
+                        OUT << (dominantSize == 2 ? "pushw DX\n" : "push AH\n");
                     else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
+                        OUT << (dominantSize == 2 ? "pushw AX\n" : "push AL\n");
+
+                    // record push
+                    scope.addPlaceholder(dominantSize);
+                    resultType = dominantType;
                     break;
                 }
-                case TokenType::OP_SUB: {
-                    // sub AX/AL to BX/BL
-                    outHandle << TAB << "sub " << regA << ", " << regB << '\n';
+                case TokenType::ASTERISK: case TokenType::OP_DIV: case TokenType::OP_MOD:
+                case TokenType::OP_BIT_OR: case TokenType::AMPERSAND: case TokenType::OP_BIT_XOR: {
+                    // all use similar/the same process, so combined them here
+                    switch (opType) {
+                        case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break; // mul AX/AL by BX/BL
+                        case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break; // div AX/AL by BX/BL
+                        case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break; // mod AX/AL by BX/BL
+                        case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break; // bitwise or
+                        case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break; // bitwise and
+                        case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break; // bitwise xor
+                        default: break; // doesn't get here
+                    }
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
+                    if (opType == TokenType::OP_MOD) // uses AX as result and DX as remainder in 16-bit mode
+                        OUT << (dominantSize == 2 ? "pushw DX\n" : "push AH\n");
                     else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
-                case TokenType::ASTERISK: {
-                    // mul by BX/BL
-                    outHandle << TAB << "mul " << regB << '\n';
+                        OUT << (dominantSize == 2 ? "pushw AX\n" : "push AL\n");
 
-                    // push result to stack (lowest-first)
-                    // max size is 16-bit so just ignore overflow
-                    outHandle << TAB << "pushw AX\n";
-                    scope.addPlaceholder(2);
-                    finalResultSize = 2;
-                    break;
-                }
-                case TokenType::OP_DIV: {
-                    // div by BX/BL
-                    outHandle << TAB << "div " << regB << '\n';
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2) // uses AX as result and DX as remainder in 16-bit mode
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
-                case TokenType::OP_MOD: {
-                    // get mod from div by BX/BL
-                    outHandle << TAB << "div " << regB << '\n';
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2) // uses AX as result and DX as remainder in 16-bit mode
-                        outHandle << TAB << "pushw DX\n";
-                    else
-                        outHandle << TAB << "push AH\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
-                case TokenType::OP_BIT_OR: {
-                    outHandle << TAB << "or " << regA << ", " << regB << '\n';
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
-                case TokenType::AMPERSAND: {
-                    outHandle << TAB << "and " << regA << ", " << regB << '\n';
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
-                case TokenType::OP_BIT_XOR: {
-                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
+                    // record push
+                    scope.addPlaceholder(dominantSize);
+                    resultType = dominantType;
                     break;
                 }
                 case TokenType::OP_BOOL_OR: {
-                    outHandle << TAB << "or " << regA << ", " << regB << '\n';
+                    OUT_BIN_OP_2(or);
 
                     // if ZF is cleared, expression is true (set to 1)
                     const std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
-                    else                outHandle << TAB << "mov " << regA << ", 1\n";
-                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+                    OUT << "jz " << labelName << '\n'; // skip over assignment to 1
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
+                    else                OUT << "mov " << regA << ", 1\n";
+                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
+                    OUT << labelName << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
-                case TokenType::OP_BOOL_AND: {
-                    // if either one is zero, boolean and is false
-
+                case TokenType::OP_BOOL_AND: { // if either one is zero, boolean and is false
                     // put 0 into regA if zero, 1 otherwise
                     // if ZF is set, set regA (non-zero -> 1)
                     std::string labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "or " << regA << ", 0\n"; // sets ZF if 0
-                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n";
-                    else                outHandle << TAB << "mov " << regA << ", 1\n";
-                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+                    OUT << "or " << regA << ", 0\n"; // sets ZF if 0
+                    OUT << "jz " << labelName << '\n'; // skip over assignment to 1
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
+                    else                OUT << "mov " << regA << ", 1\n";
+                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
+                    OUT << labelName << ":\n"; // reconvene with other branch
 
                     // put 0 into regB if zero, 1 otherwise
                     // if ZF is set, set regB (non-zero -> 1)
                     labelName = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "or " << regB << ", 0\n"; // sets ZF if 0
-                    outHandle << TAB << "jz " << labelName << '\n'; // skip over assignment to 1
+                    OUT << "or " << regB << ", 0\n"; // sets ZF if 0
+                    OUT << "jz " << labelName << '\n'; // skip over assignment to 1
                     if (regB[1] == 'X')
-                        outHandle << TAB << "movw " << regB << ", 1\n";
+                        OUT << "movw " << regB << ", 1\n";
                     else
-                        outHandle << TAB << "mov " << regB << ", 1\n";
-                    outHandle << TAB << "jmp " << labelName << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelName << ":\n"; // reconvene with other branch
+                        OUT << "mov " << regB << ", 1\n";
+                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
+                    OUT << labelName << ":\n"; // reconvene with other branch
 
                     // push regA & regB (0b0 & 0b1 or some combination)
-                    outHandle << TAB << "and " << regA << ", " << regB << '\n';
+                    OUT << "and " << regA << ", " << regB << '\n';
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_EQ: {
                     // if A ^ B is zero, equal
                     const std::string labelEQ = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
+                    OUT << "xor " << regA << ", " << regB << '\n';
 
-                    outHandle << TAB << "jz " << labelEQ << '\n';
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // non-zero becomes 0
-                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // non-zero becomes 0
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << "jz " << labelEQ << '\n';
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // non-zero becomes 0
+                    else                OUT << "mov " << regA << ", 0\n"; // non-zero becomes 0
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
 
-                    outHandle << TAB << labelEQ << ":\n";
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // zero becomes 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // zero becomes 1
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << labelEQ << ":\n";
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // zero becomes 1
+                    else                OUT << "mov " << regA << ", 1\n"; // zero becomes 1
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_NEQ: {
                     // if A ^ B is zero, equal (keep as 0)
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
-                    outHandle << TAB << "xor " << regA << ", " << regB << '\n';
-                    outHandle << TAB << "jz " << labelMerger << '\n';
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // non-zero becomes 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // non-zero becomes 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << "xor " << regA << ", " << regB << '\n';
+                    OUT << "jz " << labelMerger << '\n';
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // non-zero becomes 1
+                    else                OUT << "mov " << regA << ", 1\n"; // non-zero becomes 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_LT: {
                     // if A < B, B-A will have carry and zero cleared
-                    outHandle << TAB << "sub " << regB << ", " << regA << '\n';
+                    OUT << "sub " << regB << ", " << regA << '\n';
 
                     const std::string labelGTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "jz " << labelGTE << '\n'; // zero is set, A == B
-                    outHandle << TAB << "jc " << labelGTE << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << "jz " << labelGTE << '\n'; // zero is set, A == B
+                    OUT << "jc " << labelGTE << '\n'; // carry is set, A > B
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
 
-                    outHandle << TAB << labelGTE << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
-                    else                outHandle << TAB << "mov " << regA << ", 0\n";
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << labelGTE << ":\n"; // set regA to 0
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
+                    else                OUT << "mov " << regA << ", 0\n";
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     /// push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_GT: {
                     // if A > B, A-B will have carry and zero cleared
-                    outHandle << TAB << "sub " << regA << ", " << regB << '\n';
+                    OUT << "sub " << regA << ", " << regB << '\n';
 
                     const std::string labelLTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "jz " << labelLTE << '\n'; // zero is set, A == B
-                    outHandle << TAB << "jc " << labelLTE << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelLTE << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
-                    else                outHandle << TAB << "mov " << regA << ", 0\n";
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << "jz " << labelLTE << '\n'; // zero is set, A == B
+                    OUT << "jc " << labelLTE << '\n'; // carry is set, A > B
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelLTE << ":\n"; // set regA to 0
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
+                    else                OUT << "mov " << regA << ", 0\n";
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_LTE: {
                     // if A <= B, B-A will have carry cleared
-                    outHandle << TAB << "sub " << regB << ", " << regA << '\n';
+                    OUT << "sub " << regB << ", " << regA << '\n';
 
                     const std::string labelGT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "jc " << labelGT << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelGT << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n"; // set regA to 1
-                    else                outHandle << TAB << "mov " << regA << ", 0\n"; // set regA to 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << "jc " << labelGT << '\n'; // carry is set, A > B
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelGT << ":\n"; // set regA to 0
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // set regA to 1
+                    else                OUT << "mov " << regA << ", 0\n"; // set regA to 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
                 case TokenType::OP_GTE: {
                     // if A >= B, A-B will have carry cleared
-                    outHandle << TAB << "sub " << regA << ", " << regB << '\n';
+                    OUT << "sub " << regA << ", " << regB << '\n';
 
                     const std::string labelLT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    outHandle << TAB << "jc " << labelLT << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                outHandle << TAB << "mov " << regA << ", 1\n"; // set regA to 1
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelLT << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') outHandle << TAB << "movw " << regA << ", 0\n";
-                    else                outHandle << TAB << "mov " << regA << ", 0\n";
-                    outHandle << TAB << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    outHandle << TAB << labelMerger << ":\n"; // reconvene with other branch
+                    OUT << "jc " << labelLT << '\n'; // carry is set, A > B
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
+                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelLT << ":\n"; // set regA to 0
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
+                    else                OUT << "mov " << regA << ", 0\n";
+                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+                    OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
-                    outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder();
-                    finalResultSize = 1; // always returns an 8-bit bool
+                    BIN_OP_RECORD_BOOL;
                     break;
                 }
-                case TokenType::OP_LSHIFT: {
-                    // can only use 8-bit register for shift count
-                    outHandle << TAB << "shl " << regA << ", BL\n";
-
-                    // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
-                    break;
-                }
+                case TokenType::OP_LSHIFT:
                 case TokenType::OP_RSHIFT: {
                     // can only use 8-bit register for shift count
-                    outHandle << TAB << "shr " << regA << ", BL\n";
+                    OUT << (opType == TokenType::OP_LSHIFT ? "shl " : "shr ") << regA << ", BL\n";
 
                     // push result to stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw AX\n";
-                    else
-                        outHandle << TAB << "push AL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = maxResultSize;
+                    OUT << (dominantSize == 2 ? "pushw AX\n" : "push AL\n");
+                    scope.addPlaceholder(dominantSize);
+                    resultType = dominantType;
                     break;
                 }
                 case TokenType::ASSIGN: {
-                    // get the stack offset of the variable
-                    if (bodyNode.at(0)->getNodeType() != ASTNodeType::IDENTIFIER)
-                        throw TSyntaxException(bodyNode.at(0)->err);
+                    // take the address of the given lvalue from the stack and assign a value to it
+                    OUT << "movw BP, AX\n"; // move address to BP
 
-                    ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(bodyNode.at(0));
-                    ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
-                    size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
-                    size_t typeSize = pScopeVar->type.getSizeBytes();
-
-                    // prevent void assignment
-                    if (resultSizes[1] == 0) throw TVoidReturnException(identifier.err);
-
-                    // move the rvalue to the identifier on the left
-                    outHandle << TAB << "mov [SP-" << stackOffset << "], BL" << '\n';
-                    if (resultSizes[1] == 2)
-                        outHandle << TAB << "mov [SP-" << stackOffset-1 << "], BH" << '\n';
+                    // move the rvalue to the lvalue's address
+                    const size_t rvalueSize = resultTypes[1].getSizeBytes();
+                    if (rvalueSize == 2) {
+                        OUT << "mov [BP+0], BL" << '\n';
+                        OUT << "mov [BP+1], BH" << '\n';
+                    } else {
+                        OUT << "mov [BP-0], BL" << '\n';
+                    }
 
                     // push the value of the variable onto the stack (lowest-first)
-                    if (maxResultSize == 2)
-                        outHandle << TAB << "pushw BX\n";
-                    else
-                        outHandle << TAB << "push BL\n";
-                    scope.addPlaceholder(maxResultSize);
-                    finalResultSize = typeSize;
+                    OUT << (rvalueSize == 2 ? "pushw BX\n" : "push BL\n");
+                    scope.addPlaceholder(rvalueSize);
+                    resultType = resultTypes[1];
                     break;
                 }
                 default:
@@ -927,62 +797,29 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
         }
         case ASTNodeType::LIT_INT: {
             // get value & size of literal
-            int value = static_cast<ASTIntLiteral*>(&bodyNode)->val;
-            size_t size = getSizeOfType(TokenType::TYPE_INT);
-            
-            // push primitive to stack
-            for (size_t i = 0; i < size; i++) {
-                if (i+1 < size) {
-                    outHandle << TAB << "pushw " << (value & 0xFFFF) << '\n';
-                    scope.addPlaceholder(); // additional placeholder
-                    i++;
-                } else {
-                    outHandle << TAB << "push " << (value & 0xFF) << '\n';
-                }
-                scope.addPlaceholder();
-                value >>= 8; // shift downward
-            }
-            finalResultSize = size;
+            ASTIntLiteral* pLit = static_cast<ASTIntLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFFFF;
+            resultType = Type(TokenType::TYPE_INT);
+            OUT << "pushw " << value << '\n';
+            scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
         case ASTNodeType::LIT_BOOL: {
             // get value & size of literal
-            bool value = static_cast<ASTBoolLiteral*>(&bodyNode)->val;
-            size_t size = getSizeOfType(TokenType::TYPE_BOOL);
-            
-            // push primitive to stack
-            for (size_t i = 0; i < size; i++) {
-                if (i+1 < size) {
-                    outHandle << TAB << "pushw " << (value & 0xFFFF) << '\n';
-                    scope.addPlaceholder(); // additional placeholder
-                    i++;
-                } else {
-                    outHandle << TAB << "push " << (value & 0xFF) << '\n';
-                }
-                scope.addPlaceholder();
-                value >>= 8; // shift downward
-            }
-            finalResultSize = size;
+            ASTBoolLiteral* pLit = static_cast<ASTBoolLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFF;
+            resultType = Type(TokenType::TYPE_BOOL);
+            OUT << "push " << value << '\n';
+            scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
         case ASTNodeType::LIT_CHAR: {
             // get value & size of literal
-            char value = static_cast<ASTCharLiteral*>(&bodyNode)->val;
-            size_t size = getSizeOfType(TokenType::TYPE_CHAR);
-            
-            // push primitive to stack
-            for (size_t i = 0; i < size; i++) {
-                if (i+1 < size) {
-                    outHandle << TAB << "pushw " << (value & 0xFFFF) << '\n';
-                    scope.addPlaceholder(); // additional placeholder
-                    i++;
-                } else {
-                    outHandle << TAB << "push " << (value & 0xFF) << '\n';
-                }
-                scope.addPlaceholder();
-                value >>= 8; // shift downward
-            }
-            finalResultSize = size;
+            ASTCharLiteral* pLit = static_cast<ASTCharLiteral*>(&bodyNode);
+            unsigned short value = pLit->val & 0xFF;
+            resultType = Type(TokenType::TYPE_CHAR);
+            OUT << "push " << value << '\n';
+            scope.addPlaceholder(resultType.getSizeBytes());
             break;
         }
         case ASTNodeType::LIT_FLOAT: {
@@ -991,187 +828,375 @@ size_t assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& sc
         case ASTNodeType::IDENTIFIER: {
             // lookup identifier
             ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(&bodyNode);
-            ScopeAddr* pScopeVar = scope.getVariable(identifier.raw, identifier.err);
             size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
+            Type idenType = scope.getVariable(identifier.raw, identifier.err)->type;
 
-            // apply subscripts if necessary
-            size_t typeSize = pScopeVar->type.getSizeBytes();
-            if (identifier.getSubscripts().size() > 0) {
-                // move the SP to the BP to store the stackOffset's offset
-                outHandle << TAB << "movw BP, SP\n";
+            // if there aren't any subscripts, handle the value here
+            if (identifier.getNumSubscripts() == 0) {
+                if (idenType.isPointer()) { // handle pointers
+                    // push the address onto the stack
+                    OUT << "movw BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
+                    OUT << "sub BP, " << stackOffset << '\n';
+                    OUT << "pushw BP\n";
+                    scope.addPlaceholder(2);
 
-                // update stack offset
-                const std::vector<long long>& stackMods = pScopeVar->type.getArrayModifiers();
-                const std::vector<ASTArraySubscript*>& subscripts = identifier.getSubscripts();
-                size_t numPtrs = pScopeVar->type.getNumPtrs();
+                    // if this is a reference pointer (ie. array passed as an argument), dereference it
+                    if (idenType.isReferencePointer()) {
+                        // doesn't need to be a reference pointer anymore
+                        OUT << "popw BP\n"; // move address back into BP
+                        idenType.setIsReferencePointer(false);
+                        scope.pop(2);
 
-                // assemble subscripts to get their result (****subscripts are ints)
-                size_t k = 0;
-                for (ASTArraySubscript* pSub : subscripts) {
-                    // get size of each subtype we're indexing
-                    if (k >= stackMods.size() && numPtrs > 0) { // must be subscripting a pointer
-                        // if mutliple pointers left, this is a pointer (sizeof address)
-                        // else, the size of the primitive type
-                        typeSize = (--numPtrs > 0) ? 2 : getSizeOfType(pScopeVar->type.getPrimitiveType());
-                    } else if (k < stackMods.size()) {
-                        typeSize /= stackMods[ k ];
-                    } else {
-                        throw TSyntaxException(bodyNode.err);
+                        // push the referenced value
+                        const size_t typeSize = idenType.getSizeBytes();
+                        for (size_t k = 0; k < typeSize; ++k)
+                            OUT << "push [BP+" << k << "]\n";
+                        scope.addPlaceholder(typeSize);
                     }
 
-                    ++k; // increment k
+                    // if this is an lvalue, leave the address on the stack
+                    if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
+                        const size_t typeSize = idenType.getSizeBytes();
+                        OUT << "popw BP\n"; // pop address back into BP
+                        scope.pop(2);
 
-                    // add to BP the top int value on the stack (force subscript size to int)
-                    assembleExpression(*pSub, outHandle, scope, getSizeOfType(TokenType::TYPE_INT), isLValue);
-
-                    // pop top int (subscript) to AX
-                    outHandle << TAB << "popw AX\n";
-                    scope.pop(); scope.pop();
-
-                    outHandle << TAB << "movw BX, " << typeSize << '\n'; // move typeSize to BX
-                    outHandle << TAB << "mul BX\n"; // scale AX by BX
-                    outHandle << TAB << "add BP, AX\n"; // add to BP
-                }
-
-                // handle assignment operations vs read operations
-                if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
-                    // if this is an lvalue, push the *address*
-                    bool isArray = stackMods.size() > subscripts.size();
-                    if (isLValue || isArray) {
-                        // sub stackOffset from BP
-                        outHandle << TAB << "sub BP, " << stackOffset << '\n';
-                        
-                        // push BP (points to address of identifier)
-                        outHandle << TAB << "pushw BP\n";
+                        for (size_t k = 0; k < typeSize; ++k)
+                            OUT << "push [BP+" << k << "]\n";
+                        scope.addPlaceholder(typeSize);
+                    }
+                } else { // handle primitives
+                    // if this is an lvalue, pass the address
+                    if (identifier.isLValue()) {
+                        // push the address onto the stack
+                        OUT << "movw BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
+                        OUT << "sub BP, " << stackOffset << '\n';
+                        OUT << "pushw BP\n";
                         scope.addPlaceholder(2);
-                        finalResultSize = 2;
-                    } else { // otherwise, push *value*
-                        for (size_t i = 0; i < typeSize; i++) {
-                            // move value to top of stack
-                            // use stackOffset-i since the stack is changing but BP is not
-                            outHandle << TAB << "push [BP-" << stackOffset-i << "]\n";
+                    } else { // this is an rvalue, push the value onto the stack
+                        const size_t typeSize = idenType.getSizeBytes();
+                        for (size_t j = 0; j < typeSize; ++j) {
+                            OUT << "push [SP-" << stackOffset << "]\n";
                             scope.addPlaceholder();
                         }
-                        finalResultSize = typeSize;
                     }
-                    break;
                 }
             } else {
-                // handle assignment operations vs read operations
-                if (!identifier.isInAssignExpr) { // read operation, so push the value of the identifier onto the stack
-                    // if this is an lvalue, push the *address*
-                    if (isLValue || pScopeVar->type.isArray()) {
-                        // move address into BP
-                        outHandle << TAB << "movw BP, SP\n";
-                        outHandle << TAB << "sub BP, " << stackOffset << '\n';
+                // push the address onto the stack
+                OUT << "movw BP, SP\n"; // store the SP in BP for manipulation w/o affecting SP directly
+                OUT << "sub BP, " << stackOffset << '\n';
 
-                        // push BP (points to address of identifier)
-                        outHandle << TAB << "pushw BP\n";
-                        scope.addPlaceholder(2);
-                        finalResultSize = 2;
-                    } else { // otherwise, push *value*
-                        for (size_t i = 0; i < typeSize; i++) {
-                            // move value to top of stack
-                            outHandle << TAB << "push [SP-" << stackOffset << "]\n";
-                            scope.addPlaceholder();
-                        }
-                        finalResultSize = typeSize;
-                    }
-                    break;
+                // if this is a reference pointer (ie. array passed as an argument), dereference it
+                if (idenType.isReferencePointer()) {
+                    // doesn't need to be a reference pointer anymore
+                    idenType.setIsReferencePointer(false);
+
+                    // push the referenced value
+                    const size_t typeSize = idenType.getSizeBytes();
+                    for (size_t k = 0; k < typeSize; ++k)
+                        OUT << "push [BP+" << k << "]\n";
+                    scope.addPlaceholder(typeSize);
+                } else {
+                    // not a reference pointer, push the address
+                    OUT << "pushw BP\n"; // push the address of this identifier
+                    scope.addPlaceholder(2);
                 }
             }
 
-            // base case, assignment operation, push nothing to the stack
-            finalResultSize = 0;
+            // update result type
+            resultType = idenType;
             break;
         }
         case ASTNodeType::FUNCTION_CALL: {
             // lookup the function
             ASTFunctionCall& func = *static_cast<ASTFunctionCall*>(&bodyNode);
-            const std::string funcName = func.raw;
+            const std::string& funcName = func.raw;
             if (labelMap.count(funcName) == 0) throw TUnknownIdentifierException(func.err);
 
+            // find function and verify parameters match
+            AssembledFunc* pDestFunc = nullptr;
+            const size_t numParams = func.size();
+            auto [itr, end] = labelMap.equal_range(funcName);
+            for ((void)itr; itr != end; ++itr) {
+                // check if parameters match
+                const std::vector<Type>& paramTypes = itr->second.getParamTypes();
+                if (paramTypes.size() != func.size()) continue;
+
+                size_t j;
+                for (j = 0; j < numParams; ++j) {
+                    const Type& actualType = static_cast<ASTTypedNode*>(func.at(j))->getTypeRef();
+                    if (!paramTypes[j].isParamMatch(actualType)) break;
+                }
+
+                // if broken prematurely, a type didn't match
+                if (j == numParams) {
+                    pDestFunc = &itr->second;
+                    break;
+                }
+            }
+
+            if (pDestFunc == nullptr)
+                throw TUnknownIdentifierException(bodyNode.err);
+
             // allocate space on the stack for return bytes
-            assembled_func_t destFunc = labelMap[funcName];
-            size_t returnSize = destFunc.returnType.getSizeBytes();
+            size_t returnSize = pDestFunc->getReturnType().getSizeBytes();
 
             for (size_t i = 0; i < returnSize; i++) {
                 if (i+1 < returnSize) {
-                    outHandle << TAB << "pushw 0\n";
+                    OUT << "pushw 0\n";
                     ++i;
                 } else {
-                    outHandle << TAB << "push 0\n";
+                    OUT << "push 0\n";
                 }
             }
             scope.addPlaceholder(returnSize);
 
             // call the function
-            outHandle << TAB << "call " << destFunc.labelName << '\n';
-            finalResultSize = returnSize;
+            OUT << "call " << pDestFunc->getStartLabel() << '\n';
+            resultType = pDestFunc->getReturnType();
             break;
         }
-        case ASTNodeType::ARR_SUBSCRIPT: {
-            // passthrough the size of the subscript
-            desiredSize = getSizeOfType(TokenType::TYPE_INT); // force int size
-            finalResultSize = resultSizes[0];
+        case ASTNodeType::EXPR:
+        case ASTNodeType::ARR_SUBSCRIPT: { // passthrough
+            resultType = resultTypes[0];
             break;
         }
-        case ASTNodeType::EXPR: {
-            // this is the top-most expression, so just pass through
-            finalResultSize = resultSizes[0];
+        case ASTNodeType::LIT_ARR: { // pass through
+            resultType = static_cast<ASTArrayLiteral*>(&bodyNode)->getTypeRef();
             break;
         }
-        case ASTNodeType::LIT_ARR: {
-            // children are already on stack, so pass through the size of the node
-            ASTArrayLiteral& arr = *static_cast<ASTArrayLiteral*>(&bodyNode);
-            Type type = arr.getType();
+        case ASTNodeType::ASM: {
+            // paste inline assembly to file
+            ASTInlineASM* pASM = static_cast<ASTInlineASM*>(&bodyNode);
+            OUT << pASM->getRaw() << '\n';
+            resultType = pASM->getTypeRef();
+            break;
+        }
+        case ASTNodeType::ASM_INST: {
+            // handle the custom assembly instruction
+            ASMProtectedInstruction* pInst = static_cast<ASMProtectedInstruction*>(&bodyNode);
+            const size_t resultSize = resultTypes[0].getSizeBytes();
+            const TokenType instType = pInst->getInstType();
 
-            // force type-cast all children
-            size_t sumResultSize = 0;
-            for (size_t resultSize : resultSizes) sumResultSize += resultSize;
+            switch (instType) {
+                case TokenType::ASM_LOAD_AX:
+                case TokenType::ASM_LOAD_BX:
+                case TokenType::ASM_LOAD_CX:
+                case TokenType::ASM_LOAD_DX: {
+                    if (resultSize > 2 || resultSize == 0)
+                        throw TInvalidOperationException(pInst->err);
 
-            finalResultSize = type.getSizeBytes();
+                    // pad bytes
+                    if (resultSize == 1) {
+                        OUT << "push 0\n";
+                        scope.addPlaceholder(1);
+                    }
+
+                    // move value into register
+                    const std::string reg = instType == TokenType::ASM_LOAD_AX ? "AX" :
+                                            instType == TokenType::ASM_LOAD_BX ? "BX" :
+                                            instType == TokenType::ASM_LOAD_CX ? "CX" : "DX";
+
+                    OUT << "popw " << reg << '\n';
+                    scope.pop(2);
+                    break;
+                }
+                default: throw TSyntaxException(pInst->err);
+            }
+
+            resultType = pInst->getTypeRef();
             break;
         }
-        default: {
-            throw std::invalid_argument("Invalid node type in assembleExpression!");
+        case ASTNodeType::LIT_VOID: throw TIllegalVoidUseException(bodyNode.err);
+        default: throw TExpressionEvalException(bodyNode.err);
+    }
+
+    // handle any subscripts
+    ASTTypedNode* pTypedBody = dynamic_cast<ASTTypedNode*>(&bodyNode);
+    if (pTypedBody != nullptr && pTypedBody->getNumSubscripts() > 0) {
+        // grab address off stack
+        if (!resultType.isPointer())
+            throw TInvalidOperationException(bodyNode.err);
+
+        const size_t numPointers = resultType.getNumPointers();
+        const size_t numSubscripts = pTypedBody->getNumSubscripts();
+        const std::vector<ASTArraySubscript*>& subscripts = pTypedBody->getSubscripts();
+        const bool isLValue = pTypedBody->isLValue();
+
+        if (numSubscripts > numPointers)
+            throw TInvalidOperationException(bodyNode.err);
+
+        // handle subscripts
+        for (size_t j = 0; j < numSubscripts; ++j) {
+            const size_t lastPtrSize = resultType.getPointers().back();
+            const bool isImplicitArrayHint = resultType.getNumArrayHints() > 0 && lastPtrSize == TYPE_EMPTY_PTR;
+            ASTArraySubscript* pSub = subscripts[j];
+            resultType.popPointer();
+
+            // determine the size of the rest of the object
+            size_t chunkSize = resultType.getSizeBytes();
+
+            // if this is a pointer (not an array), dereference and get its address
+            if (lastPtrSize == TYPE_EMPTY_PTR && !isImplicitArrayHint) {
+                // pop address into BP
+                OUT << "popw BP\n";
+                OUT << "push [BP+0]\n";
+                OUT << "push [BP+1]\n";
+            }
+
+            // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
+            assembleExpression(*pSub, outHandle, scope);
+
+            OUT << "popw AX\n"; // pop subscript off stack
+            OUT << "popw CX\n"; // pop address back into CX
+            OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
+            OUT << "mul BX\n"; // scale by chunk size
+            OUT << "add CX, AX\n"; // add the chunk to the pointer
+            OUT << "pushw CX\n"; // put address back onto stack
+            scope.pop(2); // 4 pops - 2 pushes = 2 net pops
+        }
+
+        // if this isn't an array and isn't an lvalue, dereference the final address on the stack
+        if (!isLValue && (resultType.getNumPointers() == 0 || resultType.getPointers().back() == TYPE_EMPTY_PTR)) {
+            // dereference final address on stack
+            OUT << "popw BP\n"; // move address back into BP
+            scope.pop(2);
+
+            // push the referenced value
+            const size_t typeSize = resultType.getSizeBytes();
+            for (size_t k = 0; k < typeSize; ++k)
+                OUT << "push [BP+" << k << "]\n";
+            scope.addPlaceholder(typeSize);
         }
     }
 
-    // cast size, if necessary
-    if (desiredSize != -1) {
-        // prevent returning void to an expression
-        if (finalResultSize == 0 && desiredSize > 0) throw TVoidReturnException(bodyNode.err);
-
-        if (finalResultSize < desiredSize) { // push extra 0s
-            for (long long i = finalResultSize; i < desiredSize; i++) {
-                if (i+1 < desiredSize) {
-                    outHandle << TAB << "pushw 0\n";
-                    scope.addPlaceholder();
-                    ++i;
-                } else {
-                    outHandle << TAB << "push 0\n";
-                }
-                scope.addPlaceholder();
-            }
-
-            finalResultSize = desiredSize;
-        } else if (finalResultSize > desiredSize) { // pop extra values
-            for (long long i = finalResultSize; i > desiredSize; i--) {
-                if (i-1 > desiredSize) {
-                    outHandle << TAB << "popw\n";
-                    scope.pop();
-                    --i;
-                } else {
-                    outHandle << TAB << "pop\n";
-                }
-                scope.pop();
-            }
-            
-            finalResultSize = desiredSize;
-        }
+    // implicit cast
+    if (resultType != desiredType) {
+        implicitCast(outHandle, resultType, desiredType, scope, bodyNode.err);
+        resultType = desiredType; // update type to match
     }
 
-    // output should now be pseudo-cast (I say pseudo because this isn't actually type-casting)
-    return finalResultSize;
+    // mark this node as assembled
+    bodyNode.isAssembled = true;
+
+    // result type now matches desired type
+    return resultType;
+}
+
+// implicitly converts a value pushed to the top of the stack to the given type
+void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desiredType, Scope& scope, const ErrInfo err) {
+    if (resultType.isVoidNonPtr() && !desiredType.isVoidNonPtr()) throw TIllegalVoidUseException(err);
+
+    // most importantly, if the two types are equal just return
+    if (resultType == desiredType) return;
+
+    // if the desired type is void, just pop everything off
+    if (desiredType.isVoidNonPtr()) {
+        size_t resultSize = resultType.getSizeBytes();
+        if (resultSize > 0) {
+            OUT << "sub SP, " << resultSize << '\n';
+            scope.pop(resultSize);
+        }
+        return;
+    }
+
+    // if both pointers, just pass through (the address doesn't change)
+    if (resultType.isPointer() && desiredType.isPointer()) return;
+
+    // if converting between unsigned and signed of same primitive, pass through
+    TokenType primA = resultType.getPrimitiveType();
+    TokenType primB = desiredType.getPrimitiveType();
+    if (primA == primB && !resultType.isPointer() && !desiredType.isPointer() &&
+        resultType.isUnsigned() != desiredType.isUnsigned()) return;
+
+    // if converting from a pointer of some sort to an integral type
+    // pass through since they share the same size & everything
+    if (!desiredType.isPointer() && resultType.isPointer() &&
+        desiredType.getPrimitiveType() != TokenType::TYPE_FLOAT &&
+        desiredType.getPrimitiveType() != TokenType::VOID) {
+        return;
+    }
+
+    // if converting from an integral type to a pointer,
+    // pass through since they share the same size & everything
+    if (!resultType.isPointer() && desiredType.isPointer() &&
+        resultType.getPrimitiveType() != TokenType::TYPE_FLOAT &&
+        resultType.getPrimitiveType() != TokenType::VOID) {
+        return;
+    }
+
+    // if converting between primitive types, pad/pop bytes
+    if (primA != primB && !resultType.isPointer() && !desiredType.isPointer()) {
+        // handle cast to float vs other integral types
+        if (primB == TokenType::TYPE_FLOAT) {
+            throw std::runtime_error("Float implicit casting not yet implemented!");
+        } else if (primA == TokenType::TYPE_FLOAT) {
+            throw std::runtime_error("Float implicit casting not yet implemented!");
+        } else {
+            // converting between two integral types (just pad/pop bytes)
+            const size_t startSize = getSizeOfType(primA);
+            const size_t endSize = getSizeOfType(primB);
+
+            if (primB == TokenType::TYPE_BOOL) {
+                // if casting to a bool, enforce 1 or 0
+                const std::string regA = startSize == 2 ? "AX" : "AL";
+                OUT << (startSize == 2 ? "popw AX" : "pop AL") << '\n';
+
+                // buffer value
+                OUT << "buf " << regA << '\n';
+
+                // if non-zero, set to 1
+                const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                OUT << "jz " << mergeLabel << '\n';
+                OUT << (startSize == 2 ? "movw AX" : "mov AL") << ", 1\n";
+                OUT << "jmp " << mergeLabel << '\n';
+                OUT << mergeLabel << ":\n";
+                OUT << (startSize == 2 ? "pushw AX" : "push AL") << '\n';
+            }
+
+            // preserve sign bit in AL
+            if (!resultType.isUnsigned()) {
+                OUT << "mov AL, [SP-1]\n";
+                OUT << "and AL, 0x80\n"; // get sign bit
+            }
+
+            if (startSize < endSize) { // pad bytes
+                // if signed and negative, push 0xFFFFs, otherwise push 0s
+                OUT << "movw CX, 0\n";
+                if (!resultType.isUnsigned()) {
+                    const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    OUT << "buf AL\n";
+                    OUT << "jz " << mergeLabel << '\n';
+                    OUT << "movw CX, 0xFFFF\n"; // set CX to 1
+                    OUT << "jmp " << mergeLabel << '\n';
+                    OUT << mergeLabel << ":\n";
+                }
+
+                // add padding bytes
+                for (size_t i = startSize; i < endSize; ++i) {
+                    if (i+1 < endSize) {
+                        OUT << "pushw CX\n";
+                        ++i;
+                    } else {
+                        OUT << "push CL\n";
+                    }
+                }
+                scope.addPlaceholder(endSize - startSize);
+            } else if (startSize > endSize) { // pop bytes
+                OUT << "sub SP, " << (startSize - endSize) << '\n';
+                scope.pop(startSize - endSize);
+            }
+
+            // re-add sign bit
+            if (!resultType.isUnsigned()) {
+                OUT << "pop BL\n";
+                OUT << "or BL, AL\n";
+                OUT << "push BL\n";
+            }
+        }
+
+        return;
+    }
+
+    // base case, illegal cast
+    throw TIllegalImplicitCastException(err);
 }

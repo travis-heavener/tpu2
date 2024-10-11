@@ -2,23 +2,9 @@
 
 #include "token.hpp"
 
-// returns true if the given TokenType is that of a type name (ex. TYPE_INT)
-bool isTokenTypeName(TokenType type) {
-    switch (type) {
-        case TokenType::TYPE_INT:
-        case TokenType::TYPE_FLOAT:
-        case TokenType::TYPE_CHAR:
-        case TokenType::TYPE_BOOL:
-        case TokenType::VOID:
-            return true;
-        default:
-            return false;
-    }
-}
-
 // true if the token is of TYPE_INT, TYPE_BOOL, etc.
-bool isTokenPrimitiveType(const TokenType type) {
-    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT;
+bool isTokenPrimitiveType(const TokenType type, const bool allowVoid) {
+    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || (type == VOID && allowVoid);
 }
 
 // true if the token is an unary operator (ex. ~, !)
@@ -53,11 +39,15 @@ bool isTokenAssignOp(const TokenType type) {
     return type == ASSIGN;
 }
 
+bool isTokenProtectedASM(const TokenType type) {
+    return type == ASM_LOAD_AX || type == ASM_LOAD_BX || type == ASM_LOAD_CX || type == ASM_LOAD_DX;
+}
+
 // returns the size of a primitive type in bytes
 unsigned char getSizeOfType(TokenType type) {
     switch (type) {
         case TokenType::TYPE_INT: return 2; // 2-byte ints
-        case TokenType::TYPE_FLOAT: return 4; // 4-byte floats
+        case TokenType::TYPE_FLOAT: return 2; // 2-byte floats
         case TokenType::TYPE_CHAR: return 1;
         case TokenType::TYPE_BOOL: return 1;
         case TokenType::VOID: return 0;

@@ -4,9 +4,12 @@
 #include "lexer.hpp"
 #include "preprocessor.hpp"
 
-#include "util/util.hpp"
+#include "util/toolbox.hpp"
+#include "util/token.hpp"
+#include "util/t_exception.hpp"
 
 static bool isInMultilineComment = false;
+static macrodef_map macrodefMap;
 
 // returns true if the keyword is present and is not part of an identifier
 bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset) {
@@ -18,23 +21,22 @@ bool isKwdPresent(const std::string& kwd, const std::string& line, size_t offset
 }
 
 // tokenize a document to a vector of Tokens
-void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cwdStack) {
+void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cwdStack, const std::string& filename, const bool isStdlib) {
     // continuously read in the entire document, adding tokens
     std::string line;
 
     line_t lineNumber = 0;
-    macrodef_map macrodefMap;
     while (std::getline(inHandle, line)) {
         // remove trailing \r if present (CRLF for Windows systems)
         if (*line.rbegin() == '\r') line.pop_back();
 
         // tokenize line
-        tokenizeLine(line, tokens, ++lineNumber, macrodefMap, cwdStack);
+        tokenizeLine(line, tokens, ++lineNumber, cwdStack, filename, isStdlib);
     }
 }
 
 // tokenize a particular line
-void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, macrodef_map& macrodefMap, cwd_stack& cwdStack) {
+void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumber, cwd_stack& cwdStack, const std::string& filename, const bool isStdlib) {
     if (line.size() == 0) return;
 
     // if in a multiline comment, look for closing char
@@ -53,7 +55,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
 
     // run preprocessor for this line
     if (!isInMultilineComment) {
-        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack);
+        bool hasPreprocessed = preprocessLine(line, macrodefMap, tokens, cwdStack, ErrInfo(lineNumber, 0, filename));
 
         // skip lines used by the preprocessor
         if (hasPreprocessed) return;
@@ -67,7 +69,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
 
         // reset buffer & prepare error info object
         buffer.clear();
-        ErrInfo err(lineNumber, i+1);
+        ErrInfo err(lineNumber, i+1, filename);
 
         // handle the current character
         // break on single line comments
@@ -171,6 +173,47 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
         if (isKwdPresent("sizeof", line, i)) {
             i += 5; // offset by length of keyword - 1
             tokens.push_back(Token(err, "sizeof", TokenType::SIZEOF));
+            continue;
+        }
+        
+        // asm keyword
+        if (isKwdPresent("asm", line, i)) {
+            i += 2; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "asm", TokenType::ASM));
+            continue;
+        }
+
+        // protected assembly keywords
+        if (isKwdPresent("__load_AX", line, i)) {
+            if (!isStdlib) throw TInvalidTokenException(err);
+            i += 8; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "__load_AX", TokenType::ASM_LOAD_AX));
+            continue;
+        } else if (isKwdPresent("__load_BX", line, i)) {
+            if (!isStdlib) throw TInvalidTokenException(err);
+            i += 8; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "__load_BX", TokenType::ASM_LOAD_BX));
+            continue;
+        } else if (isKwdPresent("__load_CX", line, i)) {
+            if (!isStdlib) throw TInvalidTokenException(err);
+            i += 8; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "__load_CX", TokenType::ASM_LOAD_CX));
+            continue;
+        } else if (isKwdPresent("__load_DX", line, i)) {
+            if (!isStdlib) throw TInvalidTokenException(err);
+            i += 8; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "__load_DX", TokenType::ASM_LOAD_DX));
+            continue;
+        }
+
+        // unsigned & signed keywords
+        if (isKwdPresent("unsigned", line, i)) {
+            i += 7; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "unsigned", TokenType::UNSIGNED));
+            continue;
+        } else if (isKwdPresent("signed", line, i)) {
+            i += 5; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "signed", TokenType::SIGNED));
             continue;
         }
 

@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "type.hpp"
-#include "err_info.hpp"
+#include "t_exception.hpp"
 
 #define SCOPE_RETURN_START "0" // identifier cannot be named 0 so this is just a cheeky workaround
 
@@ -33,6 +33,7 @@ class Scope {
         size_t declareVariable(Type, const std::string&, ErrInfo);
         size_t declareFunctionParam(Type, const std::string&, ErrInfo);
         size_t pop();
+        void pop(size_t);
         size_t size() const { return children.size(); }
         size_t getOffset(const std::string&, ErrInfo) const;
         ScopeAddr* getVariable(const std::string&, ErrInfo) const;

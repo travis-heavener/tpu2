@@ -4,7 +4,10 @@
 #include "parser_precedences.hpp"
 #include "parser.hpp"
 
-#include "../util/util.hpp"
+#include "../util/token.hpp"
+#include "../util/toolbox.hpp"
+#include "../util/t_exception.hpp"
+#include "../util/scope_stack.hpp"
 #include "../ast/ast_nodes.hpp"
 
 void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_t endIndex, ASTNode* pHead, scope_stack_t& scopeStack) {
@@ -23,33 +26,30 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
 
             if (i > endIndex) throw TUnclosedGroupException(tokens[start].err);
 
-            // check for function call
+            // A. check for function call
             if (start - 1 >= startIndex && tokens[start-1].type == TokenType::IDENTIFIER) {
                 // create function call node
                 ASTFunctionCall* pCall = new ASTFunctionCall(tokens[start-1]);
                 pHead->push( pCall ); // append function call node
 
-                // append sub expressions separated by a comma
-                size_t end = i; // ends ON the closing parenthesis
-                size_t subExprStart = start+1;
-                std::stack<size_t> parensIndices; // only break subexprs that aren't inside parentheticals
-                for (size_t j = start+1; j < end; j++) {
-                    if (tokens[j].type == TokenType::LPAREN) {
-                        parensIndices.push(j);
-                    } else if (tokens[j].type == TokenType::RPAREN) {
-                        parensIndices.pop();
-                    } else if (parensIndices.size() == 0 && tokens[j].type == TokenType::COMMA) { // append subexpr
-                        pCall->push( parseExpression(tokens, subExprStart, j-1, scopeStack) );
-                        subExprStart = j+1;
-                    } else if (parensIndices.size() == 0 && j+1 == end) { // append subexpr
-                        pCall->push( parseExpression(tokens, subExprStart, j, scopeStack) );
-                    }
-                }
+                // check for arguments
+                if (start+1 <= i-1) {
+                    // find commas
+                    std::vector<size_t> commaIndices;
+                    delimitIndices(tokens, commaIndices, start+1, i-1); // ignore outer parens
 
-                // verify parenthesis are closed appropriately
-                if (parensIndices.size() > 0)
-                    throw TUnclosedGroupException(tokens[parensIndices.top()].err);
-            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type)) { // check for typecast
+                    // append sub expressions separated by a comma
+                    size_t subExprStart = start+1;
+                    for (size_t j = 0; j < commaIndices.size(); ++j) {
+                        pCall->push( parseExpression(tokens, subExprStart, commaIndices[j] - 1, scopeStack, true) );
+                        subExprStart = commaIndices[j] + 1; // update for next sub expr
+                    }
+
+                    // check for remaining expression
+                    if (subExprStart != i)
+                        pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
+                }
+            } else if (start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type, true)) { // B. check for typecast
                 // grab type (only allow pointer asterisk or typename)
                 Type type( tokens[start+1].type );
 
@@ -59,16 +59,20 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                         throw TInvalidTokenException(tokens[j].err);
                     
                     // add to type
-                    type.addPointer();
+                    type.addEmptyPointer();
                 }
 
-                // append typecast as unary
-                ASTOperator* pOp = new ASTOperator(tokens[start], true);
-                pOp->setUnaryType(ASTUnaryType::TYPE_CAST);
-                pOp->push( new ASTTypeCast(tokens[start], type) );
-                pHead->push( pOp );
-            } else { // found a subexpression
-                pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) ); // recurse
+                // append typecast
+                ASTTypeCast* pTypeCast = new ASTTypeCast(tokens[start]);
+                pHead->push( pTypeCast );
+                pTypeCast->setType( type );
+            } else { // C. found a subexpression
+                // if the previous node is a protected asm instruction, append to that instead
+                if (pHead->size() > 0 && pHead->lastChild()->getNodeType() == ASTNodeType::ASM_INST) {
+                    pHead->lastChild()->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+                } else {
+                    pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+                }
             }
         } else if (tokens[i].type == TokenType::LIT_INT) {
             pHead->push( new ASTIntLiteral(std::stoi(tokens[i].raw), tokens[i]) );
@@ -102,11 +106,11 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 ASTExpr* pSubExpr = new ASTExpr(tokens[i]);
                 pArr->push(pSubExpr);
                 pSubExpr->push( new ASTCharLiteral(c, tokens[i]) );
-                pSubExpr->type = type;
+                pSubExpr->setType(type);
             }
 
             // set type
-            type.addArrayModifier(pArr->size());
+            type.addHintPointer(pArr->size());
             pArr->setType( type );
         } else if (tokens[i].type == TokenType::VOID) {
             pHead->push( new ASTVoidLiteral(tokens[i]) );
@@ -132,7 +136,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                 } else if (tokens[i].type == TokenType::RBRACE || tokens[i].type == TokenType::RPAREN || tokens[i].type == TokenType::RBRACKET) {
                     groupsOpen.pop_back();
                 } else if (groupsOpen.size() == 1 && tokens[i].type == TokenType::COMMA) {
-                    // split on commas, parse each subexpr
+                    // split on commas, parse each subexpr as its own top expression
                     pArr->push( parseExpression(tokens, exprStart, i-1, scopeStack) );
                     exprStart = i+1;
                 }
@@ -163,19 +167,34 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             // verify closing bracket is found
             if (bracketsOpen > 0) throw TUnclosedGroupException(tokens[startIndex].err);
 
-            // get previous identifier
-            if (pHead->lastChild()->getNodeType() != ASTNodeType::IDENTIFIER)
-                throw TInvalidTokenException(tokens[startIndex].err);
-            ASTIdentifier& iden = *static_cast<ASTIdentifier*>(pHead->lastChild());
+            // get previous node
+            if (pHead->size() == 0) throw TInvalidOperationException(tokens[startBracket].err);
+            ASTTypedNode* pLastNode = dynamic_cast<ASTTypedNode*>(pHead->lastChild());
+            if (pLastNode == nullptr) // failed to cast to subscriptable type
+                throw TInvalidOperationException(tokens[startIndex].err);
 
             // parse expression for subscript
-            ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startIndex]);
-            iden.addSubscript( pArrSub );
-            pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack) );
+            ASTArraySubscript* pArrSub = new ASTArraySubscript(tokens[startBracket]);
+            pLastNode->addSubscript( pArrSub );
+            pArrSub->push( parseExpression(tokens, startBracket+1, i-1, scopeStack, true) );
 
             // force subscript to have int type
             ASTExpr* pSubExpr = static_cast<ASTExpr*>(pArrSub->lastChild());
-            pSubExpr->type = Type(TokenType::TYPE_INT);
+            pSubExpr->setType( Type(TokenType::TYPE_INT) );
+        } else if (tokens[i].type == TokenType::ASM) {
+            // create an inline asm node and parse the attached string
+            if (i+3 > endIndex || tokens[i+1].type != TokenType::LPAREN
+                || tokens[i+2].type != TokenType::LIT_STRING || tokens[i+3].type != TokenType::RPAREN)
+                throw TSyntaxException(tokens[i+1].err);
+
+            // evaluate the inline assembly
+            const std::string inlineASM = tokens[i+2].raw.substr(1, tokens[i+2].raw.size()-2);
+
+            // create node
+            pHead->push( new ASTInlineASM(tokens[i], inlineASM) );
+            i += 3;
+        } else if (isTokenProtectedASM(tokens[i].type)) {
+            pHead->push( new ASMProtectedInstruction(tokens[i]) );
         } else {
             throw TInvalidTokenException(tokens[i].err);
         }
@@ -187,7 +206,26 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     // precedence 2 (R -> L)
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
+        if (currentNode.getNodeType() == ASTNodeType::TYPE_CAST) { // handle typecasts
+            // confirm there is a token after this
+            if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
+
+            ASTTypeCast* pTypeCast = static_cast<ASTTypeCast*>(&currentNode);
+            ASTOperator* pOp = pTypeCast->toOperator(pHead->at(i+1));
+            pHead->removeChild(i+1);
+
+            // replace self in parent
+            pHead->insert(pOp, i);
+            pHead->removeChild(i+1);
+            delete pTypeCast;
+            continue;
+        }
+
+        // handle other unaries
         if (currentNode.getNodeType() != ASTNodeType::UNARY_OP && currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // ignore + and - if this is a binary math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -197,24 +235,28 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
         if (!currentOp.getIsUnary() && opType != TokenType::ASTERISK && opType != TokenType::AMPERSAND)
             continue;
 
-        // basically, unary can only work if it's after A) nothing or B) another operator
-        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB ||
-             opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) &&
-            !(i == 0 || pHead->at(i-1)->getNodeType() == ASTNodeType::UNARY_OP ||
-                        pHead->at(i-1)->getNodeType() == ASTNodeType::BIN_OP)) {
-            continue;
+        // prevent chaining of + or - unaries (allow if previous node has children already)
+        if ((opType == TokenType::OP_ADD || opType == TokenType::OP_SUB) && i > 0) {
+            ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
+            if (pPrev != nullptr && pPrev->getOpTokenType() == opType && pPrev->size() == 0) {
+                throw TInvalidTokenException(currentNode.err);
+            }
+
+            // verify the previous node is an operator (if not, it's a binary op)
+            if (pPrev == nullptr) continue;
+        } else if ((opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) && i > 0) {
+            // verify the previous node is an operator (if not, it's a binary op)
+            ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
+            if (pPrev == nullptr) continue;
         }
 
         // confirm there is a token after this
         if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
 
-        // if this is an asterisk, set it to a unary
-        if (opType == TokenType::ASTERISK) {
+        // if this is also a binary op, set it to a unary
+        if (opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND)
             currentOp.setIsUnary(true);
-        } else if (opType == TokenType::AMPERSAND) {
-            currentOp.setIsUnary(true);
-        }
-        
+
         // update unary type
         if (opType == TokenType::SIZEOF) {
             currentOp.setUnaryType(ASTUnaryType::SIZEOF);
@@ -232,6 +274,9 @@ void parsePrecedence3(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is mult/div/mod math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -258,6 +303,9 @@ void parsePrecedence4(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         // + and - are counted as unaries by step 1
         if (currentNode.getNodeType() != ASTNodeType::UNARY_OP || currentNode.size() > 0) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is add/sub math operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -286,6 +334,9 @@ void parsePrecedence5(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is a comparison operation
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         if (currentOp.getOpTokenType() != TokenType::OP_LSHIFT && currentOp.getOpTokenType() != TokenType::OP_RSHIFT) continue;
@@ -308,6 +359,9 @@ void parsePrecedence6(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is either GT, GTE, LT<, or LTE
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -335,6 +389,9 @@ void parsePrecedence7(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is an equality comparison
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -359,6 +416,9 @@ void parsePrecedence8(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+        
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is bitwise and
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -384,6 +444,9 @@ void parsePrecedence9(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -407,6 +470,9 @@ void parsePrecedence10(ASTNode* pHead) {
     for (size_t i = 0; i < pHead->size(); i++) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
@@ -432,6 +498,9 @@ void parsePrecedence11(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -456,6 +525,9 @@ void parsePrecedence12(ASTNode* pHead) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
 
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
+
         // verify this is bitwise xor
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);
         TokenType tokenType = currentOp.getOpTokenType();
@@ -479,6 +551,9 @@ void parsePrecedence14(ASTNode* pHead) {
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() != ASTNodeType::BIN_OP) continue;
+
+        // verify there aren't already children from recursing
+        if (currentNode.size() != 0) continue;
 
         // verify this is an assignment expression
         ASTOperator& currentOp = *static_cast<ASTOperator*>(&currentNode);

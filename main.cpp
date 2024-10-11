@@ -40,12 +40,14 @@ int main(int argc, char* argv[]) {
     // start the CPU's clock and wait
     tpu.start(memory);
 
-    std::cout << tpu.readRegister16(Register::DX) << ' ' << tpu.readRegister16(Register::AX) << '\n';
+    std::cout << tpu.readRegister16(Register::AX) << ' ' << tpu.readRegister16(Register::BX) << '\n';
+    std::cout << tpu.readRegister16(Register::CX) << ' ' << tpu.readRegister16(Register::DX) << '\n';
     std::cout << memory[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
     std::cout << tpu.readRegister16(Register::SP).getValue() << '\n';
+    std::cout << "Flags: " << (short)tpu.readRegister16(Register::FLAGS).getValue() << ".\n";
 
     // print exit status
-    std::cout << "Program exited with status " << tpu.readRegister16(Register::ES).getValue() << ".\n";
+    std::cout << "Program exited with status " << (short)tpu.readRegister16(Register::ES).getValue() << ".\n";
 
     return 0;
 }

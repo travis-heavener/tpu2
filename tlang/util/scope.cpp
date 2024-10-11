@@ -24,13 +24,8 @@ size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
 // handles any array as a pointer
 size_t Scope::declareFunctionParam(Type type, const std::string& name, ErrInfo err) {
     if (type.isArray()) {
-        // pass any arrays by reference by pushing a pointer
-        // and dropping all array modifiers (mere suggestions)
-        size_t numArrayMods = type.getNumArrayModifiers();
-        for (size_t i = 0; i < numArrayMods; ++i)
-            type.popArrayModifier();
-
-        type.addPointer();
+        // force as reference
+        type.setIsReferencePointer(true);
         return declareVariable(type, name, err);
     }
 
@@ -43,6 +38,11 @@ size_t Scope::pop() {
     delete *this->children.rbegin();
     this->children.pop_back();
     return 1;
+}
+
+void Scope::pop(size_t n) {
+    for (size_t i = 0; i < n; ++i)
+        pop();
 }
 
 // gets the offset address from the end with respect to the rest of the variables below it of a certain variable

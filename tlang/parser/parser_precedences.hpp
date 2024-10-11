@@ -3,7 +3,8 @@
 
 #include <vector>
 
-#include "../util/util.hpp"
+#include "../util/token.hpp"
+#include "../util/scope_stack.hpp"
 #include "../ast/ast_nodes.hpp"
 
 // an abstraction from the parser to make precedence parsing more straight forward

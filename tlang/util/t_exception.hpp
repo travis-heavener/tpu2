@@ -2,8 +2,18 @@
 #define __T_EXCEPTION_HPP
 
 #include <stdexcept>
+#include <string>
 
-#include "err_info.hpp"
+// for error handling
+typedef unsigned long long line_t; // for line/col numbering
+
+// store where a token is from in its original file
+class ErrInfo {
+    public:
+        ErrInfo(line_t line, line_t col, const std::string& file) : line(line), col(col), file(file) {};
+        line_t line, col;
+        const std::string file;
+};
 
 // shorthand for making exceptions
 #define MAKE_EXCEPTION(name) class T##name##Exception : public TException { \
@@ -19,7 +29,7 @@ class TException {
         virtual const std::string& toString() const { return msg; };
         
         // to get line/col info
-        const std::string getTrace() const { return "at line " + std::to_string(err.line) + ":" + std::to_string(err.col); };
+        const std::string getTrace() const { return "\n  " + err.file + ":" + std::to_string(err.line) + ":" + std::to_string(err.col); };
     protected:
         ErrInfo err;
         std::string msg;
@@ -38,5 +48,11 @@ MAKE_EXCEPTION(TypeInfer)
 MAKE_EXCEPTION(InvalidOperation)
 MAKE_EXCEPTION(Syntax)
 MAKE_EXCEPTION(VoidReturn)
+MAKE_EXCEPTION(IllegalArraySize)
+MAKE_EXCEPTION(IllegalImplicitCast)
+MAKE_EXCEPTION(ExpressionEval)
+MAKE_EXCEPTION(IllegalMacroDefinition)
+MAKE_EXCEPTION(InvalidMacroInclude)
+MAKE_EXCEPTION(IllegalVoidUse)
 
 #endif

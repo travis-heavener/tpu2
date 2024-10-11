@@ -6,51 +6,80 @@
 
 #include "token.hpp"
 
-// literal types
-#define TYPE_NO_ARR_SIZE -1
+#define TYPE_EMPTY_PTR 0
+#define SIZE_ARR_AS_PTR 1 // used in getSizeBytes to force arrays to be handled as pointers
+
+// used to compare and implicitly cast types
+class Type; // fwd dec
+Type getDominantType(const Type&, const Type&);
+
 class Type {
     public:
-        Type() : primitiveType(TokenType::VOID), arraySizes() {};
-        Type(TokenType primitiveType) : primitiveType(primitiveType), arraySizes() {};
-        // Type(const Type& t) : primitiveType(t.primitiveType), arraySizes(t.arraySizes), numPtrs(t.numPtrs), isLValue(t.isLValue) {};
+        friend Type getDominantType(const Type&, const Type&);
 
-        // Type& operator=(const Type&);
+        Type() : primitiveType(TokenType::VOID), pointers() {};
+        Type(TokenType prim) : primitiveType(prim), pointers() {};
+        Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
+        
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer) {};
+        Type(const Type&& type);
 
-        // for adding an array with a specified size (ie. declarations)
-        void addArrayModifier(size_t size) { arraySizes.push_back(size); };
+        Type& operator=(const Type&);
+        Type& operator=(const Type&&);
 
-        // for adding an array without a specified size (ie. parameter type)
-        void addEmptyArrayModifier() { arraySizes.push_back(TYPE_NO_ARR_SIZE); };
-        bool hasEmptyArrayModifiers() const;
-        void popArrayModifier() { arraySizes.pop_back(); };
-        size_t getNumArrayModifiers() const { return arraySizes.size(); };
+        bool isUnsigned() const { return _isUnsigned; };
 
-        void addPointer() { ++numPtrs; };
-        void popPointer() { --numPtrs; };
-        size_t getNumPtrs() { return numPtrs; };
+        void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
+        void addHintPointer(size_t);
+        void popPointer();
+        size_t getNumPointers() const { return pointers.size(); };
+        bool isPointer() const { return pointers.size() > 0; };
+        void clearPtrs() { pointers.clear(); };
 
-        bool isArray() const { return arraySizes.size() > 0; };
-
-        Type checkDominant(Type B) const;
-
-        const std::vector<long long>& getArrayModifiers() const { return arraySizes; };
-        size_t getSizeBytes() const;
+        const std::vector<size_t>& getPointers() const { return pointers; };
+        size_t getSizeBytes(const int=0) const;
 
         TokenType getPrimitiveType() const { return primitiveType; };
 
+        // returns true if primitive is void and is not a void pointer
+        bool isVoidNonPtr() const { return primitiveType == TokenType::VOID && pointers.size() == 0; };
+
+        // returns true if this is a void pointer
+        bool isVoidPtr() const { return primitiveType == TokenType::VOID && pointers.size() > 0; };
+
+        // returns true if primitive type is void, regardless of pointers
+        bool isVoidAny() const { return primitiveType == TokenType::VOID; };
+
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
-        bool checkArrayMods(const Type& t) const;
-        void flipModifiers() { std::reverse(arraySizes.begin(), arraySizes.end()); };
 
-        // NOT used in EQ/NEQ comparison
-        bool getIsLValue() const { return isLValue; };
-        void setIsLValue(bool lv) { isLValue = lv; };
+        bool isParamMatch(const Type&) const;
+
+        bool isArray() const { return numArrayHints > 0; };
+
+        size_t getNumArrayHints() const { return numArrayHints; };
+        void setNumArrayHints(size_t n) { numArrayHints = n; };
+        size_t getArrayHint(size_t i) const { return pointers[i + pointers.size() - numArrayHints]; };
+        void setArrayHint(size_t i, size_t v) { pointers[i + pointers.size() - numArrayHints] = v; };
+
+        // clones self but revokes all array hints (for getting the address of this type, hints must be gone to get size right)
+        Type getAddressPointer() const;
+        void clearArrayHints();
+
+        // used to handle reference pointers in function arguments
+        bool isReferencePointer() const { return _isReferencePointer; };
+        void setIsReferencePointer(bool i) { _isReferencePointer = i; };
     private:
         TokenType primitiveType;
-        std::vector<long long> arraySizes;
-        size_t numPtrs = 0;
-        bool isLValue = false;
+        std::vector<size_t> pointers;
+        
+        bool _isUnsigned = false;
+
+        // for arrays specifically
+        size_t numArrayHints = 0;
+
+        // for handling reference pointers
+        bool _isReferencePointer = false;
 };
 
 #endif

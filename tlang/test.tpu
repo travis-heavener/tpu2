@@ -1,42 +1,119 @@
 __UF0:
-    movw BP, SP
     pushw 0
+    __J0:
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
     popw AX
+    popw CX
     movw BX, 1
     mul BX
-    add BP, AX
-    push [BP-4]
+    add CX, AX
+    pushw CX
+    popw BP
+    push [BP+0]
     push 0
+    pop BL
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    jmp __J2
+    __J2:
+    push AL
+    pop AL
+    xor AH, AH
+    buf AX
+    jz __J1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __J0
+    __J1:
+    push [SP-2]
+    push [SP-2]
     pop DL
-    mov [SP-2], DL
+    mov [SP-4], DL
     pop DL
-    mov [SP-2], DL
+    mov [SP-4], DL
+    sub SP, 2
     jmp __UF0E
     __UF0E:
     ret
-main:
-    add SP, 2
-    push 84
-    push 114
-    push 97
-    push 118
-    push 105
-    push 115
-    push 0
+__UF1:
     movw BP, SP
-    sub BP, 7
+    sub BP, 2
     pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
     pushw 0
     call __UF0
+    movw BP, SP
+    sub BP, 6
+    pushw BP
+    popw BP
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 4
+    jmp __UF1E
+    __UF1E:
+    ret
+main:
+    add SP, 2
+    push 87
+    push 104
+    push 97
+    push 116
+    push 39
+    push 115
+    push 32
+    push 117
+    push 112
+    push 32
+    push 100
+    push 97
+    push 110
+    push 103
+    push 101
+    push 114
+    push 10
+    push 0
+    movw BP, SP
+    sub BP, 18
+    pushw BP
+    call __UF1
+    pushw 0
     pop DL
-    mov [SP-11], DL
+    mov [SP-22], DL
     pop DL
-    mov [SP-11], DL
-    popw
-    popw
-    popw
-    popw
-    pop
+    mov [SP-22], DL
+    sub SP, 20
     jmp mainE
     mainE:
     movw AX, 0x03
