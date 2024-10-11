@@ -18,7 +18,7 @@ AST* parseToAST(const std::vector<Token>& tokens) {
     AST* pAST = new AST();
 
     // create a scope stack to store variables and functions' types
-    scope_stack_t scopeStack = { parser_scope_t() }; // global scope
+    scope_stack_t scopeStack = { new ParserScope() }; // global scope
 
     // fill in the AST
     try {
@@ -79,13 +79,18 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
             // all good to go
             endIndex = i;
-            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack) );
+            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST) );
         }
     } catch (TException& e) {
-        // free memory & rethrow
-        delete pAST;
-        throw e;
+        while (scopeStack.size() > 0) // free ParserVar pointers
+            popScopeStack(scopeStack);
+        delete pAST; // free AST
+        throw e; // rethrow
     }
+
+    // remove unused variables & such
+    while (scopeStack.size() > 0)
+        popScopeStack(scopeStack);
 
     // return the AST
     return pAST;
@@ -366,7 +371,8 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                             throw TIllegalArraySizeException(tokens[start].err);
 
                         // add variable to scopeStack
-                        declareParserVariable(scopeStack, tokens[idenStart].raw, type, tokens[idenStart].err);
+                        ParserVariable* pParserVar = new ParserVariable(type, pHead, pVarDec);
+                        declareParserVariable(scopeStack, tokens[idenStart].raw, pParserVar, tokens[idenStart].err);
                         break;
                     } else if (tokens[i].type != TokenType::ASSIGN) { // variable must be assigned
                         throw TInvalidTokenException(tokens[i].err);
@@ -396,7 +402,8 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     }
 
                     // add variable to scopeStack
-                    declareParserVariable(scopeStack, tokens[idenStart].raw, type, tokens[idenStart].err);
+                    ParserVariable* pParserVar = new ParserVariable(type, pHead, pVarDec);
+                    declareParserVariable(scopeStack, tokens[idenStart].raw, pParserVar, tokens[idenStart].err);
 
                     // update variable declaration's type
                     pVarDec->updateType( type );
@@ -418,7 +425,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
     }
 }
 
-ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack) {
+ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack, AST* pAST) {
     size_t i = startIndex;
 
     // get return type
@@ -445,8 +452,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
     // create node
     const std::string name = tokens[++i].raw; // get function name
     ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], type);
-    declareParserVariable(scopeStack, name, type, tokens[startIndex].err); // put this function into the global scope
-    scopeStack.push_back( parser_scope_t() ); // create a new scope stack for scoped parser variables
+    scopeStack.push_back( new ParserScope() ); // create a new scope stack for scoped parser variables
 
     try {
         i += 2; // skip over function name & opening parenthesis
@@ -503,10 +509,21 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
             pHead->appendParam(pParam); // append parameter
 
             // add argument to scopeStack
-            declareParserVariable(scopeStack, tokens[idenIndex].raw, type, tokens[idenIndex].err);
+            ParserVariable* pParserVar = new ParserVariable(type);
+            declareParserVariable(scopeStack, tokens[idenIndex].raw, pParserVar, tokens[idenIndex].err);
 
             if (tokens[i].type == TokenType::COMMA) i++; // skip next comma
         }
+
+        // determine if this is a main function
+        bool isMainFunction = pHead->isMainFunction();
+
+        // declare function in parent scope
+        std::vector<Type> paramTypes;
+        pHead->loadParamTypes(paramTypes);
+
+        ParserFunction* pParserFunc = new ParserFunction(type, isMainFunction, pAST, pHead, paramTypes);
+        declareParserFunction(scopeStack, name, pParserFunc, paramTypes, tokens[startIndex].err); // put into scope
 
         // verify opening brace is next
         if (tokens[++i].type != TokenType::LBRACE)
@@ -566,7 +583,7 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
     ASTNode* pHead = new ASTConditional(tokens[branchIndices[0]]);
 
     // create a new scope
-    scopeStack.push_back( parser_scope_t() );
+    scopeStack.push_back( new ParserScope() );
 
     try {
         // iterate for each branch
@@ -617,7 +634,7 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
     }
 
     // pop this scope off the stack
-    scopeStack.pop_back();
+    popScopeStack(scopeStack);
 
     return pHead;
 }
@@ -627,7 +644,7 @@ ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startInde
     ASTWhileLoop* pHead = new ASTWhileLoop(tokens[startIndex]);
 
     // create a new scope
-    scopeStack.push_back( parser_scope_t() );
+    scopeStack.push_back( new ParserScope() );
 
     try {
         // append expression
@@ -647,7 +664,7 @@ ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startInde
     }
 
     // pop this scope off the stack
-    scopeStack.pop_back();
+    popScopeStack(scopeStack);
 
     // return node
     return pHead;
@@ -658,7 +675,7 @@ ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex,
     ASTForLoop* pHead = new ASTForLoop(tokens[startIndex]);
 
     // create a new scope
-    scopeStack.push_back( parser_scope_t() );
+    scopeStack.push_back( new ParserScope() );
 
     try {
         // append sub-expressions
@@ -691,7 +708,7 @@ ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex,
     }
 
     // pop this scope off the stack
-    scopeStack.pop_back();
+    popScopeStack(scopeStack);
 
     // return node
     return pHead;

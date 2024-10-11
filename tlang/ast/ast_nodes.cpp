@@ -1,4 +1,5 @@
 #include "ast_nodes.hpp"
+#include "../util/config.hpp"
 #include "../util/toolbox.hpp"
 #include "../util/token.hpp"
 #include "../util/t_exception.hpp"
@@ -17,6 +18,15 @@ ASTNode* ASTNode::removeChild(size_t i) {
     ASTNode* pNode = this->children[i];
     this->children.erase(this->children.begin()+i);
     return pNode;
+}
+
+void ASTNode::removeByAddress(void* addr) {
+    for (size_t i = 0; i < children.size(); ++i) {
+        if (children[i] == addr) {
+            delete removeChild(i);
+            return;
+        }
+    }
 }
 
 ASTIfCondition::~ASTIfCondition() {
@@ -51,6 +61,10 @@ ASTVarDeclaration::~ASTVarDeclaration() {
 ASTFunction::~ASTFunction() {
     for (ASTFuncParam* p : params)
         delete p;
+}
+
+bool ASTFunction::isMainFunction() const {
+    return name == FUNC_MAIN_NAME && type == Type(TokenType::TYPE_INT) && params.size() == 0;
 }
 
 ASTTypedNode::~ASTTypedNode() {
@@ -441,7 +455,11 @@ void ASTFunctionCall::inferType(scope_stack_t& scopeStack) {
     ASTTypedNode::inferChildTypes(scopeStack);
 
     // get this node's return type from scope
-    this->setType( lookupParserVariable(scopeStack, this->raw, this->err) );
+    std::vector<Type> paramTypes;
+    for (ASTNode* pChild : children)
+        paramTypes.push_back(static_cast<ASTTypedNode*>(pChild)->getTypeRef());
+
+    this->setType( lookupParserFunction(scopeStack, this->raw, this->err, paramTypes)->type );
 
     // infer subscripts
     this->inferSubscriptTypes(scopeStack);
@@ -487,7 +505,7 @@ void ASMProtectedInstruction::inferType(scope_stack_t& scopeStack) {
 
 void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // lookup the variable from the scope
-    Type type = lookupParserVariable(scopeStack, this->raw, this->err);
+    Type type = lookupParserVariable(scopeStack, this->raw, this->err)->type;
 
     // infer subscripts
     size_t numSubscripts = this->subscripts.size();

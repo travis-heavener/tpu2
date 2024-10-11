@@ -8,12 +8,7 @@
 #include "util/token.hpp"
 #include "util/type.hpp"
 #include "util/t_exception.hpp"
-
-#define FUNC_MAIN_LABEL "main"
-#define FUNC_LABEL_PREFIX "__UF" // for "user function"
-#define FUNC_END_LABEL_SUFFIX "E" // added to the end of a function label to mark where a function ends
-#define JMP_LABEL_PREFIX "__J" // really just used for jmp instructions
-#define TAB "    "
+#include "util/config.hpp"
 
 // static fields
 static size_t nextFuncLabelID = 0;
@@ -30,10 +25,8 @@ AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& fun
     // fill in param types
     func.loadParamTypes(this->paramTypes);
 
-    bool isMain = funcName == FUNC_MAIN_LABEL && paramTypes.size() == 0 && returnType == Type(TokenType::TYPE_INT);
-
     // determine labels
-    this->startLabel = isMain ? funcName : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
+    this->startLabel = func.isMainFunction() ? funcName : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
     this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
 }
 

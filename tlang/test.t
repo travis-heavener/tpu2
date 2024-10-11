@@ -3,6 +3,7 @@
 #include <stdio.t>
 
 int main() {
-    int f = !!!!!!!!!!!!!!!!!!!!!!!!!!!false;
-    return f;
+    char name[] = "Travis Heavener";
+    int a = 999;
+    return strlen(name);
 }

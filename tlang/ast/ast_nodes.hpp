@@ -33,6 +33,7 @@ class ASTNode {
         virtual ~ASTNode();
         void push(ASTNode* pNode) { children.push_back(pNode); };
         ASTNode* removeChild(size_t i);
+        void removeByAddress(void* addr);
         ASTNode* pop() { ASTNode* pNode = lastChild(); children.pop_back(); return pNode; };
         
         virtual ASTNodeType getNodeType() const { return ASTNodeType::NODE; };
@@ -223,6 +224,8 @@ class ASTFunction : public ASTNode {
 
         // used to load each parameter type to a vector
         void loadParamTypes(std::vector<Type>&) const;
+
+        bool isMainFunction() const;
     private:
         std::string name; // name of function
         Type type; // return type

@@ -8,6 +8,7 @@
 #include "preprocessor.hpp"
 #include "lexer.hpp"
 #include "parser/parser.hpp"
+#include "util/config.hpp"
 #include "util/t_exception.hpp"
 #include "util/toolbox.hpp"
 
@@ -37,9 +38,24 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    // extract any extra arguments
+    bool forceOverwrite = false;
+    DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = true;
+
+    for (int i = 2; i < argc; ++i) {
+        std::string arg( argv[i] );
+        if (arg == "-f") {
+            forceOverwrite = true;
+        } else if (arg == "-keep-unused") {
+            DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = false;
+        } else {
+            throw std::invalid_argument("Invalid argument: " + arg);
+        }
+    }
+
     // verify output file doesn't exist
     if (doesFileExist(outPath)) {
-        if (argc >= 3 && std::string(argv[2]) == "-f") { // remove by force
+        if (forceOverwrite) { // remove by force
             std::remove(outPath.c_str());
         } else {
             std::cerr << "Output file already exists: " << outPath << std::endl;
