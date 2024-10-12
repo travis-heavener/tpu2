@@ -1,9 +1,7 @@
 main:
     add SP, 2
-    pushw 26711
-    push 97
-    ;push 116
+    mov BL, 99
     movw AX, 0x03
-    popw BX
+    movw BX, 88
     syscall
     hlt

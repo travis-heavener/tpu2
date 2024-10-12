@@ -130,23 +130,43 @@ int main(int argc, char* argv[]) {
                         return 1;
                     }
 
+                    // skip default
+                    cachedInsts.clear();
                     std::string newInst = "pushw " + std::to_string( ((valB << 8) | valA) & 0xFFFF );
+                    write(opts, outHandle, newInst, newInst);
+                    continue;
+                } else if (strippedLine.find("pop ") == 0) { // move between registers
+                    // move the value between registers
+                    std::string regA = cachedInsts[0].second.substr(5);
+                    std::string regB = strippedLine.substr(4);
 
                     // skip default
                     cachedInsts.clear();
+                    std::string newInst = "mov " + regB + ", " + regA;
                     write(opts, outHandle, newInst, newInst);
                     continue;
-                } else {
-                    // just write the instruction
-                    write(opts, outHandle, cachedInsts[0].first, cachedInsts[0].second);
+                }
+            } else if (cachedInsts[0].second.find("pushw ") == 0) {
+                if (strippedLine.find("popw ") == 0) { // combine the two
+                    // move the value between registers
+                    std::string regA = cachedInsts[0].second.substr(6);
+                    std::string regB = strippedLine.substr(5);
+
+                    // skip default
+                    cachedInsts.clear();
+                    std::string newInst = "movw " + regB + ", " + regA;
+                    write(opts, outHandle, newInst, newInst);
+                    continue;
                 }
             }
 
-            // clear regardless
+            // base case, clear cached instructions and write any cached instructions
+            for (auto [cachedLine, cachedStrippedLine] : cachedInsts)
+                write(opts, outHandle, cachedLine, cachedStrippedLine);
             cachedInsts.clear();
         } else {
             // handle arguments & such (storing lines in cachedInsts if needed)
-            if (strippedLine.find("push ") == 0) {
+            if (strippedLine.find("push ") == 0 || strippedLine.find("pushw ") == 0) {
                 cachedInsts.push_back({line, strippedLine}); // record cached push instruction
             }
         }
