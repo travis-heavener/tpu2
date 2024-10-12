@@ -49,19 +49,46 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                     if (subExprStart != i)
                         pCall->push( parseExpression(tokens, subExprStart, i-1, scopeStack, true) );
                 }
-            } else if ((start + 1 <= endIndex && isTokenPrimitiveType(tokens[start+1].type, true)) ||
-                       (start + 2 <= endIndex && tokens[start+1].type == TokenType::UNSIGNED && isTokenPrimitiveType(tokens[start+2].type, true))) { // B. check for typecast
-                // grab type (only allow pointer asterisk or typename)
-                bool isUnsigned = tokens[start+1].type == TokenType::UNSIGNED;
-                Type type( tokens[start + 1 + isUnsigned].type, isUnsigned );
+            } else if (start + 1 <= endIndex && isTokenTypeKeyword(tokens[start+1].type)) { // B. check for typecast
+                // grab type
+                Type type( TokenType::TYPE_INT ); // default to signed int
 
-                for (size_t j = start + 2 + isUnsigned; j < i; ++j) {
+                // while we have a type keyword, modify the type
+                size_t j = start+1;
+                for ((void)j; j < i; ++j) {
+                    if (isTokenTypeKeyword(tokens[j].type)) {
+                        // check const if first char
+                        if (j == start+1 && tokens[j].type == TokenType::CONST) {
+                            type.setIsConst(true);
+                        } else if (isTokenSignedUnsigned(tokens[j].type)) {
+                            type.setIsUnsigned(tokens[j].type == TokenType::UNSIGNED);
+                        } else if (isTokenPrimitiveType(tokens[j].type, true)) {
+                            type.setPrimType(tokens[j].type);
+                            ++j;
+                            break; // primitive must be last
+                        } else {
+                            // invalid token
+                            throw TInvalidTokenException(tokens[j].err);
+                        }
+                    } else {
+                        break; // not a type keyword, but might be a pointer
+                    }
+                }
+
+                // grab pointers
+                for ((void)j; j < i; ++j) {
                     // only accept asterisk
                     if (tokens[j].type != TokenType::ASTERISK)
                         throw TInvalidTokenException(tokens[j].err);
-                    
+
                     // add to type
                     type.addEmptyPointer();
+                }
+
+                // only allow unsigned int or char, and disallow const void
+                bool isInvalidUnsigned = type.isUnsigned() && type.getPrimType() != TokenType::TYPE_INT && type.getPrimType() != TokenType::TYPE_CHAR;
+                if (isInvalidUnsigned || (type.isVoidNonPtr() && type.isConst())) {
+                    throw TSyntaxException(tokens[j].err);
                 }
 
                 // append typecast

@@ -206,8 +206,12 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             continue;
         }
 
-        // unsigned & signed keywords
-        if (isKwdPresent("unsigned", line, i)) {
+        // unsigned, signed, and const keywords
+        if (isKwdPresent("const", line, i)) {
+            i += 4; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "const", TokenType::CONST));
+            continue;
+        } else if (isKwdPresent("unsigned", line, i)) {
             i += 7; // offset by length of keyword - 1
             tokens.push_back(Token(err, "unsigned", TokenType::UNSIGNED));
             continue;

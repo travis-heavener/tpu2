@@ -14,7 +14,7 @@ enum TokenType {
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
 
-    UNSIGNED, SIGNED,
+    UNSIGNED, SIGNED, CONST,
 
     // operators
     OP_LT, OP_LTE, OP_GT, OP_GTE, // <, <=, >, >=
@@ -43,6 +43,8 @@ class Token {
 
 // token helpers
 bool isTokenPrimitiveType(const TokenType, const bool=false);
+bool isTokenSignedUnsigned(const TokenType);
+bool isTokenTypeKeyword(const TokenType);
 bool isTokenUnaryOp(const TokenType);
 bool isTokenBinaryOp(const TokenType);
 bool isTokenLiteral(const TokenType);

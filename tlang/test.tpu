@@ -58,111 +58,58 @@ __UF0:
     __UF0E:
     ret
 __UF1:
-    movw BP, SP
-    sub BP, 2
-    movw BP, BP
-    push [BP+0]
-    push [BP+1]
-    pushw 0
-    call __UF0
-    movw BP, SP
-    sub BP, 6
-    movw BP, BP
-    push [BP+0]
-    push [BP+1]
-    popw BX
-    push [SP-2]
-    push [SP-2]
-    popw CX
-    movw AX, 0x0
-    syscall
-    sub SP, 4
+    pushw 4098
+    mov AL, [SP-1]
+    and AL, 0x80
+    pop BL
+    or BL, AL
+    push BL
+    pop DL
+    mov [SP-2], DL
+    pop DL
+    mov [SP-2], DL
     jmp __UF1E
     __UF1E:
     ret
 main:
     add SP, 2
-    pushw 26711
-    pushw 29793
-    pushw 29479
-    pushw 29984
-    pushw 8304
-    pushw 24932
-    pushw 26478
-    pushw 29285
-    pushw 10
-    movw BP, SP
-    sub BP, 18
-    pushw BP
+    pushw 12
     pushw 0
-    call __UF0
-    movw BX, 10
+    call __UF1
     popw AX
-    sub AX, BX
-    jz __J5
-    jc __J5
-    movw AX, 1
-    jmp __J6
-    __J5:
-    movw AX, 0
-    jmp __J6
-    __J6:
-    push AL
-    pop AL
-    xor AH, AH
-    buf AX
-    jz __J4
-    pushw 28492
-    pushw 26478
-    pushw 27936
-    pushw 29541
-    pushw 24947
-    pushw 25959
-    pushw 26912
-    pushw 25454
-    pushw 28015
-    pushw 28265
-    pushw 11879
-    pushw 11822
-    pushw 10
-    movw BP, SP
-    sub BP, 26
+    movw AX, AX
+    movw BP, AX
     pushw BP
-    call __UF1
-    sub SP, 28
-    jmp __J3
-    __J4:
-    pushw 26707
-    pushw 29295
-    pushw 8308
-    pushw 25965
-    pushw 29555
-    pushw 26465
-    pushw 8293
-    pushw 28265
-    pushw 28515
-    pushw 26989
-    pushw 26478
-    pushw 11822
-    pushw 2606
-    push 0
-    movw BP, SP
-    sub BP, 27
-    pushw BP
-    call __UF1
-    sub SP, 29
+    pushw 9
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    push [SP-2]
+    push [SP-2]
+    popw AX
+    pushw AX
+    sub SP, 1
+    mov AL, [SP-1]
+    and AL, 0x80
+    movw CX, 0
+    buf AL
+    jz __J3
+    movw CX, 0xFFFF
     jmp __J3
     __J3:
-    movw BP, SP
-    sub BP, 20
-    pushw BP
-    call __UF1
-    pushw 0
+    push CL
+    pop BL
+    or BL, AL
+    push BL
     pop DL
-    mov [SP-24], DL
+    mov [SP-4], DL
     pop DL
-    mov [SP-24], DL
-    sub SP, 22
+    mov [SP-4], DL
+    sub SP, 2
     jmp mainE
     mainE:
     movw AX, 0x03

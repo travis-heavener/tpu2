@@ -31,11 +31,11 @@ void ParserFunction::remove() {
 };
 
 // returns true when the parameters match on two ParserFunctions
-bool ParserFunction::doParamsMatch(const std::vector<Type>& paramsB) {
+bool ParserFunction::doParamsMatch(const std::vector<Type>& paramsB, const ErrInfo err) {
     if (paramsB.size() != paramTypes.size()) return false;
 
     for (size_t i = 0; i < paramTypes.size(); ++i) {
-        if (!paramTypes[i].isParamMatch( paramsB[i] )) {
+        if (!paramTypes[i].isParamMatch( paramsB[i], err )) {
             return false;
         }
     }
@@ -72,7 +72,7 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
     for (auto itr = range.first; itr != range.second; ++itr) {
         // check parameters
         ParserFunction* pParserFunc = itr->second;
-        if (pParserFunc->doParamsMatch(paramTypes)) {
+        if (pParserFunc->doParamsMatch(paramTypes, err)) {
             pParserFunc->isUnused = false;
             return pParserFunc;
         }
@@ -101,7 +101,7 @@ void declareParserFunction(scope_stack_t& scopeStack, const std::string& name, P
     // search functions in global scope
     auto range = pScope->functions.equal_range(name);
     for (auto itr = range.first; itr != range.second; ++itr)
-        if (itr->second->doParamsMatch(paramTypes)) // check parameters
+        if (itr->second->doParamsMatch(paramTypes, err)) // check parameters
             throw TIdentifierInUseException(err);
 
     // declare function

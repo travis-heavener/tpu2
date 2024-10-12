@@ -924,7 +924,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 size_t j;
                 for (j = 0; j < numParams; ++j) {
                     const Type& actualType = static_cast<ASTTypedNode*>(func.at(j))->getTypeRef();
-                    if (!paramTypes[j].isParamMatch(actualType)) break;
+                    if (!paramTypes[j].isParamMatch(actualType, func.at(j)->err)) break;
                 }
 
                 // if broken prematurely, a type didn't match

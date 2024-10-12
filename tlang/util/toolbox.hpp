@@ -31,6 +31,7 @@ void trimString(std::string&);
 
 // used by the parser to find where a given closing character exists
 size_t findClosingParen(const std::vector<Token>&, const size_t, const size_t);
+size_t findClosingBrace(const std::vector<Token>&, const size_t, const size_t);
 void delimitIndices(const std::vector<Token>&, std::vector<size_t>&, const size_t, const size_t, const TokenType=TokenType::COMMA);
 
 #endif

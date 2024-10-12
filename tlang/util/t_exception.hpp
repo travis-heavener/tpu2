@@ -54,5 +54,7 @@ MAKE_EXCEPTION(ExpressionEval)
 MAKE_EXCEPTION(IllegalMacroDefinition)
 MAKE_EXCEPTION(InvalidMacroInclude)
 MAKE_EXCEPTION(IllegalVoidUse)
+MAKE_EXCEPTION(ConstQualifierMismatch)
+MAKE_EXCEPTION(ConstAssignment)
 
 #endif

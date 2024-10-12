@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "token.hpp"
+#include "t_exception.hpp"
 
 #define TYPE_EMPTY_PTR 0
 #define SIZE_ARR_AS_PTR 1 // used in getSizeBytes to force arrays to be handled as pointers
@@ -21,13 +22,14 @@ class Type {
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer) {};
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer), _isConst(t._isConst) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
         Type& operator=(const Type&&);
 
         bool isUnsigned() const { return _isUnsigned; };
+        void setIsUnsigned(bool i) { _isUnsigned = i; };
 
         void addEmptyPointer() { pointers.push_back(TYPE_EMPTY_PTR); };
         void addHintPointer(size_t);
@@ -40,6 +42,10 @@ class Type {
         size_t getSizeBytes(const int=0) const;
 
         TokenType getPrimType() const { return primitiveType; };
+        void setPrimType(TokenType t) { primitiveType = t; };
+
+        bool isConst() const { return _isConst; };
+        void setIsConst(bool i) { _isConst = i; };
 
         // returns true if primitive is void and is not a void pointer
         bool isVoidNonPtr() const { return primitiveType == TokenType::VOID && pointers.size() == 0; };
@@ -53,7 +59,7 @@ class Type {
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
 
-        bool isParamMatch(const Type&) const;
+        bool isParamMatch(const Type&, ErrInfo) const;
 
         bool isArray() const { return numArrayHints > 0; };
 
@@ -80,6 +86,9 @@ class Type {
 
         // for handling reference pointers
         bool _isReferencePointer = false;
+        
+        // for const qualifiers
+        bool _isConst = false;
 };
 
 #endif

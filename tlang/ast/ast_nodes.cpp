@@ -438,6 +438,9 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // verify right arg is not void
                 if (typeB.isVoidNonPtr()) throw TIllegalVoidUseException(err);
 
+                // verify not assigning to a const type
+                if (typeA.isConst()) throw TConstAssignmentException(err);
+
                 this->setType( typeA ); // take type of left argument
                 pB->setIsLValue(false); // revoke lvalue status from child
                 break;

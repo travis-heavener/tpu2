@@ -29,57 +29,63 @@ AST* parseToAST(const std::vector<Token>& tokens) {
             size_t startIndex = i, endIndex = i;
 
             // verify return type is specified
-            if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED)
-                ++i;
+            if (!isTokenTypeKeyword(tokens[i].type))
+                throw TSyntaxException(tokens[i].err);
 
-            if ( !isTokenPrimitiveType(tokens[i].type, true) )
-                throw TInvalidTokenException(tokens[i].err);
-            
-            // skip over any pointers attached
-            while (i+1 < tokensLen && tokens[i+1].type == TokenType::ASTERISK)
+            // grab type
+            Type type( TokenType::TYPE_INT ); // defaults to signed int
+
+            // while we have a type keyword, modify the type
+            size_t start = i;
+            while (i < tokensLen && isTokenTypeKeyword(tokens[i].type)) {
+                // check const if first char
+                if (i == start && tokens[i].type == TokenType::CONST) {
+                    type.setIsConst(true);
+                } else if (isTokenSignedUnsigned(tokens[i].type)) {
+                    type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
+                } else if (isTokenPrimitiveType(tokens[i].type, true)) {
+                    type.setPrimType(tokens[i].type);
+                    ++i;
+                    break; // primitive must be last
+                } else {
+                    // invalid token
+                    throw TInvalidTokenException(tokens[i].err);
+                }
                 ++i;
+            }
+
+            // grab pointers
+            while (i < tokensLen && tokens[i].type == TokenType::ASTERISK) {
+                type.addEmptyPointer(); // add to type
+                ++i;
+            }
             
             // verify an identifier name is present
-            if ( i+1 == tokensLen || tokens[++i].type != TokenType::IDENTIFIER )
-                throw TInvalidTokenException(tokens[i].err);
+            if ( i == tokensLen || tokens[i].type != TokenType::IDENTIFIER )
+                throw TInvalidTokenException(tokens[i == tokensLen ? i-1 : i].err);
             
+            // set the start index to where the identifier name is
+            startIndex = i++;
+
             // verify opening parenthesis is present
-            if ( i+1 == tokensLen || tokens[++i].type != TokenType::LPAREN )
-                throw TInvalidTokenException(tokens[i].err);
+            if ( i == tokensLen || tokens[i].type != TokenType::LPAREN )
+                throw TInvalidTokenException(tokens[i-1].err);
 
             // verify closing parenthesis is present
-            endIndex = i; // store brace start in endIndex for now <--------------
-            size_t parensOpen = 1;
-            do {
-                i++;
-                if (tokens[i].type == TokenType::LPAREN)
-                    parensOpen++;
-                else if (tokens[i].type == TokenType::RPAREN)
-                    parensOpen--;
-            } while ( parensOpen > 0 && i < tokensLen );
-
-            if ( i == tokensLen ) throw TUnclosedGroupException(tokens[startIndex+2].err);
+            endIndex = findClosingParen(tokens, i, tokensLen-1);
+            i = endIndex;
 
             // verify opening brace is present
             if ( i+1 == tokensLen || tokens[++i].type != TokenType::LBRACE )
                 throw TInvalidTokenException(tokens[i].err);
             
             // verify closing brace is present
-            endIndex = i; // store brace start in endIndex for now <--------------
-            size_t bracesOpen = 1;
-            do {
-                i++;
-                if (tokens[i].type == TokenType::LBRACE)
-                    bracesOpen++;
-                else if (tokens[i].type == TokenType::RBRACE)
-                    bracesOpen--;
-            } while ( bracesOpen > 0 && i < tokensLen );
-
-            if ( i == tokensLen ) throw TUnclosedGroupException(tokens[endIndex].err);
+            endIndex = findClosingBrace(tokens, i, tokensLen-1);
+            i = endIndex;
 
             // all good to go
             endIndex = i;
-            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST) );
+            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST, type) );
         }
     } catch (TException& e) {
         while (scopeStack.size() > 0) // free ParserVar pointers
@@ -284,44 +290,46 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
             case TokenType::SEMICOLON: break; // erroneous statement
             default: { // base case, parse as expression
                 // check for variable assignment
-                if (isTokenPrimitiveType(tokens[i].type, true) || tokens[i].type == TokenType::UNSIGNED ||
-                    tokens[i].type == TokenType::SIGNED) {
-                    
-                    // if (un)signed, check for next token
-                    bool isUnsigned = false;
-                    if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED) {
-                        if (i+1 > endIndex || !isTokenPrimitiveType(tokens[i+1].type))
-                            throw TInvalidTokenException(tokens[i].err);
+                if (isTokenTypeKeyword(tokens[i].type)) {
+                    // grab type
+                    Type type; // default to void
 
-                        // base case, is valid
-                        isUnsigned = tokens[i].type == TokenType::UNSIGNED;
-                        ++i; // skip to primitive
-                    }
-
+                    // while we have a type keyword, modify the type
                     size_t start = i;
-
-                    // verify not end of input
-                    if (i+1 > endIndex) throw TInvalidTokenException(tokens[i].err);
-
-                    // get type
-                    Type type(tokens[start].type, isUnsigned);
-                    while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-                        type.addEmptyPointer();
+                    while (i <= endIndex && isTokenTypeKeyword(tokens[i].type)) {
+                        // check const if first char
+                        if (i == start && tokens[i].type == TokenType::CONST) {
+                            type.setIsConst(true);
+                        } else if (isTokenSignedUnsigned(tokens[i].type)) {
+                            type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
+                        } else if (isTokenPrimitiveType(tokens[i].type, true)) {
+                            type.setPrimType(tokens[i].type);
+                            ++i;
+                            break; // primitive must be last
+                        } else {
+                            // invalid token
+                            throw TInvalidTokenException(tokens[i].err);
+                        }
                         ++i;
                     }
 
-                    // prevent trying to use an (un)signed bool or void
-                    if (isUnsigned &&
-                        (type.getPrimType() == TokenType::TYPE_BOOL || type.getPrimType() == TokenType::VOID)) {
+                    // grab pointers
+                    while (i <= endIndex && tokens[i].type == TokenType::ASTERISK) {
+                        type.addEmptyPointer(); // add to type
+                        ++i;
+                    }
+
+                    // verify not end of input
+                    if (i > endIndex) throw TInvalidTokenException(tokens[i-1].err);
+
+                    // only allow unsigned int or char, and disallow void non-ptrs
+                    bool isInvalidUnsigned = type.isUnsigned() && type.getPrimType() != TokenType::TYPE_INT && type.getPrimType() != TokenType::TYPE_CHAR;
+                    if (isInvalidUnsigned || type.isVoidNonPtr()) {
                         throw TSyntaxException(tokens[start].err);
                     }
 
-                    // prevent non-pointer void
-                    if (type.isVoidNonPtr())
-                        throw TIllegalVoidUseException(tokens[start].err);
-
                     // get identifier
-                    if (tokens[++i].type != TokenType::IDENTIFIER)
+                    if (tokens[i].type != TokenType::IDENTIFIER)
                         throw TInvalidTokenException(tokens[i].err);
                     size_t idenStart = i;
 
@@ -425,33 +433,12 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
     }
 }
 
-ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack, AST* pAST) {
+ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex, const size_t endIndex, scope_stack_t& scopeStack, AST* pAST, Type retType) {
     size_t i = startIndex;
 
-    // get return type
-    bool isReturnUnsigned = false;
-    if (tokens[i].type == TokenType::UNSIGNED || tokens[i].type == TokenType::SIGNED) {
-        isReturnUnsigned = tokens[i].type == TokenType::UNSIGNED;
-        ++i;
-    }
-
-    Type type(tokens[i].type, isReturnUnsigned);
-
-    // prevent trying to use an (un)signed bool or void
-    if (isReturnUnsigned &&
-        (tokens[i].type == TokenType::TYPE_BOOL || tokens[i].type == TokenType::VOID)) {
-        throw TSyntaxException(tokens[startIndex].err);
-    }
-
-    // append any pointers
-    while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-        type.addEmptyPointer();
-        ++i;
-    }
-
     // create node
-    const std::string name = tokens[++i].raw; // get function name
-    ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], type);
+    const std::string name = tokens[i].raw; // get function name
+    ASTFunction* pHead = new ASTFunction(name, tokens[startIndex], retType);
     scopeStack.push_back( new ParserScope() ); // create a new scope stack for scoped parser variables
 
     try {
@@ -522,7 +509,7 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
         std::vector<Type> paramTypes;
         pHead->loadParamTypes(paramTypes);
 
-        ParserFunction* pParserFunc = new ParserFunction(type, isMainFunction, pAST, pHead, paramTypes);
+        ParserFunction* pParserFunc = new ParserFunction(retType, isMainFunction, pAST, pHead, paramTypes);
         declareParserFunction(scopeStack, name, pParserFunc, paramTypes, tokens[startIndex].err); // put into scope
 
         // verify opening brace is next

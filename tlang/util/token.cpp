@@ -7,6 +7,16 @@ bool isTokenPrimitiveType(const TokenType type, const bool allowVoid) {
     return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || (type == VOID && allowVoid);
 }
 
+// true if the token is UNSIGNED or constexpr SIGNED
+bool isTokenSignedUnsigned(const TokenType type) {
+    return type == UNSIGNED || type == SIGNED;
+}
+
+// true if the token is UNSIGNED/SIGNED, CONST, or a PRIMITIVE TYPE
+bool isTokenTypeKeyword(const TokenType type) {
+    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || type == VOID || type == UNSIGNED || type == SIGNED || type == CONST;
+}
+
 // true if the token is an unary operator (ex. ~, !)
 bool isTokenUnaryOp(const TokenType type) {
     return type == OP_BOOL_NOT || type == OP_ADD || type == OP_SUB || type == OP_BIT_NOT || type == SIZEOF;

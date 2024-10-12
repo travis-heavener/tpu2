@@ -8,6 +8,7 @@ Type::Type(const Type&& B) {
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
     this->_isReferencePointer = B._isReferencePointer;
+    this->_isConst = B._isConst;
 }
 
 Type& Type::operator=(const Type& B) {
@@ -15,6 +16,7 @@ Type& Type::operator=(const Type& B) {
     this->pointers = B.pointers;
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
+    this->_isConst = B._isConst;
     return *this;
 }
 
@@ -23,6 +25,7 @@ Type& Type::operator=(const Type&& B) {
     this->pointers = std::move(B.pointers);
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
+    this->_isConst = B._isConst;
     return *this;
 }
 
@@ -78,13 +81,18 @@ bool Type::operator==(const Type& t) const {
     return true;
 }
 
-bool Type::isParamMatch(const Type& t) const {
+// returns true if the parameters match, false otherwise
+// NOTE: this must be the desired type, and t must be the given type
+bool Type::isParamMatch(const Type& t, ErrInfo err) const {
     // check primitive
     if (primitiveType != t.primitiveType) return false;
     if (_isUnsigned != t._isUnsigned) return false;
 
     // check num ptrs
     if (pointers.size() != t.pointers.size()) return false;
+
+    // prevent casting away const qualifiers implicitly
+    if (!_isConst && t._isConst) throw TConstQualifierMismatchException(err);
 
     // allow first pointer to be blank, but all others must match
     for (size_t i = pointers.size(); i >= 1; --i) {
