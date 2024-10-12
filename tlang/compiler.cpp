@@ -24,7 +24,7 @@ int main(int argc, char* argv[]) {
     }
 
     // check input file
-    const std::string inPath(argv[1]);
+    const std::string inPath = std::filesystem::canonical(argv[1]).string();
     if (inPath.find(".t", inPath.size()-3) == std::string::npos) {
         std::cerr << "Input file must be a T file (.t extension)!" << std::endl;
         exit(1);
@@ -40,16 +40,19 @@ int main(int argc, char* argv[]) {
 
     // extract any extra arguments
     bool forceOverwrite = false;
+    bool skipPostprocessor = false;
     DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = true;
 
     for (int i = 2; i < argc; ++i) {
         std::string arg( argv[i] );
         if (arg == "-f") {
             forceOverwrite = true;
+        } else if (arg == "-skip-post") {
+            skipPostprocessor = true;
         } else if (arg == "-keep-unused") {
             DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = false;
         } else {
-            throw std::invalid_argument("Invalid argument: " + arg);
+            std::cout << "Warning: Skipping invalid argument: " << arg << '\n';
         }
     }
 
@@ -79,7 +82,7 @@ int main(int argc, char* argv[]) {
         // 0. load cwd
         cwd_stack cwdStack;
         std::filesystem::path inPathAbs( inPath );
-        cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
+        cwdStack.push( std::filesystem::canonical(inPathAbs).parent_path() );
 
         // 1. tokenize file
         std::vector<Token> tokens;
@@ -106,7 +109,26 @@ int main(int argc, char* argv[]) {
         delete pAST;
 
         // remove output file
-        std::remove(outPath.c_str());
+        std::filesystem::remove(outPath);
+    }
+
+    // run through post processor (optional) to reduce redundant expressions more easily than in the assembler
+    if (!skipPostprocessor) {
+        // grab CWD to find postproc symlink
+        const std::string postprocPath = (std::filesystem::canonical("/proc/self/exe").parent_path() / "postproc").string();
+
+        const std::string tempPath = outPath + "_tmp";
+        const std::string cmd( '"' + postprocPath + "\" " + outPath + " -o " + tempPath );
+        std::system(cmd.c_str());
+
+        // remove original tpu file and replace with tmp file
+        if (!std::filesystem::exists(tempPath)) {
+            std::cerr << "Failed to invoke post processor.\n";
+            std::filesystem::remove(outPath); // remove regardless
+        } else {
+            std::filesystem::remove(outPath); // remove old
+            std::filesystem::rename(tempPath, outPath); // rename buffer to outPath
+        }
     }
 
     return 0;

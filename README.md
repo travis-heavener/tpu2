@@ -21,14 +21,15 @@ The full set of syscalls: [syscall_set.txt](references/syscall_set.txt)
 
 I have NOT tested this for Windows, although `<conio.h>` *should* work in place of ncurses since I wanted the emulated input stream to wait for character input (hence why I used ncurses on Ubuntu).
 
-Install ncurses (Linux only):
-`sudo apt-get install libncurses-dev`
+Install ncurses (Linux only): `sudo apt-get install libncurses-dev`
 
-To compile (Linux only):
-`g++ *.cpp util/*.cpp -o ./bin/main.o -Wall -Wextra -g -lncurses`
+To compile (Linux only): `make base`
 
-To compile the T-language compiler (Linux only);
-`cd ./tlang && g++ *.cpp */*.cpp -o compiler.o -Wall -Wextra -g`
+To compile the T-language compiler (Linux only); `make tcc`
+
+To compile the TPU Post-Processor: `make postproc`
+
+To compile all of the above: `make all`
 
 ## Disclaimer
 

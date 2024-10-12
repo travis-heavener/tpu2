@@ -12,7 +12,7 @@
 #include "util/toolbox.hpp"
 #include "util/t_exception.hpp"
 
-#define STDLIB_DIR "stdlib/"
+#define STDLIB_DIR std::filesystem::canonical("/proc/self/exe").parent_path() / "stdlib/"
 
 static std::set<std::string> includedPaths;
 
