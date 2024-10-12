@@ -4,6 +4,7 @@
 
 int main() {
     char name[] = "What's up danger\n";
+
     if (strlen(name) > 10) {
         char msg[] = "Long message incoming...\n";
         print(msg);
@@ -11,6 +12,12 @@ int main() {
         char msg[] = "Short message incoming...\n";
         print(msg);
     }
+
     print(name);
-    return EXIT_SUCCESS;
+
+    int a = -1;
+    return (unsigned int)a;
+
+    // return sizeof (unsigned int)&name;
+    // return sizeof (bool)&name;
 }
