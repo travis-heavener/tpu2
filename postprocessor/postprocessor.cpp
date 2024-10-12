@@ -9,30 +9,48 @@
 #define TAB "    "
 
 typedef struct post_process_opts {
-    // combines any consecutive imm8 push operations into imm16 pushw operations
-    bool mergeImm8Pushes        = true; // default: true
+    // removes any identity operations (ex. movw AX, AX) that don't set flags (doesn't remove arithmetic identities that may be used as a buffer)
+    bool removeIdentities   = true; // default: true
 
-    // combines any push/pop operations between registers to mov/movw instructions
-    bool reducePushPopsToRegs   = true; // default: true
+    // combines any consecutive imm8 push operations into imm16 pushw operations
+    bool mergeImm8Pushes    = true; // default: true
+
+    // combines any push/pop operations between registers to mov/movw instructions and remove redundant push/pops
+    bool reducePushPops     = true; // default: true
 
     // combines any consecutive target-less pop/popw instructions to just subtracting from the SP
-    bool dissolvePops           = true; // default: true
+    bool dissolvePops       = true; // default: true
 
     // removes any comments from the input file
-    bool stripComments          = false; // default: false
+    bool stripComments      = false; // default: false
 
     // removes any unnecessary whitespace (ex. leading tabs)
-    bool minify                 = false; // default: false
+    bool minify             = false; // default: false
 } post_process_opts;
 
 // fwd declarations
 void readNextLine(const post_process_opts&, std::string&, std::string&, std::ifstream&);
 void writeInstruction(const post_process_opts&, std::ofstream&, const std::string&, const std::string&);
+void trimString(std::string&);
 void ltrimString(std::string&);
 void rtrimString(std::string&);
 void stripComments(std::string&);
 
-// a postprocessor for reducing the number of instructions of a given TPU file
+/**
+ * A postprocessor for reducing the number of instructions of a given TPU file.
+ * 
+ * Usage: ./postproc <in.tpu> <optional: args>
+ * 
+ * Arguments:
+ *  -f:
+ *      Force overwrite the input file
+ *  -minify, --m:
+ *      Strip all extra whitespace
+ *  -strip-comments, --sc:
+ *      Strip all comments
+ *  -o <output path>:
+ *      Specifies the output path to be used
+ */
 int main(int argc, char* argv[]) {
     // grab cmd args
     if (argc < 2) {
@@ -117,7 +135,24 @@ int main(int argc, char* argv[]) {
     readNextLine(opts, line, strippedLine, inHandle);
     while (line != "") {
         // handle arguments & such
-        if ((opts.mergeImm8Pushes || opts.reducePushPopsToRegs) && strippedLine.find("push ") == 0) {
+        if (opts.removeIdentities && strippedLine.find("mov") == 0) {
+            bool isWordOp = strippedLine.find("movw") == 0;
+
+            // grab both args
+            const size_t commaIndex = strippedLine.find(',');
+            size_t startIndex = 4 + isWordOp;
+            std::string argA = strippedLine.substr(startIndex, commaIndex - startIndex);
+            
+            startIndex = commaIndex+1;
+            std::string argB = strippedLine.substr(startIndex);
+
+            // strip whitespace
+            trimString(argA), trimString(argB);
+
+            // write the instruction if args aren't equal
+            if (argA != argB)
+                writeInstruction(opts, outHandle, line, strippedLine);
+        } else if ((opts.mergeImm8Pushes || opts.reducePushPops) && strippedLine.find("push ") == 0) {
             // get next line and check for another push to combine with
             std::string lineBuf, strippedLineBuf;
             readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
@@ -137,14 +172,16 @@ int main(int argc, char* argv[]) {
                     strippedLine = strippedLineBuf;
                     continue; // skip reading another line
                 }
-            } else if (opts.reducePushPopsToRegs && strippedLineBuf.find("pop ") == 0) {
+            } else if (opts.reducePushPops && strippedLineBuf.find("pop ") == 0) {
                 // move the value between registers
                 std::string regA = strippedLine.substr(5);
                 std::string regB = strippedLineBuf.substr(4);
 
-                // write instruction
-                std::string newInst = "mov " + regB + ", " + regA;
-                writeInstruction(opts, outHandle, newInst, newInst);
+                // write instruction if not the same argument
+                if (regA != regB) {
+                    std::string newInst = "mov " + regB + ", " + regA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                }
             } else {
                 // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
@@ -152,7 +189,7 @@ int main(int argc, char* argv[]) {
                 strippedLine = strippedLineBuf;
                 continue; // skip reading another line
             }
-        } else if (opts.reducePushPopsToRegs && strippedLine.find("pushw ") == 0) {
+        } else if (opts.reducePushPops && strippedLine.find("pushw ") == 0) {
             // get next line and check for a popw to combine with
             std::string lineBuf, strippedLineBuf;
             readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
@@ -162,9 +199,11 @@ int main(int argc, char* argv[]) {
                 std::string regA = strippedLine.substr(6);
                 std::string regB = strippedLineBuf.substr(5);
 
-                // skip default
-                std::string newInst = "movw " + regB + ", " + regA;
-                writeInstruction(opts, outHandle, newInst, newInst);
+                // write instruction if not the same argument
+                if (regA != regB) {
+                    std::string newInst = "movw " + regB + ", " + regA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                }
             } else {
                 // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
@@ -172,26 +211,50 @@ int main(int argc, char* argv[]) {
                 strippedLine = strippedLineBuf;
                 continue; // skip reading another line
             }
-        } else if (opts.dissolvePops && (strippedLine == "popw" || strippedLine == "pop")) {
-            // fetch any successive pop/popw to combine
-            size_t popSize = strippedLine == "popw" ? 2 : 1;
-
+        } else if ((opts.dissolvePops || opts.reducePushPops) && strippedLine.find("pop") == 0) {
+            // check the next instruction
             std::string lineBuf, strippedLineBuf;
             readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
 
-            while (strippedLineBuf == "popw" || strippedLineBuf == "pop") {
-                popSize += strippedLineBuf == "popw" ? 2 : 1;
-                readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+            // fetch any successive pop/popw to combine
+            if (opts.dissolvePops && (strippedLine == "popw" || strippedLine == "pop")) {
+                size_t popSize = strippedLine == "popw" ? 2 : 1;
+                while (strippedLineBuf == "popw" || strippedLineBuf == "pop") {
+                    popSize += strippedLineBuf == "popw" ? 2 : 1;
+                    readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+                }
+
+                // write SP substraction instruction
+                const std::string subInst = "sub SP, " + std::to_string(popSize) + '\n';
+                writeInstruction(opts, outHandle, subInst, subInst);
+
+                // stopped on a non-matching line, so pass along
+                line = lineBuf;
+                strippedLine = strippedLineBuf;
+                continue; // skip reading another line
+            } else if (opts.reducePushPops &&
+                       ((strippedLineBuf.find("pushw ") == 0 && strippedLine.find("popw ") == 0) ||
+                       (strippedLineBuf.find("push ") == 0 && strippedLine.find("pop ") == 0))) {
+                // verify that the two arguments match
+                const bool isWordOp = strippedLine.find("popw ") == 0;
+                const std::string argA = strippedLine.substr(4 + isWordOp);
+                const std::string argB = strippedLineBuf.substr(5 + isWordOp);
+                
+                // if args aren't redundant, write them
+                if (argA != argB) {
+                    // not redundant, write this and pass along next
+                    writeInstruction(opts, outHandle, line, strippedLine);
+                    line = lineBuf;
+                    strippedLine = strippedLineBuf;
+                    continue;
+                }
+            } else {
+                // base case, current instruction not matched, so write that and pass along the next one
+                writeInstruction(opts, outHandle, line, strippedLine);
+                line = lineBuf;
+                strippedLine = strippedLineBuf;
+                continue; // skip reading another line
             }
-
-            // write SP substraction instruction
-            const std::string subInst = "sub SP, " + std::to_string(popSize) + '\n';
-            writeInstruction(opts, outHandle, subInst, subInst);
-
-            // stopped on a non-matching line, so pass along
-            line = lineBuf;
-            strippedLine = strippedLineBuf;
-            continue; // skip reading another line
         } else {
             // write instruction as usual
             writeInstruction(opts, outHandle, line, strippedLine);
@@ -258,6 +321,11 @@ void writeInstruction(const post_process_opts& opts, std::ofstream& outHandle, c
 }
 
 // helper for trimming strings in place
+void trimString(std::string& str) {
+    ltrimString(str);
+    rtrimString(str);
+}
+
 void ltrimString(std::string& str) {
     if (str.size() == 0) return; // skip blank lines
 
