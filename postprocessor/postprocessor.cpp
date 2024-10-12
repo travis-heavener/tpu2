@@ -26,6 +26,7 @@ typedef struct post_process_opts {
 } post_process_opts;
 
 // fwd declarations
+void write(post_process_opts&, std::ofstream&, const std::string&, const std::string&);
 void ltrimString(std::string&);
 void rtrimString(std::string&);
 void stripComments(std::string&);
@@ -91,10 +92,13 @@ int main(int argc, char* argv[]) {
     }
 
     // read the current and last instructions into memory (break/reset on labels)
-    std::vector<std::string> cachedInsts;
+    std::vector<std::pair<std::string, std::string>> cachedInsts;
     std::string line, strippedLine;
+    long long lineNum = -1;
 
     while (std::getline(inHandle, line)) {
+        ++lineNum;
+
         // strip whitespace and comments
         ltrimString(line); // strip whitespace
         strippedLine = line;
@@ -104,30 +108,53 @@ int main(int argc, char* argv[]) {
         stripComments(strippedLine);
         rtrimString(strippedLine);
 
-        // TODO: handle arguments & such (storing lines in cachedInsts if needed)
-        if (strippedLine.find("push ") == 0) {
-            // combine push to pushw
-            cachedInsts.push_back(strippedLine);
-        }
-
         // strip comments from actual line if needed
         if (opts.stripComments) stripComments(line);
         if (line.size() == 0) continue; // skip blank lines
 
-        // base case, just write the instruction to the file
-        if (opts.minify) { // remove any leading whitespace
-            outHandle << line << '\n';
-        } else { // don't minify
-            bool isLabelStart = strippedLine.back() == ':';
-            if (isLabelStart) {
-                outHandle << line << '\n'; // don't indent
-            } else {
-                outHandle << TAB << line << '\n'; // indent
+        // check for any chained arguments
+        if (cachedInsts.size() > 0) {
+            // handle any consecutive pushes
+            if (cachedInsts[0].second.find("push ") == 0) {
+                if (strippedLine.find("push ") == 0) { // combine the two
+                    // extract values
+                    int valA, valB;
+                    try {
+                        valA = std::stoi( cachedInsts[0].second.substr(5) );
+                        valB = std::stoi( strippedLine.substr(5) );
+                    } catch (std::invalid_argument& e) {
+                        std::cerr << "Invalid argument on line " << lineNum << '\n';
+                        inHandle.close();
+                        outHandle.close();
+                        std::filesystem::remove(outPath);
+                        return 1;
+                    }
+
+                    std::string newInst = "pushw " + std::to_string( ((valB << 8) | valA) & 0xFFFF );
+
+                    // skip default
+                    cachedInsts.clear();
+                    write(opts, outHandle, newInst, newInst);
+                    continue;
+                } else {
+                    // just write the instruction
+                    write(opts, outHandle, cachedInsts[0].first, cachedInsts[0].second);
+                }
+            }
+
+            // clear regardless
+            cachedInsts.clear();
+        } else {
+            // handle arguments & such (storing lines in cachedInsts if needed)
+            if (strippedLine.find("push ") == 0) {
+                cachedInsts.push_back({line, strippedLine}); // record cached push instruction
             }
         }
 
-        // remove any cached instructions since they aren't vaild anymore
-        cachedInsts.clear();
+        // just write the instruction to the file
+        if (cachedInsts.size() == 0) {
+            write(opts, outHandle, line, strippedLine);
+        }
     }
 
     // close file handles & overwrite temp .tpu file
@@ -139,6 +166,19 @@ int main(int argc, char* argv[]) {
 /*************************************************************/
 /*                          TOOLBOX                          */
 /*************************************************************/
+
+void write(post_process_opts& opts, std::ofstream& outHandle, const std::string& line, const std::string& strippedLine) {
+    if (opts.minify) { // remove any leading whitespace
+        outHandle << line << '\n';
+    } else { // don't minify
+        bool isLabelStart = strippedLine.back() == ':';
+        if (isLabelStart) {
+            outHandle << line << '\n'; // don't indent
+        } else {
+            outHandle << TAB << line << '\n'; // indent
+        }
+    }
+}
 
 // helper for trimming strings in place
 void ltrimString(std::string& str) {
