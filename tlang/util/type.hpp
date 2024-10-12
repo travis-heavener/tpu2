@@ -39,7 +39,7 @@ class Type {
         const std::vector<size_t>& getPointers() const { return pointers; };
         size_t getSizeBytes(const int=0) const;
 
-        TokenType getPrimitiveType() const { return primitiveType; };
+        TokenType getPrimType() const { return primitiveType; };
 
         // returns true if primitive is void and is not a void pointer
         bool isVoidNonPtr() const { return primitiveType == TokenType::VOID && pointers.size() == 0; };

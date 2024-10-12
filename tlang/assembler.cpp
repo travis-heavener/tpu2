@@ -336,7 +336,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
     // literal arrays are ONLY allowed during assignment
     if (bodyNode.getNodeType() == ASTNodeType::LIT_ARR) {
         ASTArrayLiteral* pArr = static_cast<ASTArrayLiteral*>(&bodyNode);
-        if (pArr->getType().getPrimitiveType() == TokenType::VOID) // unset
+        if (pArr->getType().getPrimType() == TokenType::VOID) // unset
             throw TSyntaxException(bodyNode.err);
     }
 
@@ -1083,7 +1083,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 }
 
 // implicitly converts a value pushed to the top of the stack to the given type
-void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desiredType, Scope& scope, const ErrInfo err) {
+void implicitCast(std::ofstream& outHandle, Type resultType, Type desiredType, Scope& scope, const ErrInfo err) {
     if (resultType.isVoidNonPtr() && !desiredType.isVoidNonPtr()) throw TIllegalVoidUseException(err);
 
     // most importantly, if the two types are equal just return
@@ -1103,29 +1103,34 @@ void implicitCast(std::ofstream& outHandle, Type resultType, const Type& desired
     if (resultType.isPointer() && desiredType.isPointer()) return;
 
     // if converting between unsigned and signed of same primitive, pass through
-    TokenType primA = resultType.getPrimitiveType();
-    TokenType primB = desiredType.getPrimitiveType();
+    TokenType primA = resultType.getPrimType();
+    TokenType primB = desiredType.getPrimType();
     if (primA == primB && !resultType.isPointer() && !desiredType.isPointer() &&
         resultType.isUnsigned() != desiredType.isUnsigned()) return;
 
     // if converting from a pointer of some sort to an integral type
     // pass through since they share the same size & everything
+    bool wasTypePointer = false;
     if (!desiredType.isPointer() && resultType.isPointer() &&
-        desiredType.getPrimitiveType() != TokenType::TYPE_FLOAT &&
-        desiredType.getPrimitiveType() != TokenType::VOID) {
-        return;
+        desiredType.getPrimType() != TokenType::TYPE_FLOAT &&
+        desiredType.getPrimType() != TokenType::VOID) {
+        resultType = MEM_ADDR_TYPE;
+        primA = resultType.getPrimType();
+        wasTypePointer = true;
     }
 
     // if converting from an integral type to a pointer,
     // pass through since they share the same size & everything
     if (!resultType.isPointer() && desiredType.isPointer() &&
-        resultType.getPrimitiveType() != TokenType::TYPE_FLOAT &&
-        resultType.getPrimitiveType() != TokenType::VOID) {
-        return;
+        resultType.getPrimType() != TokenType::TYPE_FLOAT &&
+        resultType.getPrimType() != TokenType::VOID) {
+        desiredType = MEM_ADDR_TYPE;
+        primB = desiredType.getPrimType();
+        wasTypePointer = true;
     }
 
     // if converting between primitive types, pad/pop bytes
-    if (primA != primB && !resultType.isPointer() && !desiredType.isPointer()) {
+    if ((primA != primB || resultType.isUnsigned() != desiredType.isUnsigned() || wasTypePointer) && !resultType.isPointer() && !desiredType.isPointer()) {
         // handle cast to float vs other integral types
         if (primB == TokenType::TYPE_FLOAT) {
             throw std::runtime_error("Float implicit casting not yet implemented!");

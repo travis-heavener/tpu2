@@ -54,6 +54,6 @@ bool assembleBody(ASTNode*, std::ofstream&, Scope&, const AssembledFunc&, const 
 Type assembleExpression(ASTNode&, std::ofstream&, Scope&);
 
 // implicitly converts a value pushed to the top of the stack to the given type
-void implicitCast(std::ofstream&, Type, const Type&, Scope&, const ErrInfo);
+void implicitCast(std::ofstream&, Type, Type, Scope&, const ErrInfo);
 
 #endif

@@ -407,7 +407,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
             }
             case TokenType::OP_LSHIFT: case TokenType::OP_RSHIFT: {
                 // verify right argument is an integer and not a pointer
-                if (typeB.isPointer() || typeB.getPrimitiveType() != TokenType::TYPE_INT)
+                if (typeB.isPointer() || typeB.getPrimType() != TokenType::TYPE_INT)
                     throw TInvalidOperationException(err);
 
                 // prevent voids or pointers

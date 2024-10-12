@@ -157,19 +157,26 @@ main:
     sub BP, 20
     pushw BP
     call __UF1
+    movw BP, SP
+    sub BP, 22
+    movw AX, BP
+    movw AX, AX
+    movw AX, AX
+    buf AX
+    jz __J7
     movw AX, 1
-    not AX
-    add AX, 1
+    jmp __J7
+    __J7:
     pushw AX
-    push [SP-2]
-    push [SP-2]
-    popw AX
-    pushw AX
+    sub SP, 1
+    pop AL
+    xor AH, AH
+    pushw 1
     pop DL
-    mov [SP-26], DL
+    mov [SP-24], DL
     pop DL
-    mov [SP-26], DL
-    sub SP, 24
+    mov [SP-24], DL
+    sub SP, 22
     jmp mainE
     mainE:
     movw AX, 0x03

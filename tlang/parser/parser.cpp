@@ -312,7 +312,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 
                     // prevent trying to use an (un)signed bool or void
                     if (isUnsigned &&
-                        (type.getPrimitiveType() == TokenType::TYPE_BOOL || type.getPrimitiveType() == TokenType::VOID)) {
+                        (type.getPrimType() == TokenType::TYPE_BOOL || type.getPrimType() == TokenType::VOID)) {
                         throw TSyntaxException(tokens[start].err);
                     }
 

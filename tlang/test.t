@@ -15,9 +15,6 @@ int main() {
 
     print(name);
 
-    int a = -1;
-    return (unsigned int)a;
-
     // return sizeof (unsigned int)&name;
-    // return sizeof (bool)&name;
+    return sizeof (bool)&name;
 }

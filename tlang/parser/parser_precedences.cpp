@@ -214,11 +214,11 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
 
             ASTTypeCast* pTypeCast = static_cast<ASTTypeCast*>(&currentNode);
             ASTOperator* pOp = pTypeCast->toOperator(pHead->at(i+1));
-            pHead->removeChild(i+1);
+            pHead->removeChild(i+1); // remove appended child
 
             // replace self in parent
+            pHead->removeChild(i);
             pHead->insert(pOp, i);
-            pHead->removeChild(i+1);
             delete pTypeCast;
             continue;
         }
@@ -245,11 +245,13 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
             }
 
             // verify the previous node is an operator (if not, it's a binary op)
-            if (pPrev == nullptr) continue;
+            ASTTypeCast* pPrevTypeCast = dynamic_cast<ASTTypeCast*>(pHead->at(i-1));
+            if (pPrev == nullptr && pPrevTypeCast == nullptr) continue;
         } else if ((opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) && i > 0) {
-            // verify the previous node is an operator (if not, it's a binary op)
+            // verify the previous node is an operator OR typecast (if not, it's a binary op)
             ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
-            if (pPrev == nullptr) continue;
+            ASTTypeCast* pPrevTypeCast = dynamic_cast<ASTTypeCast*>(pHead->at(i-1));
+            if (pPrev == nullptr && pPrevTypeCast == nullptr) continue;
         }
 
         // confirm there is a token after this
