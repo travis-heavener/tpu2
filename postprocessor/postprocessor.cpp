@@ -43,17 +43,31 @@ int main(int argc, char* argv[]) {
     // create post opts
     post_process_opts opts;
 
-    // grab any extra args
+    // specify paths
+    const std::string inPath(argv[1]);
     std::string outPath;
+
+    // grab any extra args
+    bool forceOverwrite = false;
     for (int i = 2; i < argc; ++i) {
         const std::string arg(argv[i]);
-        if (arg == "-minify" || arg == "--m") {
+        if (arg == "-f") {
+            if (outPath.size() > 0) {
+                std::cerr << "Error: Output path specified more than once.\n";
+                return 1;
+            }
+            forceOverwrite = true;
+            outPath = inPath;
+        } else if (arg == "-minify" || arg == "--m") {
             opts.minify = true;
         } else if (arg == "-strip-comments" || arg == "--sc") {
             opts.stripComments = true;
         } else if (arg == "-o") {
             if (i+1 == argc) {
                 std::cerr << "Error: Invalid usage, output file must be specified after \"-o\" flag.\n";
+                return 1;
+            } else if (outPath.size() > 0) {
+                std::cerr << "Error: Output path specified more than once.\n";
                 return 1;
             }
 
@@ -71,10 +85,14 @@ int main(int argc, char* argv[]) {
     }
 
     // grab input file
-    const std::string inPath(argv[1]);
     if (inPath == outPath) {
-        std::cerr << "Error: Cannot use input file as output file\n";
-        return 1;
+        if (!forceOverwrite) {
+            std::cerr << "Error: Cannot use input file as output file (-f arg to bypass)\n";
+            return 1;
+        } else {
+            // use temp file
+            outPath += "_tmp";
+        }
     }
 
     // open input file
@@ -182,6 +200,12 @@ int main(int argc, char* argv[]) {
     // close file handles & overwrite temp .tpu file
     inHandle.close();
     outHandle.close();
+
+    // if force overwriting, overwrite
+    if (forceOverwrite) {
+        std::filesystem::remove(inPath);
+        std::filesystem::rename(outPath, inPath);
+    }
     return 0;
 }
 
