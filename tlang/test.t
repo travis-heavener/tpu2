@@ -14,7 +14,5 @@ int main() {
     }
 
     print(name);
-
-    // return sizeof (unsigned int)&name;
-    return sizeof (bool)&name;
+    return EXIT_SUCCESS;
 }
