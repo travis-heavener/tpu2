@@ -133,11 +133,11 @@ int main(int argc, char* argv[]) {
                 } catch (std::invalid_argument& e) {
                     // not pushing imm8s, handle as separate instructions
                     writeInstruction(opts, outHandle, line, strippedLine);
-                    writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
                     line = lineBuf;
                     strippedLine = strippedLineBuf;
+                    continue; // skip reading another line
                 }
-            } else if (opts.reducePushPopsToRegs && strippedLine.find("pop ") == 0) {
+            } else if (opts.reducePushPopsToRegs && strippedLineBuf.find("pop ") == 0) {
                 // move the value between registers
                 std::string regA = strippedLine.substr(5);
                 std::string regB = strippedLineBuf.substr(4);
@@ -146,9 +146,11 @@ int main(int argc, char* argv[]) {
                 std::string newInst = "mov " + regB + ", " + regA;
                 writeInstruction(opts, outHandle, newInst, newInst);
             } else {
-                // base case, current instruction not matched, so write that and the next one
+                // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
-                writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                line = lineBuf;
+                strippedLine = strippedLineBuf;
+                continue; // skip reading another line
             }
         } else if (opts.reducePushPopsToRegs && strippedLine.find("pushw ") == 0) {
             // get next line and check for a popw to combine with
@@ -164,11 +166,11 @@ int main(int argc, char* argv[]) {
                 std::string newInst = "movw " + regB + ", " + regA;
                 writeInstruction(opts, outHandle, newInst, newInst);
             } else {
-                // base case, current instruction not matched, so write that and the next one
+                // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
-                writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
                 line = lineBuf;
                 strippedLine = strippedLineBuf;
+                continue; // skip reading another line
             }
         } else if (opts.dissolvePops && (strippedLine == "popw" || strippedLine == "pop")) {
             // fetch any successive pop/popw to combine
@@ -186,8 +188,10 @@ int main(int argc, char* argv[]) {
             const std::string subInst = "sub SP, " + std::to_string(popSize) + '\n';
             writeInstruction(opts, outHandle, subInst, subInst);
 
-            // stopped on a non-matching line, so write that one
-            writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+            // stopped on a non-matching line, so pass along
+            line = lineBuf;
+            strippedLine = strippedLineBuf;
+            continue; // skip reading another line
         } else {
             // write instruction as usual
             writeInstruction(opts, outHandle, line, strippedLine);
