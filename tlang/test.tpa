@@ -1,7 +1,0 @@
-main:
-    add SP, 2
-    mov BL, 99
-    movw AX, 0x03
-    movw BX, 88
-    syscall
-    hlt

@@ -26,7 +26,8 @@ typedef struct post_process_opts {
 } post_process_opts;
 
 // fwd declarations
-void write(post_process_opts&, std::ofstream&, const std::string&, const std::string&);
+void readNextLine(const post_process_opts&, std::string&, std::string&, std::ifstream&);
+void writeInstruction(const post_process_opts&, std::ofstream&, const std::string&, const std::string&);
 void ltrimString(std::string&);
 void rtrimString(std::string&);
 void stripComments(std::string&);
@@ -92,13 +93,107 @@ int main(int argc, char* argv[]) {
     }
 
     // read the current and last instructions into memory (break/reset on labels)
-    std::vector<std::pair<std::string, std::string>> cachedInsts;
     std::string line, strippedLine;
-    long long lineNum = -1;
 
+    // read first line
+    readNextLine(opts, line, strippedLine, inHandle);
+    while (line != "") {
+        // handle arguments & such
+        if ((opts.mergeImm8Pushes || opts.reducePushPopsToRegs) && strippedLine.find("push ") == 0) {
+            // get next line and check for another push to combine with
+            std::string lineBuf, strippedLineBuf;
+            readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+
+            if (opts.mergeImm8Pushes && strippedLineBuf.find("push ") == 0) { // can be combined
+                // extract values
+                try {
+                    int valA = std::stoi( strippedLine.substr(5) );
+                    int valB = std::stoi( strippedLineBuf.substr(5) );
+
+                    std::string newInst = "pushw " + std::to_string( ((valB << 8) | valA) & 0xFFFF );
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                } catch (std::invalid_argument& e) {
+                    // not pushing imm8s, handle as separate instructions
+                    writeInstruction(opts, outHandle, line, strippedLine);
+                    writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                    line = lineBuf;
+                    strippedLine = strippedLineBuf;
+                }
+            } else if (opts.reducePushPopsToRegs && strippedLine.find("pop ") == 0) {
+                // move the value between registers
+                std::string regA = strippedLine.substr(5);
+                std::string regB = strippedLineBuf.substr(4);
+
+                // write instruction
+                std::string newInst = "mov " + regB + ", " + regA;
+                writeInstruction(opts, outHandle, newInst, newInst);
+            } else {
+                // base case, current instruction not matched, so write that and the next one
+                writeInstruction(opts, outHandle, line, strippedLine);
+                writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+            }
+        } else if (opts.reducePushPopsToRegs && strippedLine.find("pushw ") == 0) {
+            // get next line and check for a popw to combine with
+            std::string lineBuf, strippedLineBuf;
+            readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+
+            if (strippedLineBuf.find("popw ") == 0) {
+                // move the value between registers
+                std::string regA = strippedLine.substr(6);
+                std::string regB = strippedLineBuf.substr(5);
+
+                // skip default
+                std::string newInst = "movw " + regB + ", " + regA;
+                writeInstruction(opts, outHandle, newInst, newInst);
+            } else {
+                // base case, current instruction not matched, so write that and the next one
+                writeInstruction(opts, outHandle, line, strippedLine);
+                writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                line = lineBuf;
+                strippedLine = strippedLineBuf;
+            }
+        } else if (opts.dissolvePops && (strippedLine == "popw" || strippedLine == "pop")) {
+            // fetch any successive pop/popw to combine
+            size_t popSize = strippedLine == "popw" ? 2 : 1;
+
+            std::string lineBuf, strippedLineBuf;
+            readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+
+            while (strippedLineBuf == "popw" || strippedLineBuf == "pop") {
+                popSize += strippedLineBuf == "popw" ? 2 : 1;
+                readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+            }
+
+            // write SP substraction instruction
+            const std::string subInst = "sub SP, " + std::to_string(popSize) + '\n';
+            writeInstruction(opts, outHandle, subInst, subInst);
+
+            // stopped on a non-matching line, so write that one
+            writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+        } else {
+            // write instruction as usual
+            writeInstruction(opts, outHandle, line, strippedLine);
+        }
+
+        // get next instruction
+        readNextLine(opts, line, strippedLine, inHandle);
+    }
+
+    // close file handles & overwrite temp .tpu file
+    inHandle.close();
+    outHandle.close();
+    return 0;
+}
+
+/*************************************************************/
+/*                          TOOLBOX                          */
+/*************************************************************/
+
+void readNextLine(const post_process_opts& opts, std::string& buffer, std::string& strippedBuffer, std::ifstream& inHandle) {
+    buffer.clear(); // clear buffer
+
+    std::string line, strippedLine;
     while (std::getline(inHandle, line)) {
-        ++lineNum;
-
         // strip whitespace and comments
         ltrimString(line); // strip whitespace
         strippedLine = line;
@@ -112,87 +207,21 @@ int main(int argc, char* argv[]) {
         if (opts.stripComments) stripComments(line);
         if (line.size() == 0) continue; // skip blank lines
 
-        // check for any chained arguments
-        if (cachedInsts.size() > 0) {
-            // handle any consecutive pushes
-            if (cachedInsts[0].second.find("push ") == 0) {
-                if (strippedLine.find("push ") == 0) { // combine the two
-                    // extract values
-                    int valA, valB;
-                    try {
-                        valA = std::stoi( cachedInsts[0].second.substr(5) );
-                        valB = std::stoi( strippedLine.substr(5) );
-                    } catch (std::invalid_argument& e) {
-                        std::cerr << "Invalid argument on line " << lineNum << '\n';
-                        inHandle.close();
-                        outHandle.close();
-                        std::filesystem::remove(outPath);
-                        return 1;
-                    }
-
-                    // skip default
-                    cachedInsts.clear();
-                    std::string newInst = "pushw " + std::to_string( ((valB << 8) | valA) & 0xFFFF );
-                    write(opts, outHandle, newInst, newInst);
-                    continue;
-                } else if (strippedLine.find("pop ") == 0) { // move between registers
-                    // move the value between registers
-                    std::string regA = cachedInsts[0].second.substr(5);
-                    std::string regB = strippedLine.substr(4);
-
-                    // skip default
-                    cachedInsts.clear();
-                    std::string newInst = "mov " + regB + ", " + regA;
-                    write(opts, outHandle, newInst, newInst);
-                    continue;
-                }
-            } else if (cachedInsts[0].second.find("pushw ") == 0) {
-                if (strippedLine.find("popw ") == 0) { // combine the two
-                    // move the value between registers
-                    std::string regA = cachedInsts[0].second.substr(6);
-                    std::string regB = strippedLine.substr(5);
-
-                    // skip default
-                    cachedInsts.clear();
-                    std::string newInst = "movw " + regB + ", " + regA;
-                    write(opts, outHandle, newInst, newInst);
-                    continue;
-                }
-            }
-
-            // base case, clear cached instructions and write any cached instructions
-            for (auto [cachedLine, cachedStrippedLine] : cachedInsts)
-                write(opts, outHandle, cachedLine, cachedStrippedLine);
-            cachedInsts.clear();
-        } else {
-            // handle arguments & such (storing lines in cachedInsts if needed)
-            if (strippedLine.find("push ") == 0 || strippedLine.find("pushw ") == 0) {
-                cachedInsts.push_back({line, strippedLine}); // record cached push instruction
-            }
-        }
-
-        // just write the instruction to the file
-        if (cachedInsts.size() == 0) {
-            write(opts, outHandle, line, strippedLine);
-        }
+        // update buffer & escape
+        buffer = line;
+        strippedBuffer = strippedLine;
+        return;
     }
-
-    // close file handles & overwrite temp .tpu file
-    inHandle.close();
-    outHandle.close();
-    return 0;
 }
 
-/*************************************************************/
-/*                          TOOLBOX                          */
-/*************************************************************/
-
-void write(post_process_opts& opts, std::ofstream& outHandle, const std::string& line, const std::string& strippedLine) {
+void writeInstruction(const post_process_opts& opts, std::ofstream& outHandle, const std::string& line, const std::string& strippedLine) {
     if (opts.minify) { // remove any leading whitespace
         outHandle << line << '\n';
     } else { // don't minify
+        // don't indent labels inside user functions
         bool isLabelStart = strippedLine.back() == ':';
-        if (isLabelStart) {
+        if (isLabelStart && strippedLine[strippedLine.size()-2] != 'E' &&
+            (strippedLine.find("__UF") == 0 || strippedLine.find("main") == 0)) {
             outHandle << line << '\n'; // don't indent
         } else {
             outHandle << TAB << line << '\n'; // indent

@@ -582,13 +582,13 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
 ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<size_t>& branchIndices, const size_t globalEndIndex, scope_stack_t& scopeStack) {
     ASTNode* pHead = new ASTConditional(tokens[branchIndices[0]]);
 
-    // create a new scope
-    scopeStack.push_back( new ParserScope() );
-
     try {
         // iterate for each branch
         size_t numBranches = branchIndices.size();
         for (size_t i = 0; i < numBranches; i++) {
+            // create a new scope
+            scopeStack.push_back( new ParserScope() );
+
             // determine start and end indices
             size_t startIndex = branchIndices[i];
             size_t endIndex = i+1 == numBranches ? globalEndIndex : branchIndices[i+1]-1;
@@ -626,15 +626,15 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
 
             // parse the body (up to but not including closing brace)
             parseBody(pNode, tokens, bodyStart, endIndex-1, scopeStack);
+
+            // pop this scope off the stack
+            popScopeStack(scopeStack);
         }
     } catch (TException& e) {
         // free & rethrow
         delete pHead;
         throw e;
     }
-
-    // pop this scope off the stack
-    popScopeStack(scopeStack);
 
     return pHead;
 }

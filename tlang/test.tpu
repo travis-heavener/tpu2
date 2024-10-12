@@ -1,9 +1,171 @@
+__UF0:
+    pushw 0
+    __J0:
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    movw BX, 1
+    mul BX
+    add CX, AX
+    movw BP, CX
+    push [BP+0]
+    push 0
+    pop BL
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    jmp __J2
+    __J2:
+    push AL
+    pop AL
+    xor AH, AH
+    buf AX
+    jz __J1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    pushw 1
+    popw BX
+    popw AX
+    add AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __J0
+    __J1:
+    push [SP-2]
+    push [SP-2]
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    sub SP, 2
+    jmp __UF0E
+    __UF0E:
+    ret
+__UF1:
+    movw BP, SP
+    sub BP, 2
+    movw BP, BP
+    push [BP+0]
+    push [BP+1]
+    pushw 0
+    call __UF0
+    movw BP, SP
+    sub BP, 6
+    movw BP, BP
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 4
+    jmp __UF1E
+    __UF1E:
+    ret
 main:
     add SP, 2
-    push 99
-    pop BL
+    pushw 26711
+    pushw 29793
+    pushw 29479
+    pushw 29984
+    pushw 8304
+    pushw 24932
+    pushw 26478
+    pushw 29285
+    pushw 10
+    movw BP, SP
+    sub BP, 18
+    pushw BP
+    pushw 0
+    call __UF0
+    movw BX, 10
+    popw AX
+    sub AX, BX
+    jz __J5
+    jc __J5
+    movw AX, 1
+    jmp __J6
+    __J5:
+    movw AX, 0
+    jmp __J6
+    __J6:
+    push AL
+    pop AL
+    xor AH, AH
+    buf AX
+    jz __J4
+    pushw 28492
+    pushw 26478
+    pushw 27936
+    pushw 29541
+    pushw 24947
+    pushw 25959
+    pushw 26912
+    pushw 25454
+    pushw 28015
+    pushw 28265
+    pushw 11879
+    pushw 11822
+    pushw 10
+    movw BP, SP
+    sub BP, 26
+    pushw BP
+    call __UF1
+    sub SP, 28
+    jmp __J3
+    __J4:
+    pushw 26707
+    pushw 29295
+    pushw 8308
+    pushw 25965
+    pushw 29555
+    pushw 26465
+    pushw 8293
+    pushw 28265
+    pushw 28515
+    pushw 26989
+    pushw 26478
+    pushw 11822
+    pushw 2606
+    push 0
+    movw BP, SP
+    sub BP, 27
+    pushw BP
+    call __UF1
+    sub SP, 29
+    jmp __J3
+    __J3:
+    movw BP, SP
+    sub BP, 20
+    pushw BP
+    call __UF1
+    pushw 0
+    pop DL
+    mov [SP-24], DL
+    pop DL
+    mov [SP-24], DL
+    sub SP, 22
+    jmp mainE
+    mainE:
     movw AX, 0x03
-    pushw 88
     popw BX
     syscall
     hlt
