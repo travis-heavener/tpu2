@@ -3,6 +3,9 @@
 #include <stdio.t>
 
 int main() {
+    uint_16 myVar = 99;
+    return myVar;
+
     char* msgA = "Hello there, ";
     char* name = "user";
     char* msgB = "!\n";

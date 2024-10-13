@@ -276,59 +276,13 @@ __UF3:
     ret
 main:
     add SP, 2
-    pushw __US0
-    pushw __US1
-    pushw __US2
-    movw BP, SP
-    sub BP, 6
-    push [BP+0]
-    push [BP+1]
-    movw BP, SP
-    sub BP, 6
-    push [BP+0]
-    push [BP+1]
-    pushw 0
-    call __UF2
-    sub SP, 2
-    movw BP, SP
-    sub BP, 10
-    push [BP+0]
-    push [BP+1]
-    movw BP, SP
-    sub BP, 8
-    push [BP+0]
-    push [BP+1]
-    pushw 0
-    call __UF2
-    sub SP, 2
-    movw BP, SP
-    sub BP, 14
-    push [BP+0]
-    push [BP+1]
-    call __UF3
-    add SP, 2
-    movw BP, SP
-    sub BP, 2
-    push [BP+0]
-    push [BP+1]
-    movw BP, SP
-    sub BP, 18
-    push [BP+0]
-    push [BP+1]
-    pushw 0
-    call __UF1
-    sub SP, 2
-    movw BP, SP
-    sub BP, 6
-    push [BP+0]
-    push [BP+1]
-    call __UF3
-    pushw 0
+    pushw 99
+    push [SP-2]
+    mov DL, [SP-2]
+    mov [SP-4], DL
     pop DL
-    mov [SP-26], DL
-    pop DL
-    mov [SP-26], DL
-    sub SP, 24
+    mov [SP-4], DL
+    sub SP, 2
     jmp mainE
     mainE:
     movw AX, 0x03
@@ -336,6 +290,3 @@ main:
     syscall
     hlt
 section .data
-    __US0 .strz "Hello there, "
-    __US1 .strz "user"
-    __US2 .strz "!\n"
