@@ -274,7 +274,7 @@ __UF3:
     jmp __UF3E
     __UF3E:
     ret
-main:
+_main:
     add SP, 2
     pushw 99
     push [SP-2]
@@ -283,8 +283,8 @@ main:
     pop DL
     mov [SP-4], DL
     sub SP, 2
-    jmp mainE
-    mainE:
+    jmp _mainE
+    _mainE:
     movw AX, 0x03
     popw BX
     syscall

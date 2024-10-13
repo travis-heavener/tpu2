@@ -74,6 +74,21 @@ typedef uint32_t u32;
 typedef uint16_t u16;
 typedef uint8_t u8;
 
+// reserved labels
+#define RESERVED_LABEL_MAIN     "_main"
+#define RESERVED_LABEL_MALLOC   "_malloc"
+#define RESERVED_LABEL_REALLOC  "_realloc"
+#define RESERVED_LABEL_FREE     "_free"
+
+#define DATA_TYPE_STRZ ".strz" // null-terminated string
+#define DATA_TYPE_STR ".str" // non-null terminated string
+
+// for TCC
+#define FUNC_LABEL_PREFIX       "__UF" // for "user function"
+#define FUNC_END_LABEL_SUFFIX   'E' // added to the end of a function label to mark where a function ends
+#define JMP_LABEL_PREFIX        "__J" // really just used for jmp instructions
+#define STR_DATA_LABEL_PREFIX   "__US" // for "user string"
+
 /********************************************************/
 /*                    STRING METHODS                    */
 /********************************************************/

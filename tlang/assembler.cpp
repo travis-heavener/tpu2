@@ -28,7 +28,7 @@ AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& fun
     func.loadParamTypes(this->paramTypes);
 
     // determine labels
-    this->startLabel = func.isMainFunction() ? funcName : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
+    this->startLabel = func.isMainFunction() ? RESERVED_LABEL_MAIN : (FUNC_LABEL_PREFIX + std::to_string(nextFuncLabelID++));
     this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
 }
 
@@ -75,7 +75,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
     // if this is main, add return byte spacing on top of stack
     const size_t returnSize = funcNode.getReturnType().getSizeBytes();
-    if (funcName == FUNC_MAIN_LABEL && returnSize > 0)
+    if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN && returnSize > 0)
         OUT << "add SP, " << returnSize << '\n';
 
     // add function args to scope (args on top of stack below return bytes)
@@ -100,7 +100,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     OUT << asmFunc.getEndLabel() << ":\n";
 
     // stop clock after execution is done IF MAIN or return to previous label
-    if (funcName == FUNC_MAIN_LABEL) {
+    if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN) {
         // handle return status
         OUT << "movw AX, 0x03\n"; // specify syscall type
         OUT << "popw BX\n"; // pop return status to AX
@@ -982,7 +982,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         case ASTNodeType::LIT_STRING: {
             // add to data section
             ASTStringLiteral* pStrLit = static_cast<ASTStringLiteral*>(&bodyNode);
-            dataElements.push_back(DataElem(pStrLit->raw, DATA_SECTION_STRZ));
+            dataElements.push_back(DataElem(pStrLit->raw, DATA_TYPE_STRZ));
             resultType = pStrLit->getTypeRef();
 
             // write label

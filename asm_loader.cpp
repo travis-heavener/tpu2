@@ -193,7 +193,7 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
         }
 
         // jump to mainEntryAddr
-        if (labelMap.count(MAIN_LABEL_NAME) == 0)
+        if (labelMap.count(RESERVED_LABEL_MAIN) == 0)
             throw std::invalid_argument("No main label found in file.");
 
         // fill in any labels with addresses
@@ -202,7 +202,7 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
                 throw std::invalid_argument("Could not find label: " + labelPair.first);
 
             Label label = labelMap[labelPair.first];
-            if (label.type == LABEL_DEFAULT || label.type == LABEL_STRZ || label.type == LABEL_STR) {
+            if (label.type == DATA_TYPE_DEFAULT || label.type == DATA_TYPE_STRZ || label.type == DATA_TYPE_STR) {
                 // replace with address
                 u16 destAddr = labelMap[labelPair.first].value;
                 u16 addr = labelPair.second;
@@ -213,7 +213,7 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
             }
         }
 
-        u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME).value;
+        u16 mainEntryAddr = labelMap.at(RESERVED_LABEL_MAIN).value;
         memory[INSTRUCTION_PTR_START] = OPCode::JMP;
         memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
         memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
@@ -255,9 +255,9 @@ void processLineToData(std::string& line, Memory& memory, u16& dataIndex, label_
     trimString(labelName);
     trimString(dataType);
     trimString(rawValue);
-    if (dataType == LABEL_STR || dataType == LABEL_STRZ) {
+    if (dataType == DATA_TYPE_STR || dataType == DATA_TYPE_STRZ) {
         // parse as string
-        bool isNullTerminated = dataType == LABEL_STRZ;
+        bool isNullTerminated = dataType == DATA_TYPE_STRZ;
 
         // verify string is valid
         if (!isStringValid(rawValue))

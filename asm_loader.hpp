@@ -5,22 +5,19 @@
 #include <string>
 #include <vector>
 
+#include "util/globals.hpp"
 #include "memory.hpp"
-
-#define MAIN_LABEL_NAME "main"
 
 #define SECTION_NONE 0
 #define SECTION_TEXT 1
 #define SECTION_DATA 2
 
-#define LABEL_STRZ ".strz" // null-terminated string
-#define LABEL_STR ".str" // non-null terminated string
-#define LABEL_DEFAULT ""
+#define DATA_TYPE_DEFAULT ""
 
 class Label {
     public:
-        Label() : type(LABEL_DEFAULT) {};
-        Label(u16 addr) : type(LABEL_DEFAULT), value(addr) {};
+        Label() : type(DATA_TYPE_DEFAULT) {};
+        Label(u16 addr) : type(DATA_TYPE_DEFAULT), value(addr) {};
         Label(const std::string& type, u16 addr) : type(type), value(addr) {};
         const std::string type;
         u16 value;
