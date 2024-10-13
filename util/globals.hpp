@@ -89,6 +89,8 @@ typedef uint8_t u8;
 #define JMP_LABEL_PREFIX        "__J" // really just used for jmp instructions
 #define STR_DATA_LABEL_PREFIX   "__US" // for "user string"
 
+bool isReservedKernelFuncLabel(const std::string& label);
+
 /********************************************************/
 /*                    STRING METHODS                    */
 /********************************************************/

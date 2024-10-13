@@ -33,7 +33,7 @@ class ParserFunction {
         ParserFunction(Type type, bool isMain, AST* pParent, void* pFuncNode, std::vector<Type>& paramTypes) :
             type(type), isMainFunction(isMain), pParent(pParent), pFuncNode(pFuncNode), paramTypes(paramTypes) {};
 
-        bool doParamsMatch(const std::vector<Type>&, const ErrInfo);
+        int doParamsMatch(const std::vector<Type>&, const ErrInfo);
         void remove();
 
         Type type;

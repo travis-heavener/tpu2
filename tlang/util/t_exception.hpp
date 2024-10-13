@@ -57,5 +57,7 @@ MAKE_EXCEPTION(InvalidMacroInclude)
 MAKE_EXCEPTION(IllegalVoidUse)
 MAKE_EXCEPTION(ConstQualifierMismatch)
 MAKE_EXCEPTION(ConstAssignment)
+MAKE_EXCEPTION(AmbiguousFunctionResolution)
+MAKE_EXCEPTION(FunctionParameterMismatch)
 
 #endif

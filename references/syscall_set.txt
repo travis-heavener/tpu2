@@ -4,3 +4,6 @@ SYSCALL CODE            COMMENTS
 0x01                    Prints to STDERR the sequence of bytes starting at the memory address in BX for a length stored in CX.
 0x02                    Blocks TPU cycles and reads a sequence of bytes from STDIN to a provided memory address in BX for a length stored in CL (max of 256 chars at a time).
 0x03                    Sets the exit status code for a program from the value stored in BX.
+0x04                    Invokes the kernel dynamic heap memory allocation function, taking the desired size in CX and returning the address of allocation in DX.
+0x05                    Invokes the kernel dynamic heap memory reallocation function, taking the existing heap allocation address in BX and the new desired size in CX, returning the address of allocation in DX.
+0x06                    Invokes the kernel dynamic heap memory deallocation function, taking the existing heap allocation address in BX.

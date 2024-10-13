@@ -10,6 +10,10 @@
 #define TYPE_EMPTY_PTR 0
 #define SIZE_ARR_AS_PTR 1 // used in getSizeBytes to force arrays to be handled as pointers
 
+#define TYPE_PARAM_MISMATCH 0
+#define TYPE_PARAM_EXACT_MATCH 1
+#define TYPE_PARAM_IMPLICIT_MATCH 2
+
 // used to compare and implicitly cast types
 class Type; // fwd dec
 Type getDominantType(const Type&, const Type&);
@@ -59,7 +63,7 @@ class Type {
         bool operator==(const Type&) const;
         bool operator!=(const Type& t) const { return !(*this == t); };
 
-        bool isParamMatch(const Type&, ErrInfo) const;
+        int isParamMatch(const Type&, ErrInfo) const;
 
         bool isArray() const { return numArrayHints > 0; };
 

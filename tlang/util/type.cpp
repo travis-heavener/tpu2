@@ -2,6 +2,8 @@
 #include "toolbox.hpp"
 #include "type.hpp"
 
+bool doesPrimAImplicitMatchPrimB(const TokenType, const TokenType);
+
 Type::Type(const Type&& B) {
     this->primitiveType = B.primitiveType;
     this->pointers = std::move(B.pointers);
@@ -83,25 +85,42 @@ bool Type::operator==(const Type& t) const {
 
 // returns true if the parameters match, false otherwise
 // NOTE: this must be the desired type, and t must be the given type
-bool Type::isParamMatch(const Type& t, ErrInfo err) const {
-    // check primitive
-    if (primitiveType != t.primitiveType) return false;
-    if (_isUnsigned != t._isUnsigned) return false;
-
-    // check num ptrs
-    if (pointers.size() != t.pointers.size()) return false;
-
+int Type::isParamMatch(const Type& t, ErrInfo err) const {
     // prevent casting away const qualifiers implicitly
     if (!_isConst && t._isConst) throw TConstQualifierMismatchException(err);
 
-    // allow first pointer to be blank, but all others must match
-    for (size_t i = pointers.size(); i >= 1; --i) {
-        if (pointers[i-1] != t.pointers[i-1] && i < pointers.size())
-            return false;
-    }
+    const TokenType primA = primitiveType;
+    const TokenType primB = t.primitiveType;
+    const size_t numPtrsA = pointers.size();
+    const size_t numPtrsB = t.pointers.size();
 
-    // base case, matches
-    return true;
+    // check if pointers/array pointers match
+    // allow first pointer to be blank, but all others must match
+    bool doPtrsMatch = numPtrsA == numPtrsB;
+    for (size_t i = pointers.size(); i >= 1; --i)
+        if (pointers[i-1] != t.pointers[i-1] && i < numPtrsA)
+            doPtrsMatch = false;
+
+    /**** check for exact match ****/
+    if (primA == primB && _isUnsigned == t._isUnsigned && doPtrsMatch)
+        return TYPE_PARAM_EXACT_MATCH;
+
+    /**** check for promotion/implicit conversion ****/
+
+    // allow pointers to be implicitly cast
+    if (numPtrsA > 0 && numPtrsB > 0 && !isArray() && !t.isArray())
+        return TYPE_PARAM_IMPLICIT_MATCH;
+
+    // allow unsigned and signed of the same type to be converted
+    if (primA == primB && numPtrsA == 0 && numPtrsB == 0 && _isUnsigned != t._isUnsigned)
+        return TYPE_PARAM_IMPLICIT_MATCH;
+
+    // allow certain primitives to be promoted/implicitly converted
+    if (numPtrsA == 0 && numPtrsB == 0 && doesPrimAImplicitMatchPrimB(primA, primB))
+        return true;
+
+    // base case, doesn't match
+    return false;
 }
 
 inline unsigned char getPrimitiveTypeRank(TokenType prim, bool isUnsigned) {
@@ -112,6 +131,24 @@ inline unsigned char getPrimitiveTypeRank(TokenType prim, bool isUnsigned) {
         case TokenType::TYPE_FLOAT: return 5;
         default: return 0;
     }
+}
+
+// returns true when two primitive types match or can be implicitly converted
+bool doesPrimAImplicitMatchPrimB(const TokenType A, const TokenType B) {
+    if (A == B) return true;
+
+    const bool isAIntegral = A == TokenType::TYPE_CHAR || A == TokenType::TYPE_INT;
+    const bool isBIntegral = B == TokenType::TYPE_CHAR || B == TokenType::TYPE_INT;
+
+    // allow integral types to be bools & vice versa
+    if ((isAIntegral && B == TokenType::TYPE_BOOL) || (isBIntegral && A == TokenType::TYPE_BOOL))
+        return true;
+
+    // allow conversions between integral types themselves
+    if (isAIntegral && isBIntegral) return true;
+
+    // base case, can't be implicitly converted
+    return false;
 }
 
 // used to compare and implicitly cast types

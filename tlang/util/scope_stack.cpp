@@ -31,17 +31,20 @@ void ParserFunction::remove() {
 };
 
 // returns true when the parameters match on two ParserFunctions
-bool ParserFunction::doParamsMatch(const std::vector<Type>& paramsB, const ErrInfo err) {
-    if (paramsB.size() != paramTypes.size()) return false;
+int ParserFunction::doParamsMatch(const std::vector<Type>& paramsB, const ErrInfo err) {
+    if (paramsB.size() != paramTypes.size()) return TYPE_PARAM_MISMATCH;
 
+    bool isExactMatch = true;
     for (size_t i = 0; i < paramTypes.size(); ++i) {
-        if (!paramTypes[i].isParamMatch( paramsB[i], err )) {
-            return false;
-        }
+        int isParamMatch = paramTypes[i].isParamMatch( paramsB[i], err );
+        if (isParamMatch == TYPE_PARAM_MISMATCH)
+            return TYPE_PARAM_MISMATCH;
+
+        isExactMatch = isExactMatch && isParamMatch == TYPE_PARAM_EXACT_MATCH;
     }
 
     // base case, match
-    return true;
+    return isExactMatch ? TYPE_PARAM_EXACT_MATCH : TYPE_PARAM_IMPLICIT_MATCH;
 }
 
 // lookup variable from scope stack
@@ -68,18 +71,37 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
     ParserScope* pScope = scopeStack[0];
 
     // search functions in global scope
+    std::vector<ParserFunction*> implicitMatches;
+    bool hasMatchingFunction = false;
     auto range = pScope->functions.equal_range(name);
     for (auto itr = range.first; itr != range.second; ++itr) {
         // check parameters
+        hasMatchingFunction = true;
         ParserFunction* pParserFunc = itr->second;
-        if (pParserFunc->doParamsMatch(paramTypes, err)) {
+        int matchStatus = pParserFunc->doParamsMatch(paramTypes, err);
+        if (matchStatus == TYPE_PARAM_EXACT_MATCH) {
             pParserFunc->isUnused = false;
             return pParserFunc;
+        } else if (matchStatus == TYPE_PARAM_IMPLICIT_MATCH) {
+            // store in implicitMatches
+            implicitMatches.push_back(pParserFunc);
         }
     }
 
-    // base case, not found
-    throw TUnknownFunctionException(err);
+    // verify a function exists with that name
+    if (!hasMatchingFunction)
+        throw TUnknownFunctionException(err);
+
+    // check for any implicit matches
+    if (implicitMatches.size() == 0)
+        throw TFunctionParameterMismatchException(err);
+
+    // handle implicit matches
+    if (implicitMatches.size() > 1)
+        throw TAmbiguousFunctionResolutionException(err);
+
+    implicitMatches[0]->isUnused = false;
+    return implicitMatches[0];
 }
 
 // declare a variable in the immediate scope

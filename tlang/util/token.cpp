@@ -50,7 +50,8 @@ bool isTokenAssignOp(const TokenType type) {
 }
 
 bool isTokenProtectedASM(const TokenType type) {
-    return type == ASM_LOAD_AX || type == ASM_LOAD_BX || type == ASM_LOAD_CX || type == ASM_LOAD_DX;
+    return type == ASM_LOAD_AX || type == ASM_LOAD_BX || type == ASM_LOAD_CX || type == ASM_LOAD_DX ||
+           type == ASM_READ_AX || type == ASM_READ_BX || type == ASM_READ_CX || type == ASM_READ_DX;
 }
 
 // returns the size of a primitive type in bytes

@@ -939,7 +939,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 size_t j;
                 for (j = 0; j < numParams; ++j) {
                     const Type& actualType = static_cast<ASTTypedNode*>(func.at(j))->getTypeRef();
-                    if (!paramTypes[j].isParamMatch(actualType, func.at(j)->err)) break;
+                    if (paramTypes[j].isParamMatch(actualType, func.at(j)->err) == TYPE_PARAM_MISMATCH) break;
                 }
 
                 // if broken prematurely, a type didn't match
@@ -1000,7 +1000,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         case ASTNodeType::ASM_INST: {
             // handle the custom assembly instruction
             ASMProtectedInstruction* pInst = static_cast<ASMProtectedInstruction*>(&bodyNode);
-            const size_t resultSize = resultTypes[0].getSizeBytes();
             const TokenType instType = pInst->getInstType();
 
             switch (instType) {
@@ -1008,6 +1007,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 case TokenType::ASM_LOAD_BX:
                 case TokenType::ASM_LOAD_CX:
                 case TokenType::ASM_LOAD_DX: {
+                    const size_t resultSize = resultTypes[0].getSizeBytes();
                     if (resultSize > 2 || resultSize == 0)
                         throw TInvalidOperationException(pInst->err);
 
@@ -1024,6 +1024,19 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                     OUT << "popw " << reg << '\n';
                     scope.pop(2);
+                    break;
+                }
+                case TokenType::ASM_READ_AX:
+                case TokenType::ASM_READ_BX:
+                case TokenType::ASM_READ_CX:
+                case TokenType::ASM_READ_DX: {
+                    // push the register value to the stack
+                    const std::string reg = instType == TokenType::ASM_READ_AX ? "AX" :
+                                            instType == TokenType::ASM_READ_BX ? "BX" :
+                                            instType == TokenType::ASM_READ_CX ? "CX" : "DX";
+
+                    OUT << "pushw " << reg << '\n';
+                    scope.addPlaceholder(2);
                     break;
                 }
                 default: throw TSyntaxException(pInst->err);

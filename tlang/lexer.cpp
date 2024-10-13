@@ -184,26 +184,50 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
         }
 
         // protected assembly keywords
-        if (isKwdPresent("__load_AX", line, i)) {
-            if (!isStdlib) throw TInvalidTokenException(err);
-            i += 8; // offset by length of keyword - 1
-            tokens.push_back(Token(err, "__load_AX", TokenType::ASM_LOAD_AX));
-            continue;
-        } else if (isKwdPresent("__load_BX", line, i)) {
-            if (!isStdlib) throw TInvalidTokenException(err);
-            i += 8; // offset by length of keyword - 1
-            tokens.push_back(Token(err, "__load_BX", TokenType::ASM_LOAD_BX));
-            continue;
-        } else if (isKwdPresent("__load_CX", line, i)) {
-            if (!isStdlib) throw TInvalidTokenException(err);
-            i += 8; // offset by length of keyword - 1
-            tokens.push_back(Token(err, "__load_CX", TokenType::ASM_LOAD_CX));
-            continue;
-        } else if (isKwdPresent("__load_DX", line, i)) {
-            if (!isStdlib) throw TInvalidTokenException(err);
-            i += 8; // offset by length of keyword - 1
-            tokens.push_back(Token(err, "__load_DX", TokenType::ASM_LOAD_DX));
-            continue;
+        if (line.find("__load_", i) == i) {
+            if (isKwdPresent("__load_AX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__load_AX", TokenType::ASM_LOAD_AX));
+                continue;
+            } else if (isKwdPresent("__load_BX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__load_BX", TokenType::ASM_LOAD_BX));
+                continue;
+            } else if (isKwdPresent("__load_CX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__load_CX", TokenType::ASM_LOAD_CX));
+                continue;
+            } else if (isKwdPresent("__load_DX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__load_DX", TokenType::ASM_LOAD_DX));
+                continue;
+            }
+        } else if (line.find("__read_", i) == i) {
+            if (isKwdPresent("__read_AX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__read_AX", TokenType::ASM_READ_AX));
+                continue;
+            } else if (isKwdPresent("__read_BX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__read_BX", TokenType::ASM_READ_BX));
+                continue;
+            } else if (isKwdPresent("__read_CX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__read_CX", TokenType::ASM_READ_CX));
+                continue;
+            } else if (isKwdPresent("__read_DX", line, i)) {
+                if (!isStdlib) throw TInvalidTokenException(err);
+                i += 8; // offset by length of keyword - 1
+                tokens.push_back(Token(err, "__read_DX", TokenType::ASM_READ_DX));
+                continue;
+            }
         }
 
         // unsigned, signed, and const keywords

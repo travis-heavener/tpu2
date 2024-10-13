@@ -8,6 +8,7 @@
 #include "instructions.hpp"
 #include "tpu.hpp"
 #include "memory.hpp"
+#include "kernel/kernel.hpp"
 
 constexpr bool getParity(u32 n) {
     bool parity = false;
@@ -98,6 +99,30 @@ namespace instructions {
                 // get exit status
                 u16 exitStatus = tpu.readRegister16(Register::BX).getValue();
                 tpu.setExitCode(exitStatus);
+                break;
+            }
+            case Syscall::MALLOC: {
+                // grab size from CX
+                u16 size = tpu.readRegister16(Register::CX).getValue();
+
+                // invoke malloc
+                u16 addr = heapAlloc(size);
+                tpu.moveToRegister(Register::DX, addr); // put address into DX
+                break;
+            }
+            case Syscall::REALLOC: {
+                // grab address from BX and size from CX
+                u16 addr = tpu.readRegister16(Register::BX).getValue();
+                u16 size = tpu.readRegister16(Register::CX).getValue();
+
+                // invoke realloc
+                u16 resAddr = heapRealloc(addr, size);
+                tpu.moveToRegister(Register::DX, resAddr); // put address into DX
+                break;
+            }
+            case Syscall::FREE: {
+                // grab address from BX & free
+                heapFree( tpu.readRegister16(Register::BX).getValue() );
                 break;
             }
             default: {

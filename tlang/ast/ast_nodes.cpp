@@ -552,8 +552,15 @@ void ASMProtectedInstruction::inferType(scope_stack_t& scopeStack) {
     // infer childrens' types
     this->inferChildTypes(scopeStack);
 
-    // set own type to void
-    this->setType( Type(TokenType::VOID) );
+    // set own type
+    const TokenType instType = this->getInstType();
+    if (instType == TokenType::ASM_LOAD_AX || instType == TokenType::ASM_LOAD_BX || instType == TokenType::ASM_LOAD_CX || instType == TokenType::ASM_LOAD_DX) {
+        this->setType( Type(TokenType::VOID) );
+    } else if (instType == TokenType::ASM_READ_AX || instType == TokenType::ASM_READ_BX || instType == TokenType::ASM_READ_CX || instType == TokenType::ASM_READ_DX) {
+        this->setType( Type(TokenType::TYPE_INT, true) );
+    } else {
+        throw TSyntaxException(err);
+    }
 }
 
 /******** NODES BELOW DON'T HAVE CHILDREN ********/

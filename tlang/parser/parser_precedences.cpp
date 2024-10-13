@@ -98,7 +98,9 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             } else { // C. found a subexpression
                 // if the previous node is a protected asm instruction, append to that instead
                 if (pHead->size() > 0 && pHead->lastChild()->getNodeType() == ASTNodeType::ASM_INST) {
-                    pHead->lastChild()->push( parseExpression(tokens, start+1, i-1, scopeStack) );
+                    // parse sub expression, if present
+                    if (start+1 <= i-1)
+                        pHead->lastChild()->push( parseExpression(tokens, start+1, i-1, scopeStack) );
                 } else {
                     pHead->push( parseExpression(tokens, start+1, i-1, scopeStack) );
                 }

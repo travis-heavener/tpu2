@@ -1,5 +1,9 @@
 #include "globals.hpp"
 
+bool isReservedKernelFuncLabel(const std::string& label) {
+    return label == RESERVED_LABEL_MALLOC || label == RESERVED_LABEL_FREE || label == RESERVED_LABEL_REALLOC;
+}
+
 /********************************************************/
 /*                    STRING METHODS                    */
 /********************************************************/

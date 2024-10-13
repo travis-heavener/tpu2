@@ -6,11 +6,11 @@
 
 // flag macros
 // ref: https://www.geeksforgeeks.org/flag-register-8086-microprocessor/?ref=lbp
-#define CARRY 0 // 1 if a carry/borrow bit is used during an arithmetic operation
-#define PARITY 2 // 1 if the result of arithmetic or logical operation has odd parity
-#define ZERO 6 // 1 if the result of arithmetic or logical operation is zero
-#define SIGN 7 // 1 if the result of arithmetic or logical operation is negative
-#define OVERFLOW 11 // 1 if the result of arithmetic operation overflows/underflows
+#define CARRY 0     // set if a carry/borrow bit is used during an arithmetic operation
+#define PARITY 2    // set if the result of arithmetic or logical operation has odd parity
+#define ZERO 6      // set if the result of arithmetic or logical operation is zero
+#define SIGN 7      // set if the result of arithmetic or logical operation is negative
+#define OVERFLOW 11 // set if the result of arithmetic operation overflows/underflows
 
 // instruction set opcodes
 enum OPCode {
@@ -57,7 +57,8 @@ enum Register {
 // syscall codes
 enum Syscall {
     STDOUT      = 0x00,     STDERR      = 0x01,     STDIN       = 0x02,
-    EXIT_STATUS = 0x03
+    EXIT_STATUS = 0x03,     MALLOC      = 0x04,     REALLOC     = 0x05,
+    FREE        = 0x06
 };
 
 constexpr Register getRegister16FromCode(unsigned short code) {
