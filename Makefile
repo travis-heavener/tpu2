@@ -1,5 +1,5 @@
 GPPFLAGS = -Wall -Wextra -g
-BUILD = ./build
+BUILD = "$(realpath ./build)"
 BASE = $(BUILD)/main.o
 TCC = ./tlang/tcc
 POSTPROC = $(BUILD)/postproc
@@ -7,8 +7,8 @@ POSTPROC = $(BUILD)/postproc
 BASE_SRCS = ./*.cpp ./util/*.cpp
 BASE_DEPS = $(BASE_SRCS) ./*.hpp ./util/*.hpp
 
-TCC_SRCS = ./tlang/*.cpp ./tlang/*/*.cpp
-TCC_DEPS = $(TCC_SRCS) ./tlang/*.hpp ./tlang/*/*.hpp
+TCC_SRCS = ./tlang/*.cpp ./tlang/*/*.cpp ./util/globals.cpp
+TCC_DEPS = $(TCC_SRCS) ./tlang/*.hpp ./tlang/*/*.hpp ./util/globals.hpp
 
 all: $(BASE) $(TCC) $(POSTPROC)
 base: $(BASE)
@@ -24,7 +24,7 @@ $(TCC): $(TCC_DEPS)
 	@echo -n "Building TCC (T compiler)..."
 	@g++ $(TCC_SRCS) -o $@ $(GPPFLAGS)
 	@if ! [ -L ./tlang/postproc ]; then\
-		ln -s ../$(POSTPROC) ./tlang/postproc;\
+		ln -sf $(POSTPROC) ./tlang/postproc;\
 	fi
 	@echo " Done."
 
