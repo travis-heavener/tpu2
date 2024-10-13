@@ -93,7 +93,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
     // declare end of function label
     if (!hasReturned && returnSize > 0)
-        throw std::invalid_argument("Missing return statement in non-void function: " + funcName);
+        throw TDevException("Missing return statement in non-void function: " + funcName);
     OUT << "jmp " << asmFunc.getEndLabel() << '\n';
 
     // write return label
@@ -326,7 +326,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 break;
             }
             default: {
-                throw std::invalid_argument("Unimplemented ASTNodeType!");
+                throw TDevException("Unimplemented ASTNodeType!");
             }
         }
     }
@@ -379,7 +379,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             // move argument into AX
             if (resultTypes.size() != 1)
-                throw std::runtime_error("Invalid number of resultTypes, expected 1 for unary operation.");
+                throw TDevException("Invalid number of resultTypes, expected 1 for unary operation.");
 
             // ignore OP_ADD since it's really a buffer (passthrough)
             if (unaryOp.getOpTokenType() == TokenType::OP_ADD) {
@@ -492,7 +492,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         resultType = resultTypes[0];
                         break;
                     }
-                    throw std::invalid_argument("Invalid unaryOp type in assembleExpression!");
+                    throw TDevException("Invalid unaryOp type in assembleExpression!");
                 }
             }
             break;
@@ -509,7 +509,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             // move both arguments into AX & BX
             if (resultTypes.size() != 2)
-                throw std::runtime_error("Invalid number of resultSizes, expected 2 for binary operation.");
+                throw TDevException("Invalid number of resultSizes, expected 2 for binary operation.");
 
             // get dominant type
             const Type dominantType = getDominantType(resultTypes[0], resultTypes[1]);
@@ -806,7 +806,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 default:
-                    throw std::invalid_argument("Invalid binOp type in assembleExpression!");
+                    throw TDevException("Invalid binOp type in assembleExpression!");
             }
             break;
         }
@@ -838,7 +838,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             break;
         }
         case ASTNodeType::LIT_FLOAT: {
-            throw std::invalid_argument("Float arithmetic not implemented yet!");
+            throw TDevException("Float arithmetic not implemented yet!");
         }
         case ASTNodeType::IDENTIFIER: {
             // lookup identifier
@@ -1172,9 +1172,9 @@ void implicitCast(std::ofstream& outHandle, Type resultType, Type desiredType, S
     if ((primA != primB || resultType.isUnsigned() != desiredType.isUnsigned() || wasTypePointer) && !resultType.isPointer() && !desiredType.isPointer()) {
         // handle cast to float vs other integral types
         if (primB == TokenType::TYPE_FLOAT) {
-            throw std::runtime_error("Float implicit casting not yet implemented!");
+            throw TDevException("Float implicit casting not yet implemented!");
         } else if (primA == TokenType::TYPE_FLOAT) {
-            throw std::runtime_error("Float implicit casting not yet implemented!");
+            throw TDevException("Float implicit casting not yet implemented!");
         } else {
             // converting between two integral types (just pad/pop bytes)
             const size_t startSize = getSizeOfType(primA);

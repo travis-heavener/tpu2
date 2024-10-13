@@ -23,7 +23,8 @@ class ErrInfo {
 
 class TException {
     public:
-        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 0;};
+        TException(ErrInfo err) : err(err), msg("Base TException.") {};
+        TException(ErrInfo err, const std::string& msg) : err(err), msg(msg) {};
 
         // virtual toString method
         virtual const std::string& toString() const { return msg; };
@@ -59,5 +60,11 @@ MAKE_EXCEPTION(ConstQualifierMismatch)
 MAKE_EXCEPTION(ConstAssignment)
 MAKE_EXCEPTION(AmbiguousFunctionResolution)
 MAKE_EXCEPTION(FunctionParameterMismatch)
+
+// dev exceptions
+class TDevException : public TException {
+    public:
+        TDevException(const std::string& msg) : TException(ErrInfo(0, 0, "<core>"), msg) {};
+};
 
 #endif

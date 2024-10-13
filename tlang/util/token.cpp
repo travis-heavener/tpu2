@@ -62,6 +62,6 @@ unsigned char getSizeOfType(TokenType type) {
         case TokenType::TYPE_CHAR: return 1;
         case TokenType::TYPE_BOOL: return 1;
         case TokenType::VOID: return 0;
-        default: throw std::invalid_argument("Invalid type passed to getSizeOfType.");
+        default: throw TDevException("Invalid type passed to getSizeOfType.");
     }
 }

@@ -98,6 +98,25 @@ int main(int argc, char* argv[]) {
         // close files and free AST
         outHandle.close();
         delete pAST;
+
+        // 4. run through post processor (optional) to reduce redundant expressions more easily than in the assembler
+        if (!skipPostprocessor) {
+            // grab CWD to find postproc symlink
+            const std::string postprocPath = (std::filesystem::canonical("/proc/self/exe").parent_path() / "postproc").string();
+
+            const std::string tempPath = outPath + "_tmp";
+            const std::string cmd( '"' + postprocPath + "\" " + outPath + " -o " + tempPath );
+            std::system(cmd.c_str());
+
+            // remove original tpu file and replace with tmp file
+            if (!std::filesystem::exists(tempPath)) {
+                std::cerr << "Failed to invoke post processor.\n";
+                std::filesystem::remove(outPath); // remove regardless
+            } else {
+                std::filesystem::remove(outPath); // remove old
+                std::filesystem::rename(tempPath, outPath); // rename buffer to outPath
+            }
+        }
     } catch (TException& e) {
         std::cerr << e.toString() << '\n';
 
@@ -110,25 +129,6 @@ int main(int argc, char* argv[]) {
 
         // remove output file
         std::filesystem::remove(outPath);
-    }
-
-    // run through post processor (optional) to reduce redundant expressions more easily than in the assembler
-    if (!skipPostprocessor) {
-        // grab CWD to find postproc symlink
-        const std::string postprocPath = (std::filesystem::canonical("/proc/self/exe").parent_path() / "postproc").string();
-
-        const std::string tempPath = outPath + "_tmp";
-        const std::string cmd( '"' + postprocPath + "\" " + outPath + " -o " + tempPath );
-        std::system(cmd.c_str());
-
-        // remove original tpu file and replace with tmp file
-        if (!std::filesystem::exists(tempPath)) {
-            std::cerr << "Failed to invoke post processor.\n";
-            std::filesystem::remove(outPath); // remove regardless
-        } else {
-            std::filesystem::remove(outPath); // remove old
-            std::filesystem::rename(tempPath, outPath); // rename buffer to outPath
-        }
     }
 
     return 0;
