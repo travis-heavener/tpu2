@@ -7,7 +7,7 @@ __UF0:
     push [BP+0]
     push [BP+1]
     push [SP-4]
-    pusah [SP-4]
+    push [SP-4]
     popw AX
     popw CX
     movw BX, 1
