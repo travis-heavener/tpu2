@@ -3,7 +3,7 @@
 
 #include <ostream>
 
-typedef unsigned char u8;
+#include "globals.hpp"
 
 class Byte {
     public:

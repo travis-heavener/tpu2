@@ -3,6 +3,7 @@
 
 #include <vector>
 
+#include "../../util/globals.hpp"
 #include "../util/token.hpp"
 #include "../util/scope_stack.hpp"
 #include "../ast/ast_nodes.hpp"

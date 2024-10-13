@@ -13,8 +13,6 @@
 #define DATA_SECTION_STRZ ".strz" // null-terminated string
 #define DATA_SECTION_STR ".str" // non-null terminated string
 
-#define TAB "    "
-
 inline bool DELETE_UNUSED_VARIABLES;
 inline bool DELETE_UNUSED_FUNCTIONS;
 

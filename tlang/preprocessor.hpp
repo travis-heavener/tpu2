@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include "../util/globals.hpp"
+
 #include "util/token.hpp"
 #include "util/t_exception.hpp"
 

@@ -2,8 +2,7 @@
 #define __WORD_HPP
 
 #include "byte.hpp"
-
-typedef unsigned short u16;
+#include "globals.hpp"
 
 class Word {
     public:
