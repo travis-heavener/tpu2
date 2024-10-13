@@ -3,17 +3,17 @@
 #include <stdio.t>
 
 int main() {
-    char name[] = "Travis Heavener";
-    char* msg;
+    char* msgA = "Hello there, ";
+    char* name = "user";
+    char* msgB = "!\n";
 
-    if (strlen(name) > 10) {
-        msg = "You have a long name\n";
-    } else {
-        msg = "You have a short name\n";
-    }
+    strcat(msgA, name);
+    strcat(msgA, msgB);
+    print(msgA);
 
-    print(name);
-    print("\n");
-    print(msg);
+    char* dest;
+    strcpy(dest, name);
+    print(dest);
+
     return EXIT_SUCCESS;
 }
