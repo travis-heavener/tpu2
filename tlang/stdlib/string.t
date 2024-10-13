@@ -4,7 +4,7 @@
  * @author: Travis Heavener
  */
 
-int strlen(char str[]) {
+int strlen(const char* str) {
     int i = 0;
 
     while (str[i] != '\0') {

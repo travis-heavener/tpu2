@@ -1,6 +1,7 @@
 #ifndef __AST_HPP
 #define __AST_HPP
 
+#include <string>
 #include <vector>
 
 #include "ast_nodes.hpp"
@@ -14,10 +15,12 @@
 
 class AST {
     public:
-        ~AST() {  for (ASTNode* pNode : children) delete pNode;  }
-        void push(ASTNode* pNode) {  children.push_back(pNode);  }
-        std::vector<ASTNode*>& getChildren() {  return children;  }
+        ~AST() { for (ASTNode* pNode : children) delete pNode; }
+
+        void push(ASTNode* pNode) { children.push_back(pNode); }
+        std::vector<ASTNode*>& getChildren() { return children; }
         size_t size() const { return children.size(); }
+        
         void removeByAddress(void*);
     private:
         std::vector<ASTNode*> children;

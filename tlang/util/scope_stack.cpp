@@ -79,7 +79,7 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
     }
 
     // base case, not found
-    throw TUnknownIdentifierException(err);
+    throw TUnknownFunctionException(err);
 }
 
 // declare a variable in the immediate scope

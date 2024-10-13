@@ -2,26 +2,18 @@
 #include <string.t>
 #include <stdio.t>
 
-const int* dummy() {
-    return 4098;
-}
-
 int main() {
-    const unsigned int MY_CONST = 12;
-    *(int*)dummy() = 9;
-    return (const signed char) MY_CONST;
-    // char* pS = 4098;
-    // char text[] = &pS;
-    // char name[] = "What's up danger\n";
+    char name[] = "Travis Heavener";
+    char* msg;
 
-    // if (strlen(name) > 10) {
-    //     char msg[] = "Long message incoming...\n";
-    //     print(msg);
-    // } else {
-    //     char msg[] = "Short message incoming...\n";
-    //     print(msg);
-    // }
+    if (strlen(name) > 10) {
+        msg = "You have a long name\n";
+    } else {
+        msg = "You have a short name\n";
+    }
 
-    // print(name);
-    // return EXIT_SUCCESS;
+    print(name);
+    print("\n");
+    print(msg);
+    return EXIT_SUCCESS;
 }

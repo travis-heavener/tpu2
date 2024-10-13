@@ -6,7 +6,7 @@
 
 #include <string.t>
 
-void print(char str[]) {
+void print(const char* str) {
     int len = strlen(str);  // Predetermine length to prevent overwriting BX or CX
     __load_BX( str );       // Load pointer to string into BX
     __load_CX( len );       // Load string length into CX

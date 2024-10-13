@@ -40,6 +40,15 @@ class AssembledFunc {
 
 typedef std::multimap<std::string, AssembledFunc> label_map_t;
 
+// data element class for elements in the .data section
+class DataElem {
+    public:
+        DataElem(const std::string& raw, const std::string& type) :
+            raw(raw), type(type) {};
+        const std::string raw;
+        const std::string type;
+};
+
 // generate TPU assembly code from the AST
 void generateAssembly(AST&, std::ofstream&);
 

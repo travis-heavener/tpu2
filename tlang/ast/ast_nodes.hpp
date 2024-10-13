@@ -13,7 +13,7 @@ enum class ASTNodeType {
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP, TYPE_CAST, SIZEOF, ASM, ASM_INST,
-    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_ARR, ARR_SUBSCRIPT
+    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR, ARR_SUBSCRIPT
 };
 
 enum class ASTUnaryType {
@@ -308,6 +308,17 @@ class ASTVoidLiteral : public ASTTypedNode {
         ASTVoidLiteral(const Token& token) : ASTTypedNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::LIT_VOID; };
         void inferType(scope_stack_t&);
+};
+
+class ASTStringLiteral : public ASTTypedNode {
+    public:
+        ASTStringLiteral(const Token& token, const std::string& str) : ASTTypedNode(token), str(str), token(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::LIT_STRING; };
+        void inferType(scope_stack_t&);
+        ASTNode* asCharArr() const;
+        const std::string str;
+    private:
+        Token token;
 };
 
 class ASTTypeCast : public ASTTypedNode {

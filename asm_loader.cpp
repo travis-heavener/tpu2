@@ -9,15 +9,13 @@
 #include "memory.hpp"
 #include "tpu.hpp"
 
-#define MAIN_LABEL_NAME "main"
-
-// abstractions from processLine for readability
+// abstractions from processLineToText for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
-void parseMOVW(const std::vector<std::string>&, Memory&, u16&);
+void parseMOVW(const std::vector<std::string>&, Memory&, u16&, std::vector<std::pair<std::string, u16>>&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
 void parseNOTBUF(const std::vector<std::string>&, Memory&, u16&, OPCode);
-void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool);
+void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, std::vector<std::pair<std::string, u16>>&);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&);
 void parsePOPW(const std::vector<std::string>&, Memory&, u16&);
 void parseBitShifts(const std::vector<std::string>&, Memory&, u16&, bool);
@@ -38,6 +36,53 @@ void rtrimString(std::string& str) {
 void trimString(std::string& str) {
     ltrimString(str);
     rtrimString(str);
+}
+
+// returns true if a string is valid
+bool isStringValid(const std::string& str) {
+    // check for quotes
+    if (str[0] != '"' || str.back() != '"') return false;
+
+    // check each character
+    for (size_t i = 1; i < str.size()-1; ++i) {
+        if (str[i] == '\\') {
+            if (i+1 == str.size()-1) return false;
+            ++i;
+        } else if (str[i] == '"') {
+            return false;
+        }
+    }
+
+    // base case, is valid
+    return true;
+}
+
+// used to expand an escaped character string
+char escapeChar(const std::string& str) {
+    if (str.size() == 1) return str[0];
+
+    switch (str[1]) {
+        case '\'': return '\'';
+        case '"': return '"';
+        case '\\': return '\\';
+        case 'n': return '\n';
+        case 'r': return '\r';
+        case 't': return '\t';
+        case 'b': return '\b';
+        case 'f': return '\f';
+        case 'v': return '\v';
+        case '0':
+        default: return '\0';
+    }
+}
+
+void escapeString(std::string& str) {
+    for (size_t i = 0; i < str.size(); ++i) {
+        if (str[i] == '\\') {
+            str[i] = escapeChar(str.substr(i, 2));
+            str.erase(str.begin()+i+1, str.begin()+i+2);
+        }
+    }
 }
 
 // remove comments from a string
@@ -152,15 +197,44 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     }
 
     // read each line
-    u16 instIndex = FREE_LOWER_ADDR;
+    u16 instIndex = TEXT_LOWER_ADDR;
+    u16 dataIndex = DATA_LOWER_ADDR;
     std::string line;
-    std::map<std::string, u16> labelMap; // label name, start address
+    label_map_t labelMap; // label name, start address
     
     // for labels that come after instIndex
     std::vector<std::pair<std::string, u16>> labelsToReplace; // [ label name, replacement start address ]
-    
+
+    int currentSection = SECTION_NONE;
     while (std::getline(inHandle, line)) {
-        processLine(line, memory, instIndex, labelMap, labelsToReplace); // process the line
+        // handle switching the section
+        std::string lineBuf = line;
+        ltrimString(lineBuf);
+        if (lineBuf.find("section ") == 0) {
+            // get the section
+            if (lineBuf.find(".data") == 8) {
+                currentSection = SECTION_DATA;
+            } else if (lineBuf.find(".text") == 8) {
+                currentSection = SECTION_TEXT;
+            } else {
+                // invalid section
+                throw std::invalid_argument("Invalid section: " + lineBuf.substr(8));
+            }
+            continue; // skip to next line
+        }
+
+        // switch based on the section
+        switch (currentSection) {
+            case SECTION_TEXT:
+                processLineToText(line, memory, instIndex, labelMap, labelsToReplace); // process the line
+                break;
+            case SECTION_DATA:
+                processLineToData(line, memory, dataIndex, labelMap); // process the line
+                break;
+            case SECTION_NONE: default:
+                throw std::invalid_argument("Cannot write to this section (use `section .data` or `section .text`).");
+                break;
+        }
     }
 
     // jump to mainEntryAddr
@@ -171,14 +245,20 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     for (auto labelPair : labelsToReplace) {
         if (labelMap.count(labelPair.first) == 0)
             throw std::invalid_argument("Could not find label: " + labelPair.first);
-        
-        u16 destAddr = labelMap[labelPair.first];
-        u16 addr = labelPair.second;
-        memory[ addr ] = destAddr & 0x00FF;
-        memory[addr+1] = (destAddr & 0xFF00) >> 8;
+
+        Label label = labelMap[labelPair.first];
+        if (label.type == LABEL_DEFAULT || label.type == LABEL_STRZ || label.type == LABEL_STR) {
+            // replace with address
+            u16 destAddr = labelMap[labelPair.first].value;
+            u16 addr = labelPair.second;
+            memory[ addr ] = destAddr & 0x00FF;
+            memory[addr+1] = (destAddr & 0xFF00) >> 8;
+        } else {
+            throw std::invalid_argument("Invalid label type: " + labelPair.first);
+        }
     }
 
-    u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME);
+    u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME).value;
     memory[INSTRUCTION_PTR_START] = OPCode::JMP;
     memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
     memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
@@ -188,8 +268,63 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     inHandle.close();
 }
 
+// process an individual line from .data section and load it into memory
+void processLineToData(std::string& line, Memory& memory, u16& dataIndex, label_map_t& labelMap) {
+    // normalize formatting
+    trimString(line);
+
+    // skip blank lines
+    if (line.size() == 0) return;
+
+    // check for the label name
+    size_t startIndex = 0, spaceIndex = line.find(' ');
+    if (spaceIndex == std::string::npos) throw std::invalid_argument("Invalid data declaration.");
+    std::string labelName = line.substr(startIndex, spaceIndex);
+
+    // check for the data type
+    startIndex = spaceIndex+1;
+    spaceIndex = line.find(' ', startIndex);
+    if (spaceIndex == std::string::npos) throw std::invalid_argument("Invalid data declaration.");
+    std::string dataType = line.substr(startIndex, spaceIndex-startIndex);
+
+    // check for value
+    std::string rawValue = line.substr(spaceIndex+1);
+    if (rawValue.size() == 0) throw std::invalid_argument("Invalid data declaration.");
+
+    // swtich on the data type provided
+    trimString(labelName);
+    trimString(dataType);
+    trimString(rawValue);
+    if (dataType == LABEL_STR || dataType == LABEL_STRZ) {
+        // parse as string
+        bool isNullTerminated = dataType == LABEL_STRZ;
+
+        // verify string is valid
+        if (!isStringValid(rawValue))
+            throw std::invalid_argument("Invalid string in data declaration.");
+
+        // extract raw value
+        rawValue = rawValue.substr(1, rawValue.size()-2);
+        escapeString(rawValue);
+
+        // insert each character onto the document
+        u16 startIndex = dataIndex;
+        for (const char c : rawValue) {
+            memory[dataIndex++] = (u8)c;
+        }
+
+        // add null terminator if needed
+        if (isNullTerminated) memory[dataIndex++] = '\0';
+
+        // insert into label map
+        labelMap.insert({labelName, Label(dataType, startIndex)});
+    } else {
+        throw std::invalid_argument("Invalid data type: " + dataType);
+    }
+}
+
 // process an individual line and load it into memory
-void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std::string, u16>& labelMap,
+void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_map_t& labelMap,
                  std::vector<std::pair<std::string, u16>>& labelsToReplace) {
     stripComments(line); // remove comments
     trimString(line); // ltrim & rtrim string
@@ -224,7 +359,7 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
             instIndex += 2; // make space for address
             labelsToReplace.push_back({args[0], startAddr});
         } else {
-            u16 destAddr = labelMap[args[0]];
+            u16 destAddr = labelMap[args[0]].value;
             memory[instIndex++] = destAddr & 0x00FF; // lower-half
             memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
         }
@@ -242,7 +377,7 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
             instIndex += 2; // make space for address
             labelsToReplace.push_back({args[0], startAddr});
         } else {
-            u16 destAddr = labelMap[args[0]];
+            u16 destAddr = labelMap[args[0]].value;
             memory[instIndex++] = destAddr & 0x00FF; // lower-half
             memory[instIndex++] = (destAddr & 0xFF00) >> 8; // upper-half
         }
@@ -251,10 +386,10 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
         parseMOV(args, memory, instIndex);
     } else if (kwd == "movw") {
         checkArgs(args, 2); // check for extra args
-        parseMOVW(args, memory, instIndex);
+        parseMOVW(args, memory, instIndex, labelsToReplace);
     } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
-        parsePUSH(args, memory, instIndex, kwd == "pushw");
+        parsePUSH(args, memory, instIndex, kwd == "pushw", labelsToReplace);
     } else if (kwd == "pop") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOP(args, memory, instIndex);
@@ -279,7 +414,7 @@ void processLine(std::string& line, Memory& memory, u16& instIndex, std::map<std
         // verify label name is valid
         if (kwd.size() == 1) throw std::invalid_argument("Invalid label name: " + kwd);
 
-        labelMap[labelName] = instIndex; // store entry point
+        labelMap[labelName].value = instIndex; // store entry point
     } else if (kwd == "shl" || kwd == "shr") {
         checkArgs(args, 2); // check for extra args
         parseBitShifts(args, memory, instIndex, kwd == "shl");
@@ -411,7 +546,7 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
-void parseMOVW(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+void parseMOVW(const std::vector<std::string>& args, Memory& memory, u16& instIndex, std::vector<std::pair<std::string, u16>>& labelsToReplace) {
     memory[instIndex++] = OPCode::MOVW;
 
     // verify first operand is a 16-bit register
@@ -427,10 +562,18 @@ void parseMOVW(const std::vector<std::string>& args, Memory& memory, u16& instIn
         // try second operand as imm16 (0)
         memory[instIndex++] = 0; // MOD byte
         memory[instIndex++] = regA;
-        u16 offset = std::stoul(args[1]);
-        memory[instIndex++] = (u8)(offset & 0x00FF);
-        memory[instIndex++] = (u8)((offset & 0xFF00) >> 8);
-        return;
+        try {
+            u16 offset = std::stoul(args[1]);
+            memory[instIndex++] = (u8)(offset & 0x00FF);
+            memory[instIndex++] = (u8)((offset & 0xFF00) >> 8);
+            return;
+        } catch (std::invalid_argument&) {
+            // make space for value
+            u16 replaceAddr = instIndex;
+            instIndex += 2;
+            labelsToReplace.push_back({args[1], replaceAddr});
+            return;
+        }
     }
 
     // base case, is register (1)
@@ -541,7 +684,7 @@ void parseNOTBUF(const std::vector<std::string>& args, Memory& memory, u16& inst
     }
 }
 
-void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW) {
+void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, std::vector<std::pair<std::string, u16>>& labelsToReplace) {
     memory[instIndex++] = OPCode::PUSH;
 
     Register reg;
@@ -580,17 +723,29 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
                 return;
             }
             default: { // try as imm8/16 (2-3)
-                if (isPUSHW) { // try as imm16 (3)
-                    u32 arg = std::stoul(args[0]);
-                    if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
-                    memory[instIndex++] = 3; // MOD byte
-                    memory[instIndex++] = arg & 0x00FF;
-                    memory[instIndex++] = (arg & 0xFF00) >> 8;
-                } else { // try as imm8 (2)
-                    u16 arg = std::stoul(args[0]);
-                    if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-                    memory[instIndex++] = 2; // MOD byte
-                    memory[instIndex++] = arg;
+                try {
+                    if (isPUSHW) { // try as imm16 (3)
+                        u32 arg = std::stoul(args[0]);
+                        if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
+                        memory[instIndex++] = 3; // MOD byte
+                        memory[instIndex++] = arg & 0x00FF;
+                        memory[instIndex++] = (arg & 0xFF00) >> 8;
+                    } else { // try as imm8 (2)
+                        u16 arg = std::stoul(args[0]);
+                        if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
+                        memory[instIndex++] = 2; // MOD byte
+                        memory[instIndex++] = arg;
+                    }
+                } catch (std::invalid_argument&) {
+                    // if this is a label, handle that (only allow u16s)
+                    if (!isPUSHW)
+                        throw std::invalid_argument("Cannot use u16 value in 8-bit operation.");
+
+                    // make space for value
+                    memory[instIndex++] = isPUSHW ? 3 : 2;
+                    u16 replaceAddr = instIndex;
+                    instIndex += 2;
+                    labelsToReplace.push_back({args[0], replaceAddr});
                 }
                 return;
             }

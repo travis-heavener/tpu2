@@ -13,7 +13,9 @@
 // static fields
 static size_t nextFuncLabelID = 0;
 static size_t nextJMPLabelID = 0;
+static size_t nextStringDataID = 0;
 static label_map_t labelMap;
+static std::vector<DataElem> dataElements;
 
 AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& func) {
     this->funcName = funcName;
@@ -32,6 +34,9 @@ AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& fun
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
+    // write .text section
+    outHandle << "section .text\n";
+
     // iterate over global functions
     std::vector<ASTNode*>& globalChildren = ast.getChildren();
     for (ASTNode* pFunc : globalChildren) {
@@ -40,6 +45,16 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
 
         // assemble function
         assembleFunction(funcNode, outHandle);
+    }
+
+    // write .data section
+    outHandle << "section .data\n";
+
+    // iterate over all data elements
+    size_t dataStrId = 0;
+    for (DataElem elem : dataElements) {
+        outHandle << TAB << STR_DATA_LABEL_PREFIX << dataStrId++ << ' ' <<
+            elem.type << ' ' << elem.raw << '\n';
     }
 }
 
@@ -962,6 +977,17 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         }
         case ASTNodeType::LIT_ARR: { // pass through
             resultType = static_cast<ASTArrayLiteral*>(&bodyNode)->getTypeRef();
+            break;
+        }
+        case ASTNodeType::LIT_STRING: {
+            // add to data section
+            ASTStringLiteral* pStrLit = static_cast<ASTStringLiteral*>(&bodyNode);
+            dataElements.push_back(DataElem(pStrLit->raw, DATA_SECTION_STRZ));
+            resultType = pStrLit->getTypeRef();
+
+            // write label
+            OUT << "pushw " << STR_DATA_LABEL_PREFIX << nextStringDataID++ << '\n';
+            scope.addPlaceholder(2);
             break;
         }
         case ASTNodeType::ASM: {

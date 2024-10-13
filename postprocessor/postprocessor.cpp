@@ -204,7 +204,7 @@ int main(int argc, char* argv[]) {
                     std::string newInst = "movw " + regB + ", " + regA;
                     writeInstruction(opts, outHandle, newInst, newInst);
                 }
-            } else {
+            } else if (strippedLineBuf != "popw") { // if popw, ignore anyways since whatever is pushed gets popped
                 // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
                 line = lineBuf;
@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // write SP substraction instruction
-                const std::string subInst = "sub SP, " + std::to_string(popSize) + '\n';
+                const std::string subInst = "sub SP, " + std::to_string(popSize);
                 writeInstruction(opts, outHandle, subInst, subInst);
 
                 // stopped on a non-matching line, so pass along
@@ -310,9 +310,9 @@ void writeInstruction(const post_process_opts& opts, std::ofstream& outHandle, c
         outHandle << line << '\n';
     } else { // don't minify
         // don't indent labels inside user functions
-        bool isLabelStart = strippedLine.back() == ':';
-        if (isLabelStart && strippedLine[strippedLine.size()-2] != 'E' &&
-            (strippedLine.find("__UF") == 0 || strippedLine.find("main") == 0)) {
+        bool isUnindented = (strippedLine.back() == ':' && strippedLine[strippedLine.size()-2] != 'E' &&
+            (strippedLine.find("__UF") == 0 || strippedLine.find("main") == 0)) || strippedLine.find("section ") == 0;
+        if (isUnindented) {
             outHandle << line << '\n'; // don't indent
         } else {
             outHandle << TAB << line << '\n'; // indent

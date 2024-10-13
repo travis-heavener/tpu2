@@ -401,20 +401,28 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
 
                     // confirm assignment type matches
                     if (hasImplicitArraySizeHints) {
+                        // convert to string literal
+                        if (type.getNumPointers() == 1 && pExpr->at(0)->getNodeType() == ASTNodeType::LIT_STRING) {
+                            pVarDec->updateType( type );
+                            type = pVarDec->type;
+                        }
+
                         // imply size from literal's type
                         if (pExpr->at(0)->getNodeType() != ASTNodeType::LIT_ARR)
                             throw TSyntaxException(pExpr->at(0)->err);
 
+                        // update implied size
                         ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
                         type.setArrayHint(type.getNumArrayHints()-1, pArrLit->size());
                     }
 
+                    // update variable declaration's type
+                    pVarDec->updateType( type );
+                    type = pVarDec->type;
+
                     // add variable to scopeStack
                     ParserVariable* pParserVar = new ParserVariable(type, pHead, pVarDec);
                     declareParserVariable(scopeStack, tokens[idenStart].raw, pParserVar, tokens[idenStart].err);
-
-                    // update variable declaration's type
-                    pVarDec->updateType( type );
                     break;
                 }
 
@@ -446,58 +454,89 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
 
         // append parameters
         while (tokens[i].type != TokenType::RPAREN) {
-            // get param type (checks the type)
-            Type type( tokens[i].type );
+            // grab type
+            Type type; // default to void
 
-            // add any pointers
-            while (i+1 <= endIndex && tokens[i+1].type == TokenType::ASTERISK) {
-                type.addEmptyPointer();
+            // while we have a type keyword, modify the type
+            size_t start = i;
+            while (i <= endIndex && isTokenTypeKeyword(tokens[i].type)) {
+                // check const if first char
+                if (i == start && tokens[i].type == TokenType::CONST) {
+                    type.setIsConst(true);
+                } else if (isTokenSignedUnsigned(tokens[i].type)) {
+                    type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
+                } else if (isTokenPrimitiveType(tokens[i].type, true)) {
+                    type.setPrimType(tokens[i].type);
+                    ++i;
+                    break; // primitive must be last
+                } else {
+                    // invalid token
+                    throw TInvalidTokenException(tokens[i].err);
+                }
                 ++i;
             }
-            
-            size_t idenIndex = ++i;
 
-            // skip identifier
-            ++i;
+            // grab pointers
+            while (i <= endIndex && tokens[i].type == TokenType::ASTERISK) {
+                type.addEmptyPointer(); // add to type
+                ++i;
+            }
 
-            // get all array size hints
-            size_t numHints = 0;
-            while (tokens[i].type == TokenType::LBRACKET) {
-                if (tokens[i+1].type == TokenType::LIT_INT || numHints > 0) {
-                    // verify next token is an int literal
-                    if (tokens[i+1].type != TokenType::LIT_INT)
-                        throw TInvalidTokenException(tokens[i+1].err);
+            // verify not end of input
+            if (i > endIndex) throw TInvalidTokenException(tokens[i-1].err);
 
-                    // verify next token is an RBRACKET
-                    if (tokens[i+2].type != TokenType::RBRACKET)
-                        throw TInvalidTokenException(tokens[i+2].err);
+            // get identifier
+            if (tokens[i].type != TokenType::IDENTIFIER)
+                throw TInvalidTokenException(tokens[i].err);
+            size_t idenStart = i;
 
-                    // add with value otherwise
-                    type.addHintPointer( std::stol(tokens[i+1].raw) );
-                    i += 3;
-                } else {
-                    // verify next token is an RBRACKET
-                    if (tokens[i+1].type != TokenType::RBRACKET)
-                        throw TInvalidTokenException(tokens[i+1].err);
+            // get all array size hints (only allow integer sizes)
+            if (tokens[++i].type == TokenType::LBRACKET) {
+                size_t j, numHints = 0;
+                for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; (void)j) {
+                    if (tokens[j+1].type == TokenType::LIT_INT || numHints > 0) {
+                        // verify next token is an int literal
+                        if (tokens[j+1].type != TokenType::LIT_INT)
+                            throw TInvalidTokenException(tokens[i+1].err);
 
-                    // add empty array modifier if first bracket pair
-                    type.addHintPointer( TYPE_EMPTY_PTR ); // don't use addEmptyPointer, this adds in reverse order
-                    i += 2;
+                        // verify next token is an RBRACKET
+                        if (tokens[j+2].type != TokenType::RBRACKET)
+                            throw TInvalidTokenException(tokens[j+2].err);
+
+                        // add with value otherwise
+                        type.addHintPointer( std::stol(tokens[j+1].raw) );
+                        j += 3;
+                    } else {
+                        // verify next token is an RBRACKET
+                        if (tokens[j+1].type != TokenType::RBRACKET)
+                            throw TInvalidTokenException(tokens[j+1].err);
+
+                        // add empty array modifier if first bracket pair
+                        type.addHintPointer( TYPE_EMPTY_PTR );
+                        j += 2;
+                    }
+                    numHints++;
                 }
-                numHints++;
+                i = j;
+            }
+
+            // only allow unsigned int or char, and disallow void non-ptrs
+            bool isInvalidUnsigned = type.isUnsigned() && type.getPrimType() != TokenType::TYPE_INT && type.getPrimType() != TokenType::TYPE_CHAR;
+            if (isInvalidUnsigned || type.isVoidNonPtr()) {
+                throw TSyntaxException(tokens[start].err);
             }
 
             // grab parameter name
-            if (tokens[idenIndex].type != TokenType::IDENTIFIER)
-                throw TInvalidTokenException(tokens[idenIndex].err);
+            if (tokens[idenStart].type != TokenType::IDENTIFIER)
+                throw TInvalidTokenException(tokens[idenStart].err);
 
-            const std::string paramName = tokens[idenIndex].raw;
+            const std::string paramName = tokens[idenStart].raw;
             ASTFuncParam* pParam = new ASTFuncParam(paramName, type);
             pHead->appendParam(pParam); // append parameter
 
             // add argument to scopeStack
             ParserVariable* pParserVar = new ParserVariable(type);
-            declareParserVariable(scopeStack, tokens[idenIndex].raw, pParserVar, tokens[idenIndex].err);
+            declareParserVariable(scopeStack, tokens[idenStart].raw, pParserVar, tokens[idenStart].err);
 
             if (tokens[i].type == TokenType::COMMA) i++; // skip next comma
         }

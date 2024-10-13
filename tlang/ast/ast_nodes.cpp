@@ -63,8 +63,36 @@ ASTFunction::~ASTFunction() {
         delete p;
 }
 
+// returns true if this ASTFunction the main function
 bool ASTFunction::isMainFunction() const {
     return name == FUNC_MAIN_NAME && type == Type(TokenType::TYPE_INT) && params.size() == 0;
+}
+
+ASTNode* ASTStringLiteral::asCharArr() const {
+    // transform a string literal into a character array literal
+    ASTArrayLiteral* pArr = new ASTArrayLiteral(token);
+    std::string rawString = raw.substr(1, raw.size()-2) + '\0'; // add null byte and remove quotes
+    escapeString(rawString); // escape the string
+
+    // add each character as a child
+    Type type(TokenType::TYPE_CHAR);
+    for (const char c : rawString) {
+        // create wrapper expression
+        ASTExpr* pSubExpr = new ASTExpr(token);
+        ASTCharLiteral* pChar = new ASTCharLiteral(c, token);
+        pArr->push(pSubExpr);
+        pSubExpr->push(pChar);
+
+        // imply type of child
+        pChar->setType(type);
+        pSubExpr->setType(type);
+    }
+
+    // set type
+    type.addHintPointer(pArr->size());
+    pArr->setType(type);
+
+    return pArr;
 }
 
 ASTTypedNode::~ASTTypedNode() {
@@ -98,9 +126,22 @@ void ASTVarDeclaration::updateType(const Type& type) {
     this->pExpr->setType(type);
 
     // enforce array types
-    if (this->pExpr->at(0)->getNodeType() == ASTNodeType::LIT_ARR) {
+    if (pExpr->at(0)->getNodeType() == ASTNodeType::LIT_ARR) {
         ASTArrayLiteral* pArrLit = static_cast<ASTArrayLiteral*>(pExpr->at(0));
         pArrLit->setTypeRecursive(type);
+    } else if (pExpr->at(0)->getNodeType() == ASTNodeType::LIT_STRING) {
+        // determine if this will be stack'd or not
+        if (type.getNumArrayHints() == 1) {
+            // convert to char array
+            ASTStringLiteral* pChild = static_cast<ASTStringLiteral*>(pExpr->at(0));
+            pExpr->removeChild(0);
+            pExpr->push( pChild->asCharArr() );
+            delete pChild;
+
+            // update this type
+            this->type = pExpr->getTypeRef();
+            this->pIdentifier->setType( pExpr->getTypeRef() );
+        }
     }
 }
 
@@ -118,11 +159,22 @@ void ASTArrayLiteral::setTypeRecursive(const Type& type) {
     Type desiredChildType = type;
     desiredChildType.popPointer();
 
-    for (ASTNode* pChild : this->children) {
+    for (size_t i = 0; i < children.size(); ++i) {
+        ASTNode* pChild = children[i];
+
         // update child if child is array
         if (pChild->getNodeType() == ASTNodeType::LIT_ARR) {
             // sets the child's type to what we want, so don't need to check it
             static_cast<ASTArrayLiteral*>(pChild)->setTypeRecursive(desiredChildType);
+        } else if (pChild->getNodeType() == ASTNodeType::LIT_STRING) {
+            if (desiredChildType.getNumArrayHints() == 1) { // force on stack
+                // convert to char array
+                removeChild(i);
+                insert(static_cast<ASTStringLiteral*>(pChild)->asCharArr(), i);
+                delete pChild;
+            } else if (desiredChildType.getNumPointers() != 1) { // if char pointer, keep as one
+                throw TSyntaxException(err);
+            }
         } else {
             // number of children already confirmed to match, so update type
             static_cast<ASTTypedNode*>(pChild)->setType(desiredChildType);
@@ -536,5 +588,12 @@ void ASTCharLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::
 void ASTFloatLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_FLOAT));  }
 void ASTBoolLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::TYPE_BOOL));  }
 void ASTVoidLiteral::inferType(scope_stack_t&) {  this->setType(Type(TokenType::VOID));  }
+
+void ASTStringLiteral::inferType(scope_stack_t&) {
+    // by default set as const char*
+    this->setType( Type(TokenType::TYPE_CHAR) );
+    this->getTypeRef().addEmptyPointer();
+    this->getTypeRef().setIsConst(true);
+}
 
 /************************ END TYPE INFERS ************************/

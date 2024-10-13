@@ -1,3 +1,4 @@
+section .text
 __UF0:
     pushw 0
     __J0:
@@ -53,54 +54,104 @@ __UF0:
     __UF0E:
     ret
 __UF1:
-    pushw 4098
-    mov AL, [SP-1]
-    and AL, 0x80
-    pop BL
-    or BL, AL
-    mov DL, BL
-    mov [SP-2], DL
-    pop DL
-    mov [SP-2], DL
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    pushw 0
+    call __UF0
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 4
     jmp __UF1E
     __UF1E:
     ret
 main:
     add SP, 2
-    pushw 12
-    pushw 0
-    call __UF1
-    popw AX
-    movw BP, AX
+    pushw 29268
+    pushw 30305
+    pushw 29545
+    pushw 18464
+    pushw 24933
+    pushw 25974
+    pushw 25966
+    pushw 114
+    add SP, 2
+    movw BP, SP
+    sub BP, 18
     pushw BP
-    movw BX, 9
+    pushw 0
+    call __UF0
+    movw BX, 10
+    popw AX
+    sub AX, BX
+    jz __J5
+    jc __J5
+    movw AX, 1
+    jmp __J6
+    __J5:
+    movw AX, 0
+    jmp __J6
+    __J6:
+    xor AH, AH
+    buf AX
+    jz __J4
+    movw BP, SP
+    sub BP, 4
+    pushw BP
+    movw BX, __US0
     popw AX
     movw BP, AX
     mov [BP+0], BL
     mov [BP+1], BH
     pushw BX
     sub SP, 2
-    push [SP-2]
-    push [SP-2]
-    sub SP, 1
-    mov AL, [SP-1]
-    and AL, 0x80
-    movw CX, 0
-    buf AL
-    jz __J3
-    movw CX, 0xFFFF
+    jmp __J3
+    __J4:
+    movw BP, SP
+    sub BP, 4
+    pushw BP
+    movw BX, __US1
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
     jmp __J3
     __J3:
-    mov BL, CL
-    or BL, AL
-    mov DL, BL
-    mov [SP-4], DL
+    movw BP, SP
+    sub BP, 20
+    pushw BP
+    call __UF1
+    pushw __US2
+    call __UF1
+    movw BP, SP
+    sub BP, 8
+    push [BP+0]
+    push [BP+1]
+    call __UF1
+    pushw 0
     pop DL
-    mov [SP-4], DL
-    sub SP, 2
+    mov [SP-28], DL
+    pop DL
+    mov [SP-28], DL
+    sub SP, 26
     jmp mainE
     mainE:
     movw AX, 0x03
     popw BX
     syscall
     hlt
+section .data
+    __US0 .strz "You have a long name\n"
+    __US1 .strz "You have a short name\n"
+    __US2 .strz "\n"
