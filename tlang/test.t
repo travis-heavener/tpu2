@@ -18,6 +18,8 @@ int main() {
     // strcpy(dest, name);
     // print(dest);
 
+    return sizeof (unsigned char);
+
     int* pInt = (int*)malloc(2);
     *pInt = 99;
 

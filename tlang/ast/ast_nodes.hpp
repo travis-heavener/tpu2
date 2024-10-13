@@ -12,7 +12,7 @@ enum class ASTNodeType {
     FUNCTION, FUNCTION_CALL, VAR_DECLARATION, IDENTIFIER, RETURN,
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
-    EXPR, UNARY_OP, BIN_OP, TYPE_CAST, SIZEOF, ASM, ASM_INST,
+    EXPR, UNARY_OP, BIN_OP, TYPE_CAST, ASM, ASM_INST,
     LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR, ARR_SUBSCRIPT
 };
 
@@ -327,6 +327,7 @@ class ASTTypeCast : public ASTTypedNode {
         ASTNodeType getNodeType() const { return ASTNodeType::TYPE_CAST; };
 
         ASTOperator* toOperator(ASTNode*);
+        const Token& getToken() const { return token; };
     private:
         Token token;
 };

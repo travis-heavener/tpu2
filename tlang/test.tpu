@@ -88,39 +88,20 @@ __UF2:
     ret
 _main:
     add SP, 2
-    pushw 2
-    pushw 0
-    call __UF0
-    movw BP, SP
-    sub BP, 2
-    push [BP+0]
-    push [BP+1]
-    popw AX
-    movw BP, AX
-    pushw BP
-    movw BX, 99
-    popw AX
-    movw BP, AX
-    mov [BP+0], BL
-    mov [BP+1], BH
-    pushw BX
-    sub SP, 2
-    movw BP, SP
-    sub BP, 2
-    push [BP+0]
-    push [BP+1]
+    movw AX, 0
+    pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    mov AL, BL
+    xor AH, AH
     pushw 1
-    pushw 0
-    call __UF1
-    sub SP, 2
-    pushw 2
-    pushw 0
-    call __UF0
     pop DL
-    mov [SP-12], DL
+    mov [SP-2], DL
     pop DL
-    mov [SP-12], DL
-    sub SP, 10
+    mov [SP-2], DL
     jmp _mainE
     _mainE:
     movw AX, 0x03

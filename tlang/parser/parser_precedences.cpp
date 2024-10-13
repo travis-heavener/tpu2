@@ -223,10 +223,20 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     for (long long i = pHead->size()-1; i >= 0; i--) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() == ASTNodeType::TYPE_CAST) { // handle typecasts
-            // confirm there is a token after this
-            if ((size_t)i+1 == pHead->size()) throw TInvalidTokenException(tokens[i].err);
-
+            // if no token after this, verify token before this is sizeof
             ASTTypeCast* pTypeCast = static_cast<ASTTypeCast*>(&currentNode);
+            if (i > 0 && ((size_t)i+1 == pHead->size() || dynamic_cast<ASTTypedNode*>(pHead->at(i+1)) == nullptr)) {
+                ASTOperator* pLastOp = dynamic_cast<ASTOperator*>(pHead->at(i-1));
+                if (pLastOp != nullptr && pLastOp->getIsUnary() && pLastOp->getOpTokenType() == TokenType::SIZEOF) {
+                    // append 0 after this to make sizeof work
+                    pHead->insert(new ASTIntLiteral(0, pTypeCast->getToken()), i+1);
+                }
+            }
+
+            // check for next token
+            if ((size_t)i+1 == pHead->size())
+                throw TInvalidTokenException(tokens[i].err);
+
             ASTOperator* pOp = pTypeCast->toOperator(pHead->at(i+1));
             pHead->removeChild(i+1); // remove appended child
 
