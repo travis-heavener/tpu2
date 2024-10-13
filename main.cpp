@@ -1,8 +1,10 @@
 #include <iostream>
 
+#include "util/globals.hpp"
 #include "tpu.hpp"
 #include "memory.hpp"
 #include "asm_loader.hpp"
+#include "kernel/kernel.hpp"
 
 /**
  * The TPU-2 (Terrible Processing Unit version 2) is an emulated 16-bit CPU.
@@ -22,32 +24,40 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
-#define CLOCK_FREQ_HZ 5000
-
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "Invalid usage: <executable> path_to_file.tpu\n";
         exit(1);
     }
-    
+
     // initialize the processor & memory
     TPU tpu(CLOCK_FREQ_HZ);
     Memory memory;
 
-    // load test program to memory
-    loadFileToMemory(argv[1], memory);
+    // start the kernel
+    startKernel();
 
-    // start the CPU's clock and wait
-    tpu.start(memory);
+    try {
+        // load test program to memory
+        loadFileToMemory(argv[1], memory);
 
-    std::cout << tpu.readRegister16(Register::AX) << ' ' << tpu.readRegister16(Register::BX) << '\n';
-    std::cout << tpu.readRegister16(Register::CX) << ' ' << tpu.readRegister16(Register::DX) << '\n';
-    std::cout << memory[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
-    std::cout << tpu.readRegister16(Register::SP).getValue() << '\n';
-    std::cout << "Flags: " << (short)tpu.readRegister16(Register::FLAGS).getValue() << ".\n";
+        // start the CPU's clock and wait
+        tpu.start(memory);
 
-    // print exit status
-    std::cout << "Program exited with status " << (short)tpu.readRegister16(Register::ES).getValue() << ".\n";
+        std::cout << tpu.readRegister16(Register::AX) << ' ' << tpu.readRegister16(Register::BX) << '\n';
+        std::cout << tpu.readRegister16(Register::CX) << ' ' << tpu.readRegister16(Register::DX) << '\n';
+        std::cout << (memory)[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
+        std::cout << tpu.readRegister16(Register::SP).getValue() << '\n';
+        std::cout << "Flags: " << (short)tpu.readRegister16(Register::FLAGS).getValue() << ".\n";
+
+        // print exit status
+        std::cout << "Program exited with status " << (short)tpu.readRegister16(Register::ES).getValue() << ".\n";
+    } catch (std::invalid_argument& e) {
+        std::cerr << e.what() << '\n';
+    }
+
+    // kill the kernel
+    killKernel();
 
     return 0;
 }

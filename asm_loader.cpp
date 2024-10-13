@@ -160,66 +160,72 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     std::vector<std::pair<std::string, u16>> labelsToReplace; // [ label name, replacement start address ]
 
     int currentSection = SECTION_NONE;
-    while (std::getline(inHandle, line)) {
-        // handle switching the section
-        std::string lineBuf = line;
-        ltrimString(lineBuf);
-        if (lineBuf.find("section ") == 0) {
-            // get the section
-            if (lineBuf.find(".data") == 8) {
-                currentSection = SECTION_DATA;
-            } else if (lineBuf.find(".text") == 8) {
-                currentSection = SECTION_TEXT;
-            } else {
-                // invalid section
-                throw std::invalid_argument("Invalid section: " + lineBuf.substr(8));
+    try {
+        while (std::getline(inHandle, line)) {
+            // handle switching the section
+            std::string lineBuf = line;
+            ltrimString(lineBuf);
+            if (lineBuf.find("section ") == 0) {
+                // get the section
+                if (lineBuf.find(".data") == 8) {
+                    currentSection = SECTION_DATA;
+                } else if (lineBuf.find(".text") == 8) {
+                    currentSection = SECTION_TEXT;
+                } else {
+                    // invalid section
+                    throw std::invalid_argument("Invalid section: " + lineBuf.substr(8));
+                }
+                continue; // skip to next line
             }
-            continue; // skip to next line
+
+            // switch based on the section
+            switch (currentSection) {
+                case SECTION_TEXT:
+                    processLineToText(line, memory, instIndex, labelMap, labelsToReplace); // process the line
+                    break;
+                case SECTION_DATA:
+                    processLineToData(line, memory, dataIndex, labelMap); // process the line
+                    break;
+                case SECTION_NONE: default:
+                    throw std::invalid_argument("Cannot write to this section (use `section .data` or `section .text`).");
+                    break;
+            }
         }
 
-        // switch based on the section
-        switch (currentSection) {
-            case SECTION_TEXT:
-                processLineToText(line, memory, instIndex, labelMap, labelsToReplace); // process the line
-                break;
-            case SECTION_DATA:
-                processLineToData(line, memory, dataIndex, labelMap); // process the line
-                break;
-            case SECTION_NONE: default:
-                throw std::invalid_argument("Cannot write to this section (use `section .data` or `section .text`).");
-                break;
+        // jump to mainEntryAddr
+        if (labelMap.count(MAIN_LABEL_NAME) == 0)
+            throw std::invalid_argument("No main label found in file.");
+
+        // fill in any labels with addresses
+        for (auto labelPair : labelsToReplace) {
+            if (labelMap.count(labelPair.first) == 0)
+                throw std::invalid_argument("Could not find label: " + labelPair.first);
+
+            Label label = labelMap[labelPair.first];
+            if (label.type == LABEL_DEFAULT || label.type == LABEL_STRZ || label.type == LABEL_STR) {
+                // replace with address
+                u16 destAddr = labelMap[labelPair.first].value;
+                u16 addr = labelPair.second;
+                memory[ addr ] = destAddr & 0x00FF;
+                memory[addr+1] = (destAddr & 0xFF00) >> 8;
+            } else {
+                throw std::invalid_argument("Invalid label type: " + labelPair.first);
+            }
         }
+
+        u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME).value;
+        memory[INSTRUCTION_PTR_START] = OPCode::JMP;
+        memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
+        memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
+        memory[INSTRUCTION_PTR_START+3] = (mainEntryAddr & 0xFF00) >> 8; // upper-half of addr
+
+        // close file
+        inHandle.close();
+    } catch (std::invalid_argument& e) {
+        // close inHandle
+        inHandle.close();
+        throw e;
     }
-
-    // jump to mainEntryAddr
-    if (labelMap.count(MAIN_LABEL_NAME) == 0)
-        throw std::invalid_argument("No main label found in file.");
-
-    // fill in any labels with addresses
-    for (auto labelPair : labelsToReplace) {
-        if (labelMap.count(labelPair.first) == 0)
-            throw std::invalid_argument("Could not find label: " + labelPair.first);
-
-        Label label = labelMap[labelPair.first];
-        if (label.type == LABEL_DEFAULT || label.type == LABEL_STRZ || label.type == LABEL_STR) {
-            // replace with address
-            u16 destAddr = labelMap[labelPair.first].value;
-            u16 addr = labelPair.second;
-            memory[ addr ] = destAddr & 0x00FF;
-            memory[addr+1] = (destAddr & 0xFF00) >> 8;
-        } else {
-            throw std::invalid_argument("Invalid label type: " + labelPair.first);
-        }
-    }
-
-    u16 mainEntryAddr = labelMap.at(MAIN_LABEL_NAME).value;
-    memory[INSTRUCTION_PTR_START] = OPCode::JMP;
-    memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
-    memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
-    memory[INSTRUCTION_PTR_START+3] = (mainEntryAddr & 0xFF00) >> 8; // upper-half of addr
-
-    // close file
-    inHandle.close();
 }
 
 // process an individual line from .data section and load it into memory

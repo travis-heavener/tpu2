@@ -4,8 +4,8 @@ BASE = $(BUILD)/main.o
 TCC = ./tlang/tcc
 POSTPROC = $(BUILD)/postproc
 
-BASE_SRCS = ./*.cpp ./util/*.cpp
-BASE_DEPS = $(BASE_SRCS) ./*.hpp ./util/*.hpp
+BASE_SRCS = ./*.cpp ./util/*.cpp ./kernel/*.cpp
+BASE_DEPS = $(BASE_SRCS) ./*.hpp ./util/*.hpp ./kernel/*.hpp
 
 TCC_SRCS = ./tlang/*.cpp ./tlang/*/*.cpp ./util/globals.cpp
 TCC_DEPS = $(TCC_SRCS) ./tlang/*.hpp ./tlang/*/*.hpp ./util/globals.hpp
