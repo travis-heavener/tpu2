@@ -638,9 +638,13 @@ ASTNode* parseConditional(const std::vector<Token>& tokens, const std::vector<si
 
                 // append expression
                 if (startToken.type == TokenType::IF) {
-                    static_cast<ASTIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack, true);
+                    ASTNode* pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack, true);
+                    static_cast<ASTExpr*>(pExpr)->setType(Type(TokenType::TYPE_BOOL));
+                    static_cast<ASTIfCondition*>(pNode)->pExpr = pExpr;
                 } else {
-                    static_cast<ASTElseIfCondition*>(pNode)->pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack, true);
+                    ASTNode* pExpr = parseExpression(tokens, startIndex+2, openBrace-2, scopeStack, true);
+                    static_cast<ASTExpr*>(pExpr)->setType(Type(TokenType::TYPE_BOOL));
+                    static_cast<ASTElseIfCondition*>(pNode)->pExpr = pExpr;
                 }
 
                 // offset the body token position
@@ -681,6 +685,9 @@ ASTNode* parseWhileLoop(const std::vector<Token>& tokens, const size_t startInde
 
         // parse expression
         pHead->pExpr = parseExpression( tokens, startIndex+2, i-2, scopeStack, true ); // ignore parenthesis
+
+        // force as bool
+        static_cast<ASTExpr*>(pHead->pExpr)->setType(Type(TokenType::TYPE_BOOL));
 
         // parse body
         parseBody( pHead, tokens, i+1, endIndex-1, scopeStack ); // ignore braces
@@ -725,6 +732,11 @@ ASTNode* parseForLoop(const std::vector<Token>& tokens, const size_t startIndex,
         pHead->pExprA = parseExpression( tokens, startIndex+2, semiA-1, scopeStack, true); // ignore opening parenthesis & semicolon
         pHead->pExprB = parseExpression( tokens, semiA+1, semiB-1, scopeStack, true); // ignore parenthesis & semicolon
         pHead->pExprC = parseExpression( tokens, semiB+1, i-2, scopeStack, true); // ignore closing parenthesis
+
+        // force as bool
+        static_cast<ASTExpr*>(pHead->pExprA)->setType(Type(TokenType::TYPE_BOOL));
+        static_cast<ASTExpr*>(pHead->pExprB)->setType(Type(TokenType::TYPE_BOOL));
+        static_cast<ASTExpr*>(pHead->pExprC)->setType(Type(TokenType::TYPE_BOOL));
 
         // parse body
         parseBody( pHead, tokens, i+1, endIndex-1, scopeStack ); // ignore braces
