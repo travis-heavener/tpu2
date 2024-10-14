@@ -495,6 +495,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
 
                 this->setType( typeA ); // take type of left argument
                 pB->setIsLValue(false); // revoke lvalue status from child
+                pB->setType( typeA ); // force left value to take type
                 break;
             }
             default: throw TTypeInferException(err);

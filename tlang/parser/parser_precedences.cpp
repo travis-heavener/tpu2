@@ -220,16 +220,23 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
 void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
     // combine unaries
     // precedence 2 (R -> L)
-    for (long long i = pHead->size()-1; i >= 0; i--) {
+    for (long long i = pHead->size()-1; i >= 0; --i) {
         ASTNode& currentNode = *pHead->at(i);
         if (currentNode.getNodeType() == ASTNodeType::TYPE_CAST) { // handle typecasts
-            // if no token after this, verify token before this is sizeof
+            // check if the previous node is sizeof
             ASTTypeCast* pTypeCast = static_cast<ASTTypeCast*>(&currentNode);
-            if (i > 0 && ((size_t)i+1 == pHead->size() || dynamic_cast<ASTTypedNode*>(pHead->at(i+1)) == nullptr)) {
-                ASTOperator* pLastOp = dynamic_cast<ASTOperator*>(pHead->at(i-1));
-                if (pLastOp != nullptr && pLastOp->getIsUnary() && pLastOp->getOpTokenType() == TokenType::SIZEOF) {
-                    // append 0 after this to make sizeof work
-                    pHead->insert(new ASTIntLiteral(0, pTypeCast->getToken()), i+1);
+            if (i > 0) {
+                ASTOperator* pPrevOp = dynamic_cast<ASTOperator*>(pHead->at(i-1));
+                if (pPrevOp != nullptr && pPrevOp->getOpTokenType() == TokenType::SIZEOF) {
+                    // bind this as the child of sizeof
+                    pPrevOp->push(
+                        // add 0 to typecast to make it work
+                        pTypeCast->toOperator(new ASTIntLiteral(0, pTypeCast->getToken()))
+                    );
+                    pHead->removeChild( i );
+                    --i; // skip next node too
+                    delete pTypeCast;
+                    continue;
                 }
             }
 
@@ -271,11 +278,25 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
             // verify the previous node is an operator (if not, it's a binary op)
             ASTTypeCast* pPrevTypeCast = dynamic_cast<ASTTypeCast*>(pHead->at(i-1));
             if (pPrev == nullptr && pPrevTypeCast == nullptr) continue;
+
+            // verify that if the previous node is a typecast that it's not the child of sizeof
+            if (pPrevTypeCast != nullptr && i-1 > 0 && pHead->at(i-2)->getNodeType() == ASTNodeType::UNARY_OP) {
+                if (static_cast<ASTOperator*>(pHead->at(i-2))->getOpTokenType() == TokenType::SIZEOF) {
+                    continue;
+                }
+            }
         } else if ((opType == TokenType::ASTERISK || opType == TokenType::AMPERSAND) && i > 0) {
             // verify the previous node is an operator OR typecast (if not, it's a binary op)
             ASTOperator* pPrev = dynamic_cast<ASTOperator*>(pHead->at(i-1));
             ASTTypeCast* pPrevTypeCast = dynamic_cast<ASTTypeCast*>(pHead->at(i-1));
             if (pPrev == nullptr && pPrevTypeCast == nullptr) continue;
+
+            // verify that if the previous node is a typecast that it's not the child of sizeof
+            if (pPrevTypeCast != nullptr && i-1 > 0 && pHead->at(i-2)->getNodeType() == ASTNodeType::UNARY_OP) {
+                if (static_cast<ASTOperator*>(pHead->at(i-2))->getOpTokenType() == TokenType::SIZEOF) {
+                    continue;
+                }
+            }
         }
 
         // confirm there is a token after this
