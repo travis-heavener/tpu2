@@ -771,8 +771,8 @@ namespace instructions {
                 tpu.setFlag(OVERFLOW, remainder == 0);
                 break;
             }
-            case 1:   // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-            case 3: { // Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+            case 1:   // Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
+            case 3: { // Divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
                 u16 uA = tpu.readRegister16(Register::AX).getValue();
                 u16 uB;
                 if ((mod.getValue() & 0b111) == 3) {
@@ -1073,31 +1073,42 @@ namespace instructions {
         // get operands
         u8 opA = tpu.readByte(memory).getValue();
         u8 numShifts = tpu.readByte(memory).getValue();
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Shifts the value in the given 8-bit register left imm8 times in place.
-                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister8FromCode(opA), A << std::min((int)numShifts, 8) );
-                break;
-            }
-            case 1: { // Shifts the value in the given 16-bit register left imm8 times in place.
-                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 16) );
-                break;
-            }
+            case 0:   // Shifts the value in the given 8-bit register left imm8 times in place.
             case 2: { // Shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
+                if ((mod.getValue() & 0b111) == 2)
+                    numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
                 u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
-                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
-                tpu.moveToRegister( getRegister8FromCode(opA), A << std::min((int)numShifts, 8) );
+                u8 value = 0;
+
+                if (!isSignedOp) {
+                    value = A << std::min((int)numShifts, 8);
+                } else { // handle signed value
+                    value = (A & 0x7F) << std::min((int)numShifts, 8);
+                    value |= A & 0x80; // re-add sign bit
+                }
+                tpu.moveToRegister( getRegister8FromCode(opA), value );
                 break;
             }
+            case 1:   // Shifts the value in the given 16-bit register left imm8 times in place.
             case 3: { // Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
+                if ((mod.getValue() & 0b111) == 3)
+                    numShifts = tpu.readRegister16(getRegister16FromCode(numShifts)).getValue();
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A << std::min((int)numShifts, 16) );
+                u16 value = 0;
+
+                if (!isSignedOp) {
+                    value = A << std::min((int)numShifts, 16);
+                } else { // handle signed value
+                    value = (A & 0x7FFF) << std::min((int)numShifts, 16);
+                    value |= A & 0x8000; // re-add sign bit
+                }
+                tpu.moveToRegister( getRegister16FromCode(opA), value );
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: shl.");
+                throw std::invalid_argument("Invalid MOD byte for operation: shl/sshl.");
                 break;
             }
         }
@@ -1111,31 +1122,42 @@ namespace instructions {
         // get operands
         u8 opA = tpu.readByte(memory).getValue();
         u8 numShifts = tpu.readByte(memory).getValue();
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Shifts the value in the given 8-bit register right imm8 times in place.
-                u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister8FromCode(opA), A >> std::min((int)numShifts, 8) );
-                break;
-            }
-            case 1: { // Shifts the value in the given 16-bit register right imm8 times in place.
-                u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 16) );
-                break;
-            }
+            case 0:   // Shifts the value in the given 8-bit register right imm8 times in place.
             case 2: { // Shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
+                if ((mod.getValue() & 0b111) == 2)
+                    numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
                 u8 A = tpu.readRegister8(getRegister8FromCode(opA)).getValue();
-                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
-                tpu.moveToRegister( getRegister8FromCode(opA), A >> std::min((int)numShifts, 8) );
+                u8 value = 0;
+
+                if (!isSignedOp) {
+                    value = A >> std::min((int)numShifts, 8);
+                } else { // handle signed value
+                    value = (A & 0x7F) >> std::min((int)numShifts, 8);
+                    value |= A & 0x80; // re-add sign bit
+                }
+                tpu.moveToRegister( getRegister8FromCode(opA), value );
                 break;
             }
+            case 1:   // Shifts the value in the given 16-bit register right imm8 times in place.
             case 3: { // Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
+                if ((mod.getValue() & 0b111) == 3)
+                    numShifts = tpu.readRegister16(getRegister16FromCode(numShifts)).getValue();
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
-                numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
-                tpu.moveToRegister( getRegister16FromCode(opA), A >> std::min((int)numShifts, 16) );
+                u16 value = 0;
+
+                if (!isSignedOp) {
+                    value = A >> std::min((int)numShifts, 16);
+                } else { // handle signed value
+                    value = (A & 0x7FFF) >> std::min((int)numShifts, 16);
+                    value |= A & 0x8000; // re-add sign bit
+                }
+                tpu.moveToRegister( getRegister16FromCode(opA), value );
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: shr.");
+                throw std::invalid_argument("Invalid MOD byte for operation: shr/sshr.");
                 break;
             }
         }

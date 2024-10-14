@@ -380,7 +380,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
     } else if (kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr") {
         checkArgs(args, 2); // check for extra args
         bool isSignedOp = kwd == "sshl" || kwd == "sshr";
-        parseBitShifts(args, memory, instIndex, kwd == "shl", isSignedOp);
+        parseBitShifts(args, memory, instIndex, kwd == "shl" || kwd == "sshl", isSignedOp);
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);

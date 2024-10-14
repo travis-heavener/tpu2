@@ -1,7 +1,7 @@
 section .text
 _main:
-    movw AX, 128
-    sdiv 17
+    mov AL, 64
+    sshl AL, 2
     movw BX, AX
     movw AX, 0x03
     syscall
