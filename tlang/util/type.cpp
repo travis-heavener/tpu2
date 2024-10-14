@@ -97,7 +97,7 @@ int Type::isParamMatch(const Type& t, ErrInfo err) const {
     // check if pointers/array pointers match
     // allow first pointer to be blank, but all others must match
     bool doPtrsMatch = numPtrsA == numPtrsB;
-    for (size_t i = pointers.size(); i >= 1; --i)
+    for (size_t i = pointers.size(); doPtrsMatch && i >= 1; --i)
         if (pointers[i-1] != t.pointers[i-1] && i < numPtrsA)
             doPtrsMatch = false;
 
