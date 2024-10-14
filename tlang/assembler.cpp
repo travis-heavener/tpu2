@@ -1098,8 +1098,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             OUT << "popw AX\n"; // pop subscript off stack
             OUT << "popw CX\n"; // pop address back into CX
-            OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
-            OUT << "mul BX\n"; // scale by chunk size
+
+            // if the chunk size isn't 1, scale subscript in AX by it
+            if (chunkSize > 1) {
+                OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
+                OUT << "mul BX\n"; // scale by chunk size
+            }
             OUT << "add CX, AX\n"; // add the chunk to the pointer
             OUT << "pushw CX\n"; // put address back onto stack
             scope.pop(2); // 4 pops - 2 pushes = 2 net pops

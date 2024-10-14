@@ -10,8 +10,6 @@ __UF0:
     push [SP-4]
     popw AX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     movw BP, CX
     push [BP+0]
@@ -120,8 +118,6 @@ __UF1:
     popw AX
     add AX, BX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     pushw CX
     movw BP, SP
@@ -132,8 +128,6 @@ __UF1:
     push [SP-6]
     popw AX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     movw BP, CX
     mov BL, [BP+0]
@@ -484,8 +478,6 @@ __UF6:
     push [SP-4]
     popw AX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     pushw CX
     mov BL, 45
@@ -521,8 +513,6 @@ __UF6:
     push [SP-4]
     popw AX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     pushw CX
     mov BL, 0
@@ -542,8 +532,6 @@ __UF6:
     push [SP-4]
     popw AX
     popw CX
-    movw BX, 1
-    mul BX
     add CX, AX
     pushw CX
     push [SP-10]
