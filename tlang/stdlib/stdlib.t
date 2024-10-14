@@ -113,11 +113,10 @@ int atoi(const char* str) {
 // Converts an integer to a string.
 const char* itoa(const int n) {
     // count places of ten
-    int len = 0 + (n < 0); // add space for null byte
+    int len = 1 + (n < 0); // add space for null byte
     int tempNum = n;
-    while (tempNum > 0) {
+    while (tempNum = tempNum / 10) {
         len = len + 1;
-        tempNum = tempNum / 10;
     }
 
     // allocate string (with space for null terminator)
