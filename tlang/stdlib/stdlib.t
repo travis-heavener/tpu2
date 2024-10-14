@@ -16,6 +16,31 @@
 #define uint_8 unsigned char
 #define int_8 signed char
 
+#include <stdio.t>
+
+/********* DYNAMIC HEAP MEMORY ALLOCATION *********/
+
+void* malloc(const int size) {
+    asm("movw AX, 0x04");   // specify syscall type
+    __load_CX(size);        // load the requested size into CX
+    asm("syscall");         // invoke kernel malloc function
+    return __read_DX();     // return the address stored in DX
+}
+
+void* realloc(const void* addr, const int size) {
+    asm("movw AX, 0x05");   // specify syscall type
+    __load_BX(addr);        // load the existing allocation address into BX
+    __load_CX(size);        // load the requested size into CX
+    asm("syscall");         // invoke kernel malloc function
+    return __read_DX();     // return the address stored in DX
+}
+
+void free(const void* addr) {
+    asm("movw AX, 0x06");   // specify syscall type
+    __load_BX(addr);        // load the existing allocation address into BX
+    asm("syscall");         // invoke kernel malloc function
+}
+
 /********* CHAR-RELATED FUNCTIONS *********/
 
 int isspace(const char c) {
@@ -85,25 +110,37 @@ int atoi(const char* str) {
     return val;
 }
 
-/********* DYNAMIC HEAP MEMORY ALLOCATION *********/
+// Converts an integer to a string.
+const char* itoa(const int n) {
+    // count places of ten
+    int len = 0 + (n < 0); // add space for null byte
+    int tempNum = n;
+    while (tempNum > 0) {
+        len = len + 1;
+        tempNum = tempNum / 10;
+    }
 
-void* malloc(const int size) {
-    asm("movw AX, 0x04");   // specify syscall type
-    __load_CX(size);        // load the requested size into CX
-    asm("syscall");         // invoke kernel malloc function
-    return __read_DX();     // return the address stored in DX
-}
+    // allocate string (with space for null terminator)
+    char* str = malloc(sizeof(char) * len);
 
-void* realloc(void* addr, const int size) {
-    asm("movw AX, 0x05");   // specify syscall type
-    __load_BX(addr);        // load the existing allocation address into BX
-    __load_CX(size);        // load the requested size into CX
-    asm("syscall");         // invoke kernel malloc function
-    return __read_DX();     // return the address stored in DX
-}
+    // write the entire string
+    int i;
+    tempNum = n;
+    for (i = len; i >= 0; i = i - 1) {
+        if (i == 0 && n < 0) {
+            str[i] = '-';
+        } else if (i == len) {
+            str[i] = '\0';
+        } else {
+            str[i] = (unsigned int)(tempNum % 10) + '0';
+            tempNum = tempNum / 10;
+        }
 
-void free(void* addr) {
-    asm("movw AX, 0x06");   // specify syscall type
-    __load_BX(addr);        // load the existing allocation address into BX
-    asm("syscall");         // invoke kernel malloc function
+        if (i == 0) {
+            return str;
+        }
+    }
+
+    // return string
+    return str;
 }
