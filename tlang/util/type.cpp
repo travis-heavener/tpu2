@@ -117,10 +117,10 @@ int Type::isParamMatch(const Type& t, ErrInfo err) const {
 
     // allow certain primitives to be promoted/implicitly converted
     if (numPtrsA == 0 && numPtrsB == 0 && doesPrimAImplicitMatchPrimB(primA, primB))
-        return true;
+        return TYPE_PARAM_IMPLICIT_MATCH;
 
     // base case, doesn't match
-    return false;
+    return TYPE_PARAM_MISMATCH;
 }
 
 inline unsigned char getPrimitiveTypeRank(TokenType prim, bool isUnsigned) {

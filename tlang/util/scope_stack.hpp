@@ -38,6 +38,8 @@ class ParserFunction {
 
         Type type;
         bool isUnused = true;
+
+        const std::vector<Type>& getParamTypes() const { return paramTypes; };
     private:
         bool isMainFunction;
         AST* pParent;
@@ -65,7 +67,7 @@ typedef std::vector<ParserScope*> scope_stack_t;
 ParserVariable* lookupParserVariable(scope_stack_t&, const std::string&, ErrInfo);
 
 // lookup function from scope stack
-ParserFunction* lookupParserFunction(scope_stack_t&, const std::string&, ErrInfo, const std::vector<Type>&);
+ParserFunction* lookupParserFunction(scope_stack_t&, const std::string&, ErrInfo, const std::vector<Type>&, int&);
 
 // declare a variable in the immediate scope
 void declareParserVariable(scope_stack_t&, const std::string&, ParserVariable*, ErrInfo);

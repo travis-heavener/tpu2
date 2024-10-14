@@ -3,29 +3,29 @@
 #include <stdio.t>
 
 int main() {
-    // uint_16 myVar = 99;
-    // return myVar;
+    // return atoi("-9812");
+    // return EXIT_SUCCESS;
 
-    // char* msgA = "Hello there, ";
-    // char* name = "user";
-    // char* msgB = "!\n";
+    int i = 0;
+    int j = 0;
 
-    // strcat(msgA, name);
-    // strcat(msgA, msgB);
-    // print(msgA);
+    for (i = 0; i < 10; i = i + 1) {
+        for (j = 0; j < 4; j = j + 1) {
+            print("a");
+        }
+        print("b");
+        return 99;
+        print("c");
+    }
 
-    // char* dest;
-    // strcpy(dest, name);
-    // print(dest);
+    return 0;
 
-    return sizeof (unsigned char);
+    // int x = 0;
 
-    int* pInt = (int*)malloc(2);
-    *pInt = 99;
+    // if (x == 0) {
+    //     print("herre'");
+    //     return 8;
+    // }
 
-    realloc(pInt, 1);
-
-    return malloc(2);
-
-    return EXIT_SUCCESS;
+    // return 12;
 }

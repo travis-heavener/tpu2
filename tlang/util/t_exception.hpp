@@ -23,7 +23,7 @@ class ErrInfo {
 
 class TException {
     public:
-        TException(ErrInfo err) : err(err), msg("Base TException.") {};
+        TException(ErrInfo err) : err(err), msg("Base TException.") {throw 0;};
         TException(ErrInfo err, const std::string& msg) : err(err), msg(msg) {};
 
         // virtual toString method
@@ -50,6 +50,7 @@ MAKE_EXCEPTION(TypeInfer)
 MAKE_EXCEPTION(InvalidOperation)
 MAKE_EXCEPTION(Syntax)
 MAKE_EXCEPTION(VoidReturn)
+MAKE_EXCEPTION(MissingReturn)
 MAKE_EXCEPTION(IllegalArraySize)
 MAKE_EXCEPTION(IllegalImplicitCast)
 MAKE_EXCEPTION(ExpressionEval)

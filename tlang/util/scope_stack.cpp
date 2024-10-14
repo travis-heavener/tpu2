@@ -66,7 +66,7 @@ ParserVariable* lookupParserVariable(scope_stack_t& scopeStack, const std::strin
 }
 
 // lookup function from scope stack
-ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::string& name, ErrInfo err, const std::vector<Type>& paramTypes) {
+ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::string& name, ErrInfo err, const std::vector<Type>& paramTypes, int& status) {
     // look in global scope
     ParserScope* pScope = scopeStack[0];
 
@@ -81,6 +81,7 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
         int matchStatus = pParserFunc->doParamsMatch(paramTypes, err);
         if (matchStatus == TYPE_PARAM_EXACT_MATCH) {
             pParserFunc->isUnused = false;
+            status = TYPE_PARAM_EXACT_MATCH;
             return pParserFunc;
         } else if (matchStatus == TYPE_PARAM_IMPLICIT_MATCH) {
             // store in implicitMatches
@@ -101,6 +102,7 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
         throw TAmbiguousFunctionResolutionException(err);
 
     implicitMatches[0]->isUnused = false;
+    status = TYPE_PARAM_IMPLICIT_MATCH;
     return implicitMatches[0];
 }
 
@@ -123,7 +125,7 @@ void declareParserFunction(scope_stack_t& scopeStack, const std::string& name, P
     // search functions in global scope
     auto range = pScope->functions.equal_range(name);
     for (auto itr = range.first; itr != range.second; ++itr)
-        if (itr->second->doParamsMatch(paramTypes, err)) // check parameters
+        if (itr->second->doParamsMatch(paramTypes, err) == TYPE_PARAM_EXACT_MATCH) // check parameters
             throw TIdentifierInUseException(err);
 
     // declare function

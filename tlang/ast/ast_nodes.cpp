@@ -514,7 +514,19 @@ void ASTFunctionCall::inferType(scope_stack_t& scopeStack) {
     for (ASTNode* pChild : children)
         paramTypes.push_back(static_cast<ASTTypedNode*>(pChild)->getTypeRef());
 
-    this->setType( lookupParserFunction(scopeStack, this->raw, this->err, paramTypes)->type );
+    int status;
+    ParserFunction* pParserFunc = lookupParserFunction(scopeStack, this->raw, this->err, paramTypes, status);
+
+    // if this is a partial match, update own types
+    if (status == TYPE_PARAM_IMPLICIT_MATCH) {
+        size_t i = 0;
+        for (const Type& paramType : pParserFunc->getParamTypes()) {
+            static_cast<ASTTypedNode*>(children[i++])->setType(paramType);
+        }
+    }
+
+    // set own type to return type
+    this->setType( pParserFunc->type );
 
     // infer subscripts
     this->inferSubscriptTypes(scopeStack);

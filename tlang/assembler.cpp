@@ -89,11 +89,11 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
         scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
-    bool hasReturned = assembleBody(&funcNode, outHandle, scope, asmFunc, true, true);
+    bool hasReturned = assembleBody(&funcNode, outHandle, scope, asmFunc, true);
 
     // declare end of function label
     if (!hasReturned && returnSize > 0)
-        throw TDevException("Missing return statement in non-void function: " + funcName);
+        throw TMissingReturnException(funcNode.err);
     OUT << "jmp " << asmFunc.getEndLabel() << '\n';
 
     // write return label
@@ -113,7 +113,7 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const AssembledFunc& asmFunc, const bool isNewScope, const bool isTopScope) {
+bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const AssembledFunc& asmFunc, const bool isTopScope) {
     size_t startingScopeSize = scope.size(); // remove any scoped variables at the end
     const Type& desiredType = asmFunc.getReturnType();
     const size_t returnSize = desiredType.getSizeBytes();
@@ -156,8 +156,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
-                hasReturned = !isTopScope && hasReturnedLocal;
+                assembleBody(&loop, outHandle, scope, asmFunc);
 
                 // jump back to the loopStartLabel
                 OUT << "jmp " << loopStartLabel << '\n';
@@ -203,8 +202,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 OUT << "jz " << mergeLabel << "\n";
 
                 // assemble the body here in new scope
-                bool hasReturnedLocal = assembleBody(&loop, outHandle, scope, asmFunc);
-                hasReturned = !isTopScope && hasReturnedLocal;
+                assembleBody(&loop, outHandle, scope, asmFunc);
 
                 // assemble third expression
                 resultSize = assembleExpression(*loop.pExprC, outHandle, scope).getSizeBytes();
@@ -251,8 +249,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                     // this is executed when not jumping anywhere (else branch or false condition)
                     // process the body in a new scope
-                    bool hasReturnedLocal = assembleBody(conditional.at(j), outHandle, scope, asmFunc);
-                    hasReturned = !isTopScope && hasReturnedLocal;
+                    assembleBody(conditional.at(j), outHandle, scope, asmFunc);
 
                     // jump to merge label
                     OUT << "jmp " << mergeLabel << '\n';
@@ -332,14 +329,28 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
     }
 
     // remove extra scope variables after the scope closes
-    if (isNewScope || hasReturned) {
-        size_t sizeFreed = scope.size() - startingScopeSize;
+    long long sizeFreed = scope.size() - startingScopeSize;
 
-        // move back SP
-        if (sizeFreed > 0) {
-            OUT << "sub SP, " << sizeFreed << '\n';
-            scope.pop(sizeFreed);
+    // move back SP
+    if (sizeFreed > 0) {
+        OUT << "sub SP, " << sizeFreed << '\n';
+        scope.pop(sizeFreed);
+    }
+
+    // jump to end if returned
+    if (hasReturned) {
+        // remove everything else in the scope except the return bytes
+        // DON'T USE scope.pop SINCE THIS ISN'T A GUARANTEED RETURN
+        if (!isTopScope) {
+            size_t argSizes = 0;
+            for (const Type& t : asmFunc.getParamTypes())
+                argSizes += t.getSizeBytes();
+
+            long long popSize = scope.size() - returnSize - argSizes;
+
+            if (popSize > 0) OUT << "sub SP, " << popSize << '\n';
         }
+        OUT << "jmp " << asmFunc.getEndLabel() << '\n';
     }
 
     return hasReturned;

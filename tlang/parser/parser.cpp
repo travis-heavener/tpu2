@@ -155,7 +155,7 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                     if (endCond > endIndex) throw TUnclosedGroupException(tokens[braceStart].err);
 
                     // check for else on the same line
-                    if (tokens[*branchIndices.rbegin()].type == TokenType::ELSE || // the current branch is an else (nothing allowed after)
+                    if (tokens[branchIndices.back()].type == TokenType::ELSE || // the current branch is an else (nothing allowed after)
                         endCond+1 == endIndex || // there's nothing after
                         (tokens[endCond+1].type != TokenType::ELSE_IF && tokens[endCond+1].type != TokenType::ELSE) // there's not an else if/else after
                     ) {

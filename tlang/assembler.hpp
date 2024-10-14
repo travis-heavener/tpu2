@@ -57,7 +57,7 @@ void assembleFunction(ASTFunction&, std::ofstream&);
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)
-bool assembleBody(ASTNode*, std::ofstream&, Scope&, const AssembledFunc&, const bool=true, const bool=false);
+bool assembleBody(ASTNode*, std::ofstream&, Scope&, const AssembledFunc&, const bool=false);
 
 // assembles an expression, returning the type of the value pushed to the stack
 Type assembleExpression(ASTNode&, std::ofstream&, Scope&);
