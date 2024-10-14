@@ -469,71 +469,86 @@ namespace instructions {
         // get operands
         u8 opA = tpu.readByte(memory).getValue();
         Register dest;
+
+        // switch based on signedness
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Adds 8-bit register and imm8 and stores in first operand.
-                dest = getRegister8FromCode(opA);
-                u8 A = tpu.readRegister8(dest).getValue();
-                u8 B = tpu.readByte(memory).getValue();
-                u8 sum = A + B;
-                tpu.moveToRegister( dest, sum );
-
-                // update flags
-                tpu.setFlag(CARRY, ((u16)A + (u16)B) > 0xFF); // same as overflow
-                tpu.setFlag(PARITY, getParity(sum));
-                tpu.setFlag(ZERO, sum == 0);
-                tpu.setFlag(SIGN, (sum & (1u << 7)) > 0);
-                tpu.setFlag(OVERFLOW, ((u16)A + (u16)B) > 0xFF);
-                break;
-            }
-            case 1: { // Adds 16-bit register and imm16 and stores in first operand.
-                dest = getRegister16FromCode(opA);
-                u16 A = tpu.readRegister16(dest).getValue();
-                u16 B = tpu.readWord(memory).getValue();
-                u16 sum = A + B;
-                tpu.moveToRegister( dest, sum );
-
-                // update flags
-                tpu.setFlag(CARRY, ((u32)A + (u32)B) > 0xFFFF); // same as overflow
-                tpu.setFlag(PARITY, getParity(sum));
-                tpu.setFlag(ZERO, sum == 0);
-                tpu.setFlag(SIGN, (sum & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, ((u32)A + (u32)B) > 0xFFFF);
-                break;
-            }
+            case 0:   // Adds 8-bit register and imm8 and stores in first operand.
             case 2: { // Adds two 8-bit registers and stores in first operand.
                 dest = getRegister8FromCode(opA);
-                Register src = getRegister8FromCode(tpu.readByte(memory).getValue());
-                u8 A = tpu.readRegister8(dest).getValue();
-                u8 B = tpu.readRegister8(src).getValue();
-                u8 sum = A + B;
-                tpu.moveToRegister( dest, sum );
+                u8 uA = tpu.readRegister8(dest).getValue();
+                u8 uB;
+                if ((mod.getValue() & 0b111) == 2) {
+                    Register src = getRegister8FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister8(src).getValue();
+                } else {
+                    uB = tpu.readByte(memory).getValue();
+                }
+                u8 sum8 = 0;
+                bool isCarry = false;
 
-                // update flags
-                tpu.setFlag(CARRY, ((u16)A + (u16)B) > 0xFF); // same as overflow
-                tpu.setFlag(PARITY, getParity(sum));
-                tpu.setFlag(ZERO, sum == 0);
-                tpu.setFlag(SIGN, (sum & (1u << 7)) > 0);
-                tpu.setFlag(OVERFLOW, ((u16)A + (u16)B) > 0xFF);
+                if (!isSignedOp) { // unsigned operation
+                    sum8 = uA + uB;
+                    isCarry = ((u16)uA + (u16)uB) > 0xFF;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s8 A = (uA & 0x80) ? -(0x7F - (uA & 0x7F) + 1) : (uA & 0x7F);
+                    s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
+                    s16 ssum16 = (s16)A + (s16)B;
+
+                    // copy bits (don't trust typecasts)
+                    sum8 |= A + B;
+                    isCarry = ssum16 > 0x7F || ssum16 < -0x80;
+                }
+
+                // store result & update flags
+                tpu.moveToRegister( dest, sum8 );
+                tpu.setFlag(CARRY, isCarry); // same as overflow
+                tpu.setFlag(PARITY, getParity(sum8));
+                tpu.setFlag(ZERO, sum8 == 0);
+                tpu.setFlag(SIGN, sum8 & 0x80);
+                tpu.setFlag(OVERFLOW, isCarry);
                 break;
             }
+            case 1:   // Adds 16-bit register and imm16 and stores in first operand.
             case 3: { // Adds two 16-bit registers and stores in first operand.
                 dest = getRegister16FromCode(opA);
-                Register src = getRegister16FromCode(tpu.readByte(memory).getValue());
-                u16 A = tpu.readRegister16(dest).getValue();
-                u16 B = tpu.readRegister16(src).getValue();
-                u16 sum = A + B;
-                tpu.moveToRegister( dest, sum );
+                u16 uA = tpu.readRegister16(dest).getValue();
+                u16 uB;
+                if ((mod.getValue() & 0b111) == 3) {
+                    Register src = getRegister16FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister16(src).getValue();
+                } else {
+                    uB = tpu.readWord(memory).getValue();
+                }
+                u16 sum16 = 0;
+                bool isCarry = false;
 
-                // update flags
-                tpu.setFlag(CARRY, ((u32)A + (u32)B) > 0xFFFF); // same as overflow
-                tpu.setFlag(PARITY, getParity(sum));
-                tpu.setFlag(ZERO, sum == 0);
-                tpu.setFlag(SIGN, (sum & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, ((u32)A + (u32)B) > 0xFFFF);
+                if (!isSignedOp) { // unsigned operation
+                    sum16 = uA + uB;
+                    isCarry = ((u32)uA + (u32)uB) > 0xFFFF;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s16 A = (uA & 0x8000) ? -(0x7FFF - (uA & 0x7FFF) + 1) : (uA & 0x7FFF);
+                    s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
+                    s32 ssum32 = (s32)A + (s32)B;
+
+                    // copy bits (don't trust typecasts)
+                    sum16 |= A + B;
+                    isCarry = ssum32 > 0x7FFF || ssum32 < -0x8000;
+                }
+
+                // store result & update flags
+                tpu.moveToRegister( dest, sum16 );
+                tpu.setFlag(CARRY, isCarry); // same as overflow
+                tpu.setFlag(PARITY, getParity(sum16));
+                tpu.setFlag(ZERO, sum16 == 0);
+                tpu.setFlag(SIGN, sum16 & 0x8000);
+                tpu.setFlag(OVERFLOW, isCarry);
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: add.");
+                throw std::invalid_argument("Invalid MOD byte for operation: add/sadd.");
                 break;
             }
         }
@@ -547,71 +562,84 @@ namespace instructions {
         // get operands
         u8 opA = tpu.readByte(memory).getValue();
         Register dest;
+
+        // switch based on signedness
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Subtracts imm8 from an 8-bit register and stores in first operand.
-                dest = getRegister8FromCode(opA);
-                u8 A = tpu.readRegister8(dest).getValue();
-                u8 B = tpu.readByte(memory).getValue();
-                u8 diff = A - B;
-                tpu.moveToRegister( dest, diff );
-
-                // update flags
-                tpu.setFlag(CARRY, ((short)A - (short)B) < 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(diff));
-                tpu.setFlag(ZERO, diff == 0);
-                tpu.setFlag(SIGN, (diff & (1u << 7)) > 0);
-                tpu.setFlag(OVERFLOW, ((short)A - (short)B) < 0);
-                break;
-            }
-            case 1: { // Subtracts imm16 from a 16-bit register and stores in first operand.
-                dest = getRegister16FromCode(opA);
-                u16 A = tpu.readRegister16(dest).getValue();
-                u16 B = tpu.readWord(memory).getValue();
-                u16 diff = A - B;
-                tpu.moveToRegister( dest, diff );
-
-                // update flags
-                tpu.setFlag(CARRY, ((int)A - (int)B) < 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(diff));
-                tpu.setFlag(ZERO, diff == 0);
-                tpu.setFlag(SIGN, (diff & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, ((int)A - (int)B) < 0);
-                break;
-            }
+            case 0:   // Subtracts imm8 from an 8-bit register and stores in first operand.
             case 2: { // Subtracts 8-bit registers (second operand from first) and stores in first operand.
                 dest = getRegister8FromCode(opA);
-                Register src = getRegister8FromCode(tpu.readByte(memory).getValue());
-                u8 A = tpu.readRegister8(dest).getValue();
-                u8 B = tpu.readRegister8(src).getValue();
-                u8 diff = A - B;
-                tpu.moveToRegister( dest, diff );
+                u8 uA = tpu.readRegister8(dest).getValue();
+                u8 uB;
+                if ((mod.getValue() & 0b111) == 2) {
+                    Register src = getRegister8FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister8(src).getValue();
+                } else {
+                    uB = tpu.readByte(memory).getValue();
+                }
+                u8 diff8 = 0;
+                bool isBorrow = false;
 
-                // update flags
-                tpu.setFlag(CARRY, ((short)A - (short)B) < 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(diff));
-                tpu.setFlag(ZERO, diff == 0);
-                tpu.setFlag(SIGN, (diff & (1u << 7)) > 0);
-                tpu.setFlag(OVERFLOW, ((short)A - (short)B) < 0);
+                if (!isSignedOp) { // unsigned operation
+                    diff8 = uA + uB;
+                    isBorrow = uB > uA;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s8 A = (uA & 0x80) ? -(0x7F - (uA & 0x7F) + 1) : (uA & 0x7F);
+                    s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
+
+                    // copy bits (don't trust typecasts)
+                    diff8 |= A + B;
+                    isBorrow = B > A;
+                }
+
+                // store result & update flags
+                tpu.moveToRegister( dest, diff8 );
+                tpu.setFlag(CARRY, isBorrow); // same as overflow
+                tpu.setFlag(PARITY, getParity(diff8));
+                tpu.setFlag(ZERO, diff8 == 0);
+                tpu.setFlag(SIGN, diff8 & 0x80);
+                tpu.setFlag(OVERFLOW, isBorrow);
                 break;
             }
-            case 3: { // Adds two 16-bit registers and stores in first operand.
+            case 1:   // Subtracts imm16 from a 16-bit register and stores in first operand.
+            case 3: { // Subtracts 16-bit registers (second operand from first) and stores in first operand.
                 dest = getRegister16FromCode(opA);
-                Register src = getRegister16FromCode(tpu.readByte(memory).getValue());
-                u16 A = tpu.readRegister16(dest).getValue();
-                u16 B = tpu.readRegister16(src).getValue();
-                u16 diff = A - B;
-                tpu.moveToRegister( dest, diff );
+                u16 uA = tpu.readRegister16(dest).getValue();
+                u16 uB;
+                if ((mod.getValue() & 0b111) == 3) {
+                    Register src = getRegister16FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister16(src).getValue();
+                } else {
+                    uB = tpu.readWord(memory).getValue();
+                }
+                u16 diff16 = 0;
+                bool isBorrow = false;
 
-                // update flags
-                tpu.setFlag(CARRY, ((int)A - (int)B) < 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(diff));
-                tpu.setFlag(ZERO, diff == 0);
-                tpu.setFlag(SIGN, (diff & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, ((int)A - (int)B) < 0);
+                if (!isSignedOp) { // unsigned operation
+                    diff16 = uA + uB;
+                    isBorrow = uB > uA;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s16 A = (uA & 0x8000) ? -(0x7FFF - (uA & 0x7FFF) + 1) : (uA & 0x7FFF);
+                    s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
+
+                    // copy bits (don't trust typecasts)
+                    diff16 |= A + B;
+                    isBorrow = B > A;
+                }
+
+                // store result & update flags
+                tpu.moveToRegister( dest, diff16 );
+                tpu.setFlag(CARRY, isBorrow); // same as overflow
+                tpu.setFlag(PARITY, getParity(diff16));
+                tpu.setFlag(ZERO, diff16 == 0);
+                tpu.setFlag(SIGN, diff16 & 0x8000);
+                tpu.setFlag(OVERFLOW, isBorrow);
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: sub.");
+                throw std::invalid_argument("Invalid MOD byte for operation: sub/ssub.");
                 break;
             }
         }
@@ -623,73 +651,80 @@ namespace instructions {
         tpu.sleep(); // wait since TPU has to process mod byte
 
         // multiply operands
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
-                u8 A = tpu.readRegister8(Register::AL).getValue();
-                u8 B = tpu.readByte(memory).getValue();
-                u16 product = A * B;
-                tpu.moveToRegister(Register::AX, product);
-
-                // update flags
-                tpu.setFlag(CARRY, product > 0xFF); // same as overflow
-                tpu.setFlag(PARITY, getParity(product));
-                tpu.setFlag(ZERO, product == 0);
-                tpu.setFlag(SIGN, (product & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, product > 0xFF);
-                break;
-            }
-            case 1: { // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-                u16 A = tpu.readRegister8(Register::AX).getValue();
-                u16 B = tpu.readWord(memory).getValue();
-                u32 product = A * B;
-                u16 lower = product & 0x0000FFFF;
-                u16 upper = (product & 0xFFFF0000) >> 16;
-
-                tpu.moveToRegister(Register::AX, lower);
-                tpu.moveToRegister(Register::DX, upper);
-
-                // update flags
-                tpu.setFlag(CARRY, upper > 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(product));
-                tpu.setFlag(ZERO, product == 0);
-                tpu.setFlag(SIGN, (upper & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, upper > 0);
-                break;
-            }
+            case 0:   // Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
             case 2: { // Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-                u8 A = tpu.readRegister8(Register::AL).getValue();
-                u8 B = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
-                u16 product = A * B;
-                tpu.moveToRegister(Register::AX, product);
+                u8 uA = tpu.readRegister8(Register::AL).getValue();
+                u8 uB;
+                if ((mod.getValue() & 0b111) == 2) {
+                    uB = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                } else {
+                    uB = tpu.readByte(memory).getValue();
+                }
+                u16 product = 0;
+                bool isCarry = false;
 
-                // update flags
-                tpu.setFlag(CARRY, product > 0xFF); // same as overflow
+                if (!isSignedOp) {
+                    product = uA * uB;
+                    isCarry = product > 0xFF;
+                } else {
+                    // handle signed multiplication
+                    s8 A = (uA & 0x80) ? -(0x7F - (uA & 0x7F) + 1) : (uA & 0x7F);
+                    s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
+                    s16 sproduct = (s16)A * (s16)B;
+                    product |= sproduct;
+                    isCarry = sproduct > 0x7F || sproduct < -0x80;
+                }
+
+                // move value & update flags
+                tpu.moveToRegister(Register::AX, product);
+                tpu.setFlag(CARRY, isCarry); // same as overflow
                 tpu.setFlag(PARITY, getParity(product));
                 tpu.setFlag(ZERO, product == 0);
-                tpu.setFlag(SIGN, (product & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, product > 0xFF);
+                tpu.setFlag(SIGN, product & 0x8000);
+                tpu.setFlag(OVERFLOW, isCarry);
                 break;
             }
+            case 1:   // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
             case 3: { // Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-                u16 A = tpu.readRegister16(Register::AX).getValue();
-                u16 B = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
-                u32 product = A * B;
-                u16 lower = product & 0x0000FFFF;
-                u16 upper = (product & 0xFFFF0000) >> 16;
+                u16 uA = tpu.readRegister16(Register::AX).getValue();
+                u16 uB;
+                if ((mod.getValue() & 0b111) == 3) {
+                    uB = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                } else {
+                    uB = tpu.readWord(memory).getValue();
+                }
+                u32 product = 0;
+                bool isCarry = false;
 
+                if (!isSignedOp) {
+                    product = uA * uB;
+                    isCarry = product > 0xFF;
+                } else {
+                    // handle signed multiplication
+                    s16 A = (uA & 0x8000) ? -(0x7FFF - (uA & 0x7FFF) + 1) : (uA & 0x7FFF);
+                    s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
+                    s32 sproduct = (s32)A * (s32)B;
+                    product |= sproduct;
+                    isCarry = sproduct > 0x7FFF || sproduct < -0x8000;
+                }
+
+                // move value & update flags
+                u16 lower = product & 0xFFFF;
+                u16 upper = product >> 16;
                 tpu.moveToRegister(Register::AX, lower);
                 tpu.moveToRegister(Register::DX, upper);
 
-                // update flags
-                tpu.setFlag(CARRY, upper > 0); // same as overflow
+                tpu.setFlag(CARRY, isCarry); // same as overflow
                 tpu.setFlag(PARITY, getParity(product));
                 tpu.setFlag(ZERO, product == 0);
-                tpu.setFlag(SIGN, (upper & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, upper > 0);
+                tpu.setFlag(SIGN, upper & 0x8000);
+                tpu.setFlag(OVERFLOW, isCarry);
                 break;
             }
             default: {
-                throw std::invalid_argument("Invalid MOD byte for operation: mul.");
+                throw std::invalid_argument("Invalid MOD byte for operation: mul/smul.");
                 break;
             }
         }
@@ -701,64 +736,71 @@ namespace instructions {
         tpu.sleep(); // wait since TPU has to process mod byte
 
         // divide operands
+        const bool isSignedOp = mod.getValue() & 8;
         switch (mod.getValue() & 0b111) {
-            case 0: { // Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
-                u8 A = tpu.readRegister8(Register::AL).getValue();
-                u8 B = tpu.readByte(memory).getValue();
-                u8 dividend = A / B, remainder = A % B;
-                tpu.moveToRegister(Register::AL, dividend);
-                tpu.moveToRegister(Register::AH, remainder);
-
-                // update flags
-                tpu.setFlag(CARRY, remainder == 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(dividend));
-                tpu.setFlag(ZERO, dividend == 0);
-                tpu.setFlag(SIGN, (dividend & (1u << 7)) > 0);
-                tpu.setFlag(OVERFLOW, remainder == 0);
-                break;
-            }
-            case 1: { // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-                u16 A = tpu.readRegister16(Register::AX).getValue();
-                u16 B = tpu.readWord(memory).getValue();
-                u16 dividend = A / B, remainder = A % B;
-                tpu.moveToRegister(Register::AX, dividend);
-                tpu.moveToRegister(Register::DX, remainder);
-
-                // update flags
-                tpu.setFlag(CARRY, remainder == 0); // same as overflow
-                tpu.setFlag(PARITY, getParity(dividend));
-                tpu.setFlag(ZERO, dividend == 0);
-                tpu.setFlag(SIGN, (dividend & (1u << 15)) > 0);
-                tpu.setFlag(OVERFLOW, remainder == 0);
-                break;
-            }
+            case 0:   // Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
             case 2: { // Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-                u8 A = tpu.readRegister8(Register::AL).getValue();
-                u8 B = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
-                u8 dividend = A / B, remainder = A % B;
+                u8 uA = tpu.readRegister8(Register::AL).getValue();
+                u8 uB;
+                if ((mod.getValue() & 0b111) == 2) {
+                    uB = tpu.readRegister8( getRegister8FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                } else {
+                    uB = tpu.readByte(memory).getValue();
+                }
+                u8 dividend = 0, remainder = 0;
+
+                if (!isSignedOp) {
+                    dividend = uA / uB;
+                    remainder = uA % uB;
+                } else {
+                    // handle signed multiplication
+                    s8 A = (uA & 0x80) ? -(0x7F - (uA & 0x7F) + 1) : (uA & 0x7F);
+                    s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
+                    dividend  |= A / B;
+                    remainder |= A % B;
+                }
+
+                // set value & update flags
                 tpu.moveToRegister(Register::AL, dividend);
                 tpu.moveToRegister(Register::AH, remainder);
 
-                // update flags
                 tpu.setFlag(CARRY, remainder == 0); // same as overflow
                 tpu.setFlag(PARITY, getParity(dividend));
                 tpu.setFlag(ZERO, dividend == 0);
-                tpu.setFlag(SIGN, (dividend & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, dividend & 0x80);
                 tpu.setFlag(OVERFLOW, remainder == 0);
                 break;
             }
+            case 1:   // Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
             case 3: { // Multiplies the AX register by an 8-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-                u16 A = tpu.readRegister16(Register::AX).getValue();
-                u16 B = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
-                u16 dividend = A / B, remainder = A % B;
+                u16 uA = tpu.readRegister16(Register::AX).getValue();
+                u16 uB;
+                if ((mod.getValue() & 0b111) == 3) {
+                    uB = tpu.readRegister16( getRegister16FromCode(tpu.readByte(memory).getValue()) ).getValue();
+                } else {
+                    uB = tpu.readWord(memory).getValue();
+                }
+                u16 dividend = 0, remainder = 0;
+
+                if (!isSignedOp) {
+                    dividend = uA / uB;
+                    remainder = uA % uB;
+                } else {
+                    // handle signed multiplication
+                    s16 A = (uA & 0x8000) ? -(0x7FFF - (uA & 0x7FFF) + 1) : (uA & 0x7FFF);
+                    s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
+                    dividend  |= A / B;
+                    remainder |= A % B;
+                }
+
+                // set value & update flags
                 tpu.moveToRegister(Register::AX, dividend);
                 tpu.moveToRegister(Register::DX, remainder);
 
-                // update flags
                 tpu.setFlag(CARRY, remainder == 0); // same as overflow
                 tpu.setFlag(PARITY, getParity(dividend));
                 tpu.setFlag(ZERO, dividend == 0);
-                tpu.setFlag(SIGN, (dividend & (1u << 15)) > 0);
+                tpu.setFlag(SIGN, dividend & 0x8000);
                 tpu.setFlag(OVERFLOW, remainder == 0);
                 break;
             }
@@ -805,7 +847,7 @@ namespace instructions {
         tpu.setFlag(CARRY, 0); // same as overflow
         tpu.setFlag(PARITY, getParity(value));
         tpu.setFlag(ZERO, value == 0);
-        tpu.setFlag(SIGN, (value & (1u << 7)) > 0);
+        tpu.setFlag(SIGN, (value & 128) > 0);
         tpu.setFlag(OVERFLOW, 0);
     }
 
@@ -825,7 +867,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 1: { // Logical AND between 16-bit register and imm16, stored in first operand.
@@ -849,7 +891,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 3: { // Logical AND between two 16-bit registers, stored in first operand.
@@ -888,7 +930,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 1: { // Logical OR between 16-bit register and imm16, stored in first operand.
@@ -912,7 +954,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 3: { // Logical OR between two 16-bit registers, stored in first operand.
@@ -951,7 +993,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 1: { // Logical OR between 16-bit register and imm16, stored in first operand.
@@ -975,7 +1017,7 @@ namespace instructions {
                 // update flags
                 tpu.setFlag(PARITY, getParity(result));
                 tpu.setFlag(ZERO, result == 0);
-                tpu.setFlag(SIGN, (result & (1u << 7)) > 0);
+                tpu.setFlag(SIGN, (result & 128) > 0);
                 break;
             }
             case 3: { // Logical OR between two 16-bit registers, stored in first operand.

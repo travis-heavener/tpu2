@@ -40,25 +40,45 @@ pop                         0x09 /1         Pops the last byte off the stack wit
 popw reg                    0x0A /0         Pops the top two bytes off the stack to a 16-bit register, the top byte into the upper half.
 popw                        0x0A /1         Pops the top two bytes off the stack without storing them.
 
-add reg, imm8               0x14 /0         Adds 8-bit register and imm8 and stores in first operand.
-add reg, imm16              0x14 /1         Adds 16-bit register and imm16 and stores in first operand.
-add reg, reg                0x14 /2         Adds two 8-bit registers and stores in first operand.
-add reg, reg                0x14 /3         Adds two 16-bit registers and stores in first operand.
+add reg, imm8               0x14 /0  U      Adds 8-bit register and imm8 and stores in first operand.
+add reg, imm16              0x14 /1  U      Adds 16-bit register and imm16 and stores in first operand.
+add reg, reg                0x14 /2  U      Adds two 8-bit registers and stores in first operand.
+add reg, reg                0x14 /3  U      Adds two 16-bit registers and stores in first operand.
 
-sub reg, imm8               0x15 /0         Subtracts imm8 from an 8-bit register and stores in first operand.
-sub reg, imm16              0x15 /1         Subtracts imm16 from a 16-bit register and stores in first operand.
-sub reg, reg                0x15 /2         Subtracts 8-bit registers (second operand from first) and stores in first operand.
-sub reg, reg                0x15 /3         Subtracts 16-bit registers (second operand from first) and stores in first operand.
+sadd reg, imm8              0x14 /0  S      Signed-adds 8-bit register and imm8 and stores in first operand.
+sadd reg, imm16             0x14 /1  S      Signed-adds 16-bit register and imm16 and stores in first operand.
+sadd reg, reg               0x14 /2  S      Signed-adds two 8-bit registers and stores in first operand.
+sadd reg, reg               0x14 /3  S      Signed-adds two 16-bit registers and stores in first operand.
 
-mul imm8                    0x16 /0         Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
-mul imm16                   0x16 /1         Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-mul reg                     0x16 /2         Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-mul reg                     0x16 /3         Multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+sub reg, imm8               0x15 /0  U      Subtracts imm8 from an 8-bit register and stores in first operand.
+sub reg, imm16              0x15 /1  U      Subtracts imm16 from a 16-bit register and stores in first operand.
+sub reg, reg                0x15 /2  U      Subtracts 8-bit registers (second operand from first) and stores in first operand.
+sub reg, reg                0x15 /3  U      Subtracts 16-bit registers (second operand from first) and stores in first operand.
 
-div imm8                    0x17 /0         Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
-div imm16                   0x17 /1         Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
-div reg                     0x17 /2         Divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
-div reg                     0x17 /3         Divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
+ssub reg, imm8              0x15 /0  S      Signed-subtracts imm8 from an 8-bit register and stores in first operand.
+ssub reg, imm16             0x15 /1  S      Signed-subtracts imm16 from a 16-bit register and stores in first operand.
+ssub reg, reg               0x15 /2  S      Signed-subtracts 8-bit registers (second operand from first) and stores in first operand.
+ssub reg, reg               0x15 /3  S      Signed-subtracts 16-bit registers (second operand from first) and stores in first operand.
+
+mul imm8                    0x16 /0  U      Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
+mul imm16                   0x16 /1  U      Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+mul reg                     0x16 /2  U      Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
+mul reg                     0x16 /3  U      Multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+
+smul imm8                   0x16 /0  S      Signed-multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
+smul imm16                  0x16 /1  S      Signed-multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+smul reg                    0x16 /2  S      Signed-multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
+smul reg                    0x16 /3  S      Signed-multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+
+div imm8                    0x17 /0  U      Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
+div imm16                   0x17 /1  U      Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
+div reg                     0x17 /2  U      Divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
+div reg                     0x17 /3  U      Divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
+
+sdiv imm8                   0x17 /0  S      Signed-divides the AL register by imm8 and stores the dividend in AL and remainder AH.
+sdiv imm16                  0x17 /1  S      Signed-divides the AX register by imm16 and stores the dividend in AX and remainder DX.
+sdiv reg                    0x17 /2  S      Signed-divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
+sdiv reg                    0x17 /3  S      Signed-divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
 
 buf reg                     0x1F /0         Buffers a value from an 8-bit register, updating the flags according to the register value.
 buf reg                     0x1F /1         Buffers a value from a 16-bit register, updating the flags according to the register value.
@@ -83,12 +103,22 @@ xor reg, reg                0x22 /3         Logical XOR between two 16-bit regis
 not reg                     0x23 /0         Performs bitwise NOT on an 8-bit register and stores in that register.
 not reg                     0x23 /1         Performs bitwise NOT on an 16-bit register and stores in that register.
 
-shl reg, imm8               0x24 /0         Shifts the value in the given 8-bit register left imm8 times in place.
-shl reg, imm8               0x24 /1         Shifts the value in the given 16-bit register left imm8 times in place.
-shl reg, reg                0x24 /2         Shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
-shl reg, reg                0x24 /3         Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
+shl reg, imm8               0x24 /0  U      Shifts the value in the given 8-bit register left imm8 times in place.
+shl reg, imm8               0x24 /1  U      Shifts the value in the given 16-bit register left imm8 times in place.
+shl reg, reg                0x24 /2  U      Shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
+shl reg, reg                0x24 /3  U      Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
 
-shr reg, imm8               0x25 /0         Shifts the value in the given 8-bit register right imm8 times in place.
-shr reg, imm8               0x25 /1         Shifts the value in the given 16-bit register right imm8 times in place.
-shr reg, reg                0x25 /2         Shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
-shr reg, reg                0x25 /3         Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
+sshl reg, imm8              0x24 /0  S      Signed-shifts the value in the given 8-bit register left imm8 times in place.
+sshl reg, imm8              0x24 /1  S      Signed-shifts the value in the given 16-bit register left imm8 times in place.
+sshl reg, reg               0x24 /2  S      Signed-shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
+sshl reg, reg               0x24 /3  S      Signed-shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
+
+shr reg, imm8               0x25 /0  U      Shifts the value in the given 8-bit register right imm8 times in place.
+shr reg, imm8               0x25 /1  U      Shifts the value in the given 16-bit register right imm8 times in place.
+shr reg, reg                0x25 /2  U      Shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
+shr reg, reg                0x25 /3  U      Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
+
+sshr reg, imm8              0x25 /0  S      Signed-shifts the value in the given 8-bit register right imm8 times in place.
+sshr reg, imm8              0x25 /1  S      Signed-shifts the value in the given 16-bit register right imm8 times in place.
+sshr reg, reg               0x25 /2  S      Signed-shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
+sshr reg, reg               0x25 /3  S      Signed-shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.

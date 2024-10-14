@@ -12,13 +12,13 @@
 // abstractions from processLineToText for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
 void parseMOVW(const std::vector<std::string>&, Memory&, u16&, std::vector<std::pair<std::string, u16>>&);
-void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode);
-void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool);
+void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
+void parseMULDIV(const std::vector<std::string>&, Memory&, u16&, bool, bool);
 void parseNOTBUF(const std::vector<std::string>&, Memory&, u16&, OPCode);
 void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, std::vector<std::pair<std::string, u16>>&);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&);
 void parsePOPW(const std::vector<std::string>&, Memory&, u16&);
-void parseBitShifts(const std::vector<std::string>&, Memory&, u16&, bool);
+void parseBitShifts(const std::vector<std::string>&, Memory&, u16&, bool, bool);
 
 // returns true if a string is valid
 bool isStringValid(const std::string& str) {
@@ -356,18 +356,20 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
     } else if (kwd == "popw") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOPW(args, memory, instIndex);
-    } else if (kwd == "add" || kwd == "sub" || kwd == "and" || kwd == "or" || kwd == "xor") {
+    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor") {
         checkArgs(args, 2); // check for extra args
-        OPCode code = kwd == "add" ? OPCode::ADD : kwd == "sub" ? OPCode::SUB :
+        OPCode code = (kwd == "add" || kwd == "sadd") ? OPCode::ADD : (kwd == "ssub" || kwd == "sub") ? OPCode::SUB :
                       kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : OPCode::XOR;
-        parseADDSUBLogic(args, memory, instIndex, code);
-    } else if (kwd == "mul" || kwd == "div") {
+        bool isSignedOp = kwd == "sadd" || kwd == "ssub";
+        parseADDSUBLogic(args, memory, instIndex, code, isSignedOp);
+    } else if (kwd == "mul" || kwd == "div" || kwd == "smul" || kwd == "sdiv") {
         checkArgs(args, 1); // check for extra args
-        parseMULDIV(args, memory, instIndex, kwd == "mul");
+        bool isSignedOp = kwd == "smul" || kwd == "sdiv";
+        parseMULDIV(args, memory, instIndex, kwd == "mul" || kwd == "smul", isSignedOp);
     } else if (kwd == "not" || kwd == "buf") {
         checkArgs(args, 1); // check for extra args
         parseNOTBUF(args, memory, instIndex, kwd == "not" ? OPCode::NOT : OPCode::BUF);
-    } else if (*kwd.rbegin() == ':') { // label name
+    } else if (kwd.back() == ':') { // label name
         checkArgs(args, 0); // verify rest of line is empty
         std::string labelName = kwd.substr(0, kwd.size()-1);
 
@@ -375,9 +377,10 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
         if (kwd.size() == 1) throw std::invalid_argument("Invalid label name: " + kwd);
 
         labelMap[labelName].value = instIndex; // store entry point
-    } else if (kwd == "shl" || kwd == "shr") {
+    } else if (kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr") {
         checkArgs(args, 2); // check for extra args
-        parseBitShifts(args, memory, instIndex, kwd == "shl");
+        bool isSignedOp = kwd == "sshl" || kwd == "sshr";
+        parseBitShifts(args, memory, instIndex, kwd == "shl", isSignedOp);
     } else {
         // invalid instruction
         throw std::invalid_argument("Invalid instruction: " + kwd);
@@ -546,7 +549,7 @@ void parseMOVW(const std::vector<std::string>& args, Memory& memory, u16& instIn
 }
 
 // ADD, SUB, AND, OR, and XOR all use the same argument & MOD byte patterns
-void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction) {
+void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction, bool isSignedOp) {
     std::vector<u8> bytesToWrite;
     
     // determine target register
@@ -555,12 +558,12 @@ void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16&
     bytesToWrite.push_back(reg);
 
     // determine MOD byte
-    u8 MOD = 0;
+    u8 MOD = isSignedOp ? 8 : 0;
     try { // try second operand as register
         Register regB = getRegisterFromString(args[1]);
         bool isRegB8 = isRegister8Bit(regB); // prevent register mismatch
         if (isRegA8 != isRegB8) throw std::runtime_error("8-bit and 16-bit register mismatch.");
-        MOD = isRegA8 ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
+        MOD |= isRegA8 ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
         bytesToWrite.push_back(regB); // src
     } catch (std::invalid_argument&) { // try as imm8/16
         // try as imm8 or imm16 (0-1)
@@ -569,10 +572,10 @@ void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16&
         
         if (isRegA8) { // try as imm8 (0)
             if (arg > 0xFF) throw std::invalid_argument("Expected 8-bit literal.");
-            MOD = 0;
+            MOD |= 0;
         } else { // try as imm16 (1)
             if (arg > 0xFFFF) throw std::invalid_argument("Expected 16-bit literal.");
-            MOD = 1;
+            MOD |= 1;
             bytesToWrite.push_back((arg & 0xFF00) >> 8); // upper half
         }
     }
@@ -584,14 +587,14 @@ void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16&
 }
 
 // MUL & DIV both use the same argument & MOD byte patterns
-void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isMul) {
+void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isMul, bool isSignedOp) {
     std::vector<u8> bytesToWrite;
 
     // determine MOD byte
-    u8 MOD = 0;
+    u8 MOD = isSignedOp ? 8 : 0;
     try { // try second operand as register
         Register reg = getRegisterFromString(args[0]);
-        MOD = isRegister8Bit(reg) ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
+        MOD |= isRegister8Bit(reg) ? 2 : 3; // try as 8-bit (2) or 16-bit (3)
         bytesToWrite.push_back(reg); // src
     } catch (std::invalid_argument&) { // try as imm8/16
         // try as imm8 or imm16 (0-1)
@@ -601,10 +604,10 @@ void parseMULDIV(const std::vector<std::string>& args, Memory& memory, u16& inst
         if (arg > 0xFFFF) {
             throw std::invalid_argument("Expected 16-bit literal.");
         } else if (arg > 0xFF) { // try as imm16 (0)
-            MOD = 1;
+            MOD |= 1;
             bytesToWrite.push_back((arg & 0xFF00) >> 8); // upper half
         } else { // try as imm8 (0)
-            MOD = 0;
+            MOD |= 0;
         }
     }
 
@@ -747,13 +750,17 @@ void parsePOPW(const std::vector<std::string>& args, Memory& memory, u16& instIn
     }
 }
 
-void parseBitShifts(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isLeftShift) {
+void parseBitShifts(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isLeftShift, bool isSignedOp) {
     memory[instIndex++] = isLeftShift ? OPCode::SHL : OPCode::SHR;
 
-    // get register
+    // determine MOD byte
     Register reg = getRegisterFromString(args[0]);
+    u8 MOD = isSignedOp ? 8 : 0;
+    MOD |= !isRegister8Bit(reg);
+
+    // get register
     size_t modByteAddr = instIndex++;
-    memory[modByteAddr] = !isRegister8Bit(reg); // MOD byte
+    memory[modByteAddr] = MOD; // MOD byte
     memory[instIndex++] = reg;
 
     // try as register
