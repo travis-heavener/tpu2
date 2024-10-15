@@ -155,6 +155,7 @@ void TPU::execute(Memory& memory) {
         caseInstruction(SUB)
         caseInstruction(MUL)
         caseInstruction(DIV)
+        caseInstruction(CMP)
         caseInstruction(BUF)
         caseInstruction(AND)
         caseInstruction(OR)

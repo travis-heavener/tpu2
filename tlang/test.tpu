@@ -1,8 +1,22 @@
 section .text
 _main:
-    mov AL, 64
-    sshl AL, 2
-    movw BX, AX
+    movw AX, 130
+    movw BX, 8
+
+    scmp AL, BL
+    jz J1   ; EQ
+    jc J2   ; LT
+    jmp J3  ; GT
+    J1:
+        movw BX, 0
+        jmp JR
+    J2:
+        movw BX, 1
+        jmp JR
+    J3:
+        movw BX, 2
+        jmp JR
+    JR:
     movw AX, 0x03
     syscall
     hlt

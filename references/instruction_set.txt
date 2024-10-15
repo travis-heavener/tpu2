@@ -80,6 +80,16 @@ sdiv imm16                  0x17 /1  S      Signed-divides the AX register by im
 sdiv reg                    0x17 /2  S      Signed-divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
 sdiv reg                    0x17 /3  S      Signed-divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
 
+cmp reg, imm8               0x18 /0  U      Compares an 8-bit register value and imm8. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+cmp reg, imm16              0x18 /1  U      Compares a 16-bit register value and imm16. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+cmp reg, reg                0x18 /2  U      Compares two 8-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+cmp reg, reg                0x18 /3  U      Compares two 16-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+
+scmp reg, imm8              0x18 /0  S      Signed-compares an 8-bit register value and imm8. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+scmp reg, imm16             0x18 /1  S      Signed-compares a 16-bit register value and imm16. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+scmp reg, reg               0x18 /2  S      Signed-compares two 8-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+scmp reg, reg               0x18 /3  S      Signed-compares two 16-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+
 buf reg                     0x1F /0         Buffers a value from an 8-bit register, updating the flags according to the register value.
 buf reg                     0x1F /1         Buffers a value from a 16-bit register, updating the flags according to the register value.
 buf imm8                    0x1F /2         Buffers an imm8 value, updating the flags according to the value.

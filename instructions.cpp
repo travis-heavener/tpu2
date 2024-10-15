@@ -581,7 +581,7 @@ namespace instructions {
                 bool isBorrow = false;
 
                 if (!isSignedOp) { // unsigned operation
-                    diff8 = uA + uB;
+                    diff8 = uA - uB;
                     isBorrow = uB > uA;
                 } else { // signed operation
                     // if negative, extract unsigned to signed neg
@@ -589,7 +589,7 @@ namespace instructions {
                     s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
 
                     // copy bits (don't trust typecasts)
-                    diff8 |= A + B;
+                    diff8 |= A - B;
                     isBorrow = B > A;
                 }
 
@@ -617,7 +617,7 @@ namespace instructions {
                 bool isBorrow = false;
 
                 if (!isSignedOp) { // unsigned operation
-                    diff16 = uA + uB;
+                    diff16 = uA - uB;
                     isBorrow = uB > uA;
                 } else { // signed operation
                     // if negative, extract unsigned to signed neg
@@ -625,7 +625,7 @@ namespace instructions {
                     s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
 
                     // copy bits (don't trust typecasts)
-                    diff16 |= A + B;
+                    diff16 |= A - B;
                     isBorrow = B > A;
                 }
 
@@ -806,6 +806,93 @@ namespace instructions {
             }
             default: {
                 throw std::invalid_argument("Invalid MOD byte for operation: div.");
+                break;
+            }
+        }
+    }
+
+    void processCMP(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        u8 opA = tpu.readByte(memory).getValue();
+        Register regA;
+
+        // switch based on signedness
+        const bool isSignedOp = mod.getValue() & 8;
+        switch (mod.getValue() & 0b111) {
+            case 0:   // Compares an 8-bit register value and imm8.
+            case 2: { // Compares two 8-bit registers.
+                regA = getRegister8FromCode(opA);
+                u8 uA = tpu.readRegister8(regA).getValue();
+                u8 uB;
+                if ((mod.getValue() & 0b111) == 2) {
+                    Register regB = getRegister8FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister8(regB).getValue();
+                } else {
+                    uB = tpu.readByte(memory).getValue();
+                }
+                u8 diff8 = 0;
+                bool isCarry = false;
+
+                if (!isSignedOp) { // unsigned operation
+                    diff8 = uA - uB;
+                    isCarry = uB > uA;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s8 A = (uA & 0x80) ? -(0x7F - (uA & 0x7F) + 1) : (uA & 0x7F);
+                    s8 B = (uB & 0x80) ? -(0x7F - (uB & 0x7F) + 1) : (uB & 0x7F);
+
+                    // copy bits (don't trust typecasts)
+                    diff8 |= A - B;
+                    isCarry = B > A;
+                }
+
+                // update flags
+                tpu.setFlag(CARRY, isCarry); // same as overflow
+                tpu.setFlag(PARITY, getParity(diff8));
+                tpu.setFlag(ZERO, diff8 == 0);
+                tpu.setFlag(OVERFLOW, isCarry);
+                break;
+            }
+            case 1:   // Compares a 16-bit register value and imm16.
+            case 3: { // Compares two 16-bit registers.
+                regA = getRegister16FromCode(opA);
+                u16 uA = tpu.readRegister16(regA).getValue();
+                u16 uB;
+                if ((mod.getValue() & 0b111) == 3) {
+                    Register regB = getRegister16FromCode(tpu.readByte(memory).getValue());
+                    uB = tpu.readRegister16(regB).getValue();
+                } else {
+                    uB = tpu.readWord(memory).getValue();
+                }
+                u16 diff16 = 0;
+                bool isCarry = false;
+
+                if (!isSignedOp) { // unsigned operation
+                    diff16 = uA - uB;
+                    isCarry = uB > uA;
+                } else { // signed operation
+                    // if negative, extract unsigned to signed neg
+                    s16 A = (uA & 0x8000) ? -(0x7FFF - (uA & 0x7FFF) + 1) : (uA & 0x7FFF);
+                    s16 B = (uB & 0x8000) ? -(0x7FFF - (uB & 0x7FFF) + 1) : (uB & 0x7FFF);
+
+                    // copy bits (don't trust typecasts)
+                    diff16 |= A - B;
+                    isCarry = B > A;
+                }
+
+                // update flags
+                tpu.setFlag(CARRY, isCarry); // same as overflow
+                tpu.setFlag(PARITY, getParity(diff16));
+                tpu.setFlag(ZERO, diff16 == 0);
+                tpu.setFlag(OVERFLOW, isCarry);
+                break;
+            }
+            default: {
+                throw std::invalid_argument("Invalid MOD byte for operation: cmp/scmp.");
                 break;
             }
         }

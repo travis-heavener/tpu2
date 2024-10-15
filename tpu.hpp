@@ -29,6 +29,7 @@ enum OPCode {
     SUB         = 0x15,
     MUL         = 0x16,
     DIV         = 0x17,
+    CMP         = 0x18,
     BUF         = 0x1F,
     AND         = 0x20,
     OR          = 0x21,

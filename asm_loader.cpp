@@ -356,11 +356,11 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
     } else if (kwd == "popw") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOPW(args, memory, instIndex);
-    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor") {
+    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp") {
         checkArgs(args, 2); // check for extra args
         OPCode code = (kwd == "add" || kwd == "sadd") ? OPCode::ADD : (kwd == "ssub" || kwd == "sub") ? OPCode::SUB :
-                      kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : OPCode::XOR;
-        bool isSignedOp = kwd == "sadd" || kwd == "ssub";
+                      kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : (kwd == "cmp" || kwd == "scmp") ? OPCode::CMP : OPCode::XOR;
+        bool isSignedOp = kwd == "sadd" || kwd == "ssub" || kwd == "scmp";
         parseADDSUBLogic(args, memory, instIndex, code, isSignedOp);
     } else if (kwd == "mul" || kwd == "div" || kwd == "smul" || kwd == "sdiv") {
         checkArgs(args, 1); // check for extra args
