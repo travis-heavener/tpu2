@@ -3,7 +3,7 @@
 #include "util/globals.hpp"
 #include "tpu.hpp"
 #include "memory.hpp"
-#include "asm_loader.hpp"
+#include "assembler/asm_loader.hpp"
 #include "kernel/kernel.hpp"
 
 /**

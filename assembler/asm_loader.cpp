@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "asm_loader.hpp"
-#include "memory.hpp"
-#include "tpu.hpp"
+#include "../memory.hpp"
+#include "../tpu.hpp"
 
 // abstractions from processLineToText for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);
@@ -141,7 +141,7 @@ void loadInstructionArgs(const std::string& line, std::vector<std::string>& args
 }
 
 // responsible for taking a .tpu file and loading it into memory for main
-void loadFileToMemory(const std::string& path, Memory& memory) {
+u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textStart, u16& dataStart) {
     // open file
     std::ifstream inHandle(path);
 
@@ -151,8 +151,7 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
     }
 
     // read each line
-    u16 instIndex = TEXT_LOWER_ADDR;
-    u16 dataIndex = DATA_LOWER_ADDR;
+    u16 memIndex = 0;
     std::string line;
     label_map_t labelMap; // label name, start address
     
@@ -169,8 +168,16 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
                 // get the section
                 if (lineBuf.find(".data") == 8) {
                     currentSection = SECTION_DATA;
+                    dataStart = memIndex;
                 } else if (lineBuf.find(".text") == 8) {
                     currentSection = SECTION_TEXT;
+                    textStart = memIndex;
+
+                    // allocate space at the start of .text to jump to the main entry point
+                    memory[memIndex++] = OPCode::JMP;
+                    memory[memIndex++] = 0; // MOD byte
+                    labelsToReplace.push_back({RESERVED_LABEL_MAIN, memIndex}); // add this jmp instruction to labelsToReplace
+                    memIndex += 2; // make space for address
                 } else {
                     // invalid section
                     throw std::invalid_argument("Invalid section: " + lineBuf.substr(8));
@@ -181,10 +188,10 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
             // switch based on the section
             switch (currentSection) {
                 case SECTION_TEXT:
-                    processLineToText(line, memory, instIndex, labelMap, labelsToReplace); // process the line
+                    processLineToText(line, memory, memIndex, labelMap, labelsToReplace); // process the line
                     break;
                 case SECTION_DATA:
-                    processLineToData(line, memory, dataIndex, labelMap); // process the line
+                    processLineToData(line, memory, memIndex, labelMap); // process the line
                     break;
                 case SECTION_NONE: default:
                     throw std::invalid_argument("Cannot write to this section (use `section .data` or `section .text`).");
@@ -202,7 +209,7 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
                 throw std::invalid_argument("Could not find label: " + labelPair.first);
 
             Label label = labelMap[labelPair.first];
-            if (label.type == DATA_TYPE_DEFAULT || label.type == DATA_TYPE_STRZ || label.type == DATA_TYPE_STR) {
+            if (label.type == DATA_TYPE_DEFAULT || label.type == DATA_TYPE_STRZ) {
                 // replace with address
                 u16 destAddr = labelMap[labelPair.first].value;
                 u16 addr = labelPair.second;
@@ -213,12 +220,6 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
             }
         }
 
-        u16 mainEntryAddr = labelMap.at(RESERVED_LABEL_MAIN).value;
-        memory[INSTRUCTION_PTR_START] = OPCode::JMP;
-        memory[INSTRUCTION_PTR_START+1] = 0; // MOD byte
-        memory[INSTRUCTION_PTR_START+2] = mainEntryAddr & 0x00FF; // lower-half of addr
-        memory[INSTRUCTION_PTR_START+3] = (mainEntryAddr & 0xFF00) >> 8; // upper-half of addr
-
         // close file
         inHandle.close();
     } catch (std::invalid_argument& e) {
@@ -226,6 +227,9 @@ void loadFileToMemory(const std::string& path, Memory& memory) {
         inHandle.close();
         throw e;
     }
+
+    // return the size taken by the binary file
+    return memIndex; // points to the next index
 }
 
 // process an individual line from .data section and load it into memory
@@ -255,10 +259,7 @@ void processLineToData(std::string& line, Memory& memory, u16& dataIndex, label_
     trimString(labelName);
     trimString(dataType);
     trimString(rawValue);
-    if (dataType == DATA_TYPE_STR || dataType == DATA_TYPE_STRZ) {
-        // parse as string
-        bool isNullTerminated = dataType == DATA_TYPE_STRZ;
-
+    if (dataType == DATA_TYPE_STRZ) { // parse as string
         // verify string is valid
         if (!isStringValid(rawValue))
             throw std::invalid_argument("Invalid string in data declaration.");
@@ -273,8 +274,8 @@ void processLineToData(std::string& line, Memory& memory, u16& dataIndex, label_
             memory[dataIndex++] = (u8)c;
         }
 
-        // add null terminator if needed
-        if (isNullTerminated) memory[dataIndex++] = '\0';
+        // add null terminator
+        memory[dataIndex++] = '\0';
 
         // insert into label map
         labelMap.insert({labelName, Label(dataType, startIndex)});

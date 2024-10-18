@@ -84,7 +84,6 @@ typedef int8_t    s8;
 #define RESERVED_LABEL_FREE     "_free"
 
 #define DATA_TYPE_STRZ ".strz" // null-terminated string
-#define DATA_TYPE_STR ".str" // non-null terminated string
 
 // for TCC
 #define FUNC_LABEL_PREFIX       "__UF" // for "user function"

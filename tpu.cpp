@@ -5,7 +5,7 @@
 #include <random>
 
 #include "tpu.hpp"
-#include "instructions.hpp"
+#include "assembler/instructions.hpp"
 
 Register getRegisterFromString(const std::string& str) {
     if (str == "AX") return Register::AX;

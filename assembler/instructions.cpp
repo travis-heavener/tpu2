@@ -6,9 +6,9 @@
 #include <iostream>
 
 #include "instructions.hpp"
-#include "tpu.hpp"
-#include "memory.hpp"
-#include "kernel/kernel.hpp"
+#include "../tpu.hpp"
+#include "../memory.hpp"
+#include "../kernel/kernel.hpp"
 
 constexpr bool getParity(u32 n) {
     bool parity = false;
