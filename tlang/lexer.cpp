@@ -91,7 +91,26 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
         }
 
         // int/float literals (cannot start with a decimal/period!!)
-        if (std::isdigit(line[i])) {
+        if (line.find("0x") == i || line.find("0b") == i) {
+            const bool isHex = line[i+1] == 'x';
+            // parse hex/binary literal
+            TokenType tokenType = TokenType::LIT_INT;
+            i += 2;
+            buffer = line[i];
+            while (++i < lineLen && std::isxdigit(line[i])) {
+                buffer.push_back(line[i]);
+            }
+
+            // rollback iterator if not at end
+            if (i != lineLen) i--;
+
+            // parse the int literal to a string
+            unsigned long long literal = std::stoull(buffer, nullptr, isHex ? 16 : 2);
+
+            // add the token
+            tokens.push_back(Token(err, std::to_string(literal), tokenType));
+            continue;
+        } else if (std::isdigit(line[i])) {
             TokenType tokenType = TokenType::LIT_INT;
             buffer = line[i]; // update buffer
             while (++i < lineLen && (std::isdigit(line[i]) || line[i] == '.')) {
@@ -106,7 +125,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             tokens.push_back(Token(err, buffer, tokenType));
             continue;
         }
-        
+
         // character literals
         if (line[i] == '\'') {
             // look for closing quote
