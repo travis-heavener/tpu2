@@ -24,7 +24,7 @@ $(TCC): $(TCC_DEPS)
 	@echo -n "Building TCC (T compiler)..."
 	@g++ $(TCC_SRCS) -o $@ $(GPPFLAGS)
 	@if ! [ -L ./tlang/postproc ]; then\
-		ln -sf "$(realpath ${POSTPROC})" ./tlang/postproc;\
+		ln -sf ../build/postproc ./tlang/postproc;\
 	fi
 	@echo " Done."
 
