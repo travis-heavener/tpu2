@@ -83,6 +83,29 @@ int isprint(const char c) {
     return c >= 32 && c <= 126;
 }
 
+/********* BASIC MATH FUNCTIONS *********/
+
+int min(const int A, const int B) {
+    if (A < B) {
+        return A;
+    }
+    return B;
+}
+
+int max(const int A, const int B) {
+    if (A > B) {
+        return A;
+    }
+    return B;
+}
+
+int abs(const int A) {
+    if (A < 0) {
+        return -A;
+    }
+    return A;
+}
+
 /********* TYPE CASTING FUNCTIONS *********/
 
 // Converts a string to an integer, or 0 if the conversion failed.
@@ -113,17 +136,17 @@ int atoi(const char* str) {
 // Converts an integer to a string.
 const char* itoa(const int n) {
     // count places of ten
-    int len = 1 + (n < 0); // add space for null byte
+    int len = 1 + (n < 0);
     int tempNum = n;
     while (tempNum = tempNum / 10) {
         len = len + 1;
     }
 
     // allocate string (with space for null terminator)
-    char* str = malloc(sizeof(char) * len);
+    char* str = malloc(sizeof(char) * (len+1));
 
     // write the entire string
-    int i;
+    int i = 0;
     tempNum = n;
     for (i = len; i >= 0; i = i - 1) {
         if (i == 0 && n < 0) {
@@ -131,12 +154,8 @@ const char* itoa(const int n) {
         } else if (i == len) {
             str[i] = '\0';
         } else {
-            str[i] = (unsigned int)(tempNum % 10) + '0';
+            str[i] = abs(tempNum % 10) + '0';
             tempNum = tempNum / 10;
-        }
-
-        if (i == 0) {
-            return str;
         }
     }
 

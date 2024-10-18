@@ -396,6 +396,14 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     if (typeA.isPointer()) pA->setType( MEM_ADDR_TYPE );
                     if (typeB.isPointer()) pB->setType( MEM_ADDR_TYPE );
 
+                    // if one is unsigned and the other isn't, make both
+                    if (typeA.isUnsigned() != typeB.isUnsigned()) {
+                        if (typeA.isUnsigned())
+                            pB->getTypeRef().setIsUnsigned(true);
+                        else
+                            pA->getTypeRef().setIsUnsigned(true);
+                    }
+
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );
                 } else { // one is a pointer
@@ -430,6 +438,14 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 } else {
                     // assume dominant type
                     this->setType( getDominantType(typeA, typeB) );
+
+                    // if one is unsigned and the other isn't, make both
+                    if (!typeA.isPointer() && !typeB.isPointer() && typeA.isUnsigned() != typeB.isUnsigned()) {
+                        if (typeA.isUnsigned())
+                            pB->getTypeRef().setIsUnsigned(true);
+                        else
+                            pA->getTypeRef().setIsUnsigned(true);
+                    }
                 }
 
                 // revoke lvalue status from children
@@ -452,9 +468,22 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // take size of boolean
                 this->setType( Type(TokenType::TYPE_BOOL) );
 
+                // if one is unsigned and the other isn't, make both
+                if (!typeA.isPointer() && !typeB.isPointer() && typeA.isUnsigned() != typeB.isUnsigned()) {
+                    if (typeA.isUnsigned())
+                        pB->getTypeRef().setIsUnsigned(true);
+                    else
+                        pA->getTypeRef().setIsUnsigned(true);
+                }
+
                 // revoke lvalue status from children
                 pA->setIsLValue(false);
                 pB->setIsLValue(false);
+
+                // force A and B to be the same type
+                Type domType = getDominantType(pA->getTypeRef(), pB->getTypeRef());
+                pA->setType(domType);
+                pB->setType(domType);
                 break;
             }
             case TokenType::OP_LSHIFT: case TokenType::OP_RSHIFT: {
@@ -468,7 +497,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
 
                 // take left type
                 this->setType( typeA );
-                
+
                 // revoke lvalue status from children
                 pA->setIsLValue(false);
                 pB->setIsLValue(false);

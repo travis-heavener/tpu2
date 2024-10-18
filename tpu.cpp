@@ -2,6 +2,7 @@
 #include <thread>
 #include <iostream>
 #include <string>
+#include <random>
 
 #include "tpu.hpp"
 #include "instructions.hpp"

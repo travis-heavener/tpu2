@@ -78,15 +78,15 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN && returnSize > 0)
         OUT << "add SP, " << returnSize << '\n';
 
-    // add function args to scope (args on top of stack below return bytes)
+    // add return bytes to scope
+    if (funcNode.getReturnType().getSizeBytes() > 0)
+        scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
+
+    // add function args to scope (args on top of stack just above return bytes)
     for (size_t i = 0; i < funcNode.getNumParams(); ++i) { // add the variable to the scope
         ASTFuncParam* pArg = funcNode.paramAt(i);
         scope.declareFunctionParam(pArg->type, pArg->name, funcNode.err);
     }
-
-    // add return bytes to scope
-    if (funcNode.getReturnType().getSizeBytes() > 0)
-        scope.declareVariable(funcNode.getReturnType(), SCOPE_RETURN_START, funcNode.err);
 
     // assemble body content
     bool hasReturned = assembleBody(&funcNode, outHandle, scope, asmFunc, true);
@@ -346,7 +346,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
             for (const Type& t : asmFunc.getParamTypes())
                 argSizes += t.getSizeBytes();
 
-            long long popSize = scope.size() - returnSize - argSizes;
+            long long popSize = scope.size() - returnSize - argSizes; // argSizes popped by caller
 
             if (popSize > 0) OUT << "sub SP, " << popSize << '\n';
         }
@@ -368,6 +368,50 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
     // get desired expression type
     const Type desiredType = static_cast<ASTTypedNode*>(&bodyNode)->getType();
+
+    // if this node is a function call, allocate return bytes below args
+    if (bodyNode.getNodeType() == ASTNodeType::FUNCTION_CALL) {
+        ASTFunctionCall& func = *static_cast<ASTFunctionCall*>(&bodyNode);
+        const std::string& funcName = func.raw;
+
+        // find function and verify parameters match
+        AssembledFunc* pDestFunc = nullptr;
+        const size_t numParams = func.size();
+        auto [itr, end] = labelMap.equal_range(funcName);
+        for ((void)itr; itr != end; ++itr) {
+            // check if parameters match
+            const std::vector<Type>& paramTypes = itr->second.getParamTypes();
+            if (paramTypes.size() != func.size()) continue;
+
+            size_t j;
+            for (j = 0; j < numParams; ++j) {
+                const Type& actualType = static_cast<ASTTypedNode*>(func.at(j))->getTypeRef();
+                if (paramTypes[j].isParamMatch(actualType, func.at(j)->err) == TYPE_PARAM_MISMATCH) break;
+            }
+
+            // if broken prematurely, a type didn't match
+            if (j == numParams) {
+                pDestFunc = &itr->second;
+                break;
+            }
+        }
+
+        if (pDestFunc == nullptr)
+            throw TUnknownIdentifierException(bodyNode.err);
+
+        // allocate space on the stack for return bytes
+        size_t returnSize = pDestFunc->getReturnType().getSizeBytes();
+
+        for (size_t i = 0; i < returnSize; i++) {
+            if (i+1 < returnSize) {
+                OUT << "pushw 0\n";
+                ++i;
+            } else {
+                OUT << "push 0\n";
+            }
+        }
+        scope.addPlaceholder(returnSize);
+    }
 
     // recurse this expression's children, bottom-up
     size_t numChildren = bodyNode.size();
@@ -562,31 +606,39 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 case TokenType::OP_ADD: case TokenType::OP_SUB: { // add/sub AX/AL to/from BX/BL
                     // handle pointer arithmetic
                     Type typeA = resultTypes[0], typeB = resultTypes[1];
-                    
+                    const bool isUnsigned = typeA.isUnsigned() || typeB.isUnsigned();
+
                     if (typeA.isPointer()) {
                         typeA.popPointer(); // get internal size, also removes forced ptr status for accurate size
                         const size_t chunkSize = typeA.getSizeBytes();
 
                         // mul needs AX register, so move it temporarily (don't need to do scope.pop/addPlaceholder)
-                        OUT << "pushw AX\n";
-                        OUT << "movw AX, " << chunkSize << '\n';
-                        OUT << "mul BX\n"; // other operand is in BX already
-                        OUT << "movw BX, AX\n"; // save new operand
-                        OUT << "popw AX\n"; // move AX back
+                        if (chunkSize > 0) {
+                            OUT << "pushw AX\n";
+                            OUT << "movw AX, " << chunkSize << '\n';
+                            OUT << "mul BX\n"; // other operand is in BX already
+                            OUT << "movw BX, AX\n"; // save new operand
+                            OUT << "popw AX\n"; // move AX back
+                        }
                     } else if (typeB.isPointer()) {
                         typeB.popPointer(); // get internal size, also removes forced ptr status for accurate size
                         const size_t chunkSize = typeB.getSizeBytes();
 
                         // operand already in AX; move chunk size into CX
-                        OUT << "movw CX, " << chunkSize << '\n';
-                        OUT << "mul CX\n"; // other operand is in BX already
+                        if (chunkSize > 0) {
+                            OUT << "movw CX, " << chunkSize << '\n';
+                            OUT << "mul CX\n"; // other operand is in BX already
+                        }
                     }
 
                     // perform add or sub
-                    if (opType == TokenType::OP_ADD)
-                        OUT_BIN_OP_2(add);
-                    else
-                        OUT_BIN_OP_2(sub);
+                    if (isUnsigned) {
+                        if (opType == TokenType::OP_ADD) OUT_BIN_OP_2(add);
+                        else OUT_BIN_OP_2(sub);
+                    } else {
+                        if (opType == TokenType::OP_ADD) OUT_BIN_OP_2(sadd);
+                        else OUT_BIN_OP_2(ssub);
+                    }
 
                     // push result to stack (lowest-first)
                     if (opType == TokenType::OP_MOD) // uses AX as result and DX as remainder in 16-bit mode
@@ -601,15 +653,30 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 }
                 case TokenType::ASTERISK: case TokenType::OP_DIV: case TokenType::OP_MOD:
                 case TokenType::OP_BIT_OR: case TokenType::AMPERSAND: case TokenType::OP_BIT_XOR: {
+                    Type typeA = resultTypes[0], typeB = resultTypes[1];
+                    const bool isUnsigned = typeA.isUnsigned() || typeB.isUnsigned();
+
                     // all use similar/the same process, so combined them here
-                    switch (opType) {
-                        case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break; // mul AX/AL by BX/BL
-                        case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break; // div AX/AL by BX/BL
-                        case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break; // mod AX/AL by BX/BL
-                        case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break; // bitwise or
-                        case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break; // bitwise and
-                        case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break; // bitwise xor
-                        default: break; // doesn't get here
+                    if (isUnsigned) {
+                        switch (opType) {
+                            case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break; // mul AX/AL by BX/BL
+                            case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break; // div AX/AL by BX/BL
+                            case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break; // mod AX/AL by BX/BL
+                            case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break; // bitwise or
+                            case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break; // bitwise and
+                            case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break; // bitwise xor
+                            default: break; // doesn't get here
+                        }
+                    } else {
+                        switch (opType) {
+                            case TokenType::ASTERISK:   OUT_BIN_OP_1B(smul); break; // mul AX/AL by BX/BL
+                            case TokenType::OP_DIV:     OUT_BIN_OP_1B(sdiv); break; // div AX/AL by BX/BL
+                            case TokenType::OP_MOD:     OUT_BIN_OP_1B(sdiv); break; // mod AX/AL by BX/BL
+                            case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break; // bitwise or
+                            case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break; // bitwise and
+                            case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break; // bitwise xor
+                            default: break; // doesn't get here
+                        }
                     }
 
                     // push result to stack (lowest-first)
@@ -617,6 +684,16 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         OUT << (dominantSize == 2 ? "pushw DX\n" : "push AH\n");
                     else
                         OUT << (dominantSize == 2 ? "pushw AX\n" : "push AL\n");
+
+                    // get the sign from DH for 16-bit mult
+                    if (opType == TokenType::ASTERISK && dominantSize == 2 && !isUnsigned) {
+                        // grab sign from DH
+                        OUT << "pop CH\n";
+                        OUT << "mov CL, DH\n";
+                        OUT << "and CL, 128\n";
+                        OUT << "or CH, CL\n";
+                        OUT << "push CH\n";
+                    }
 
                     // record push
                     scope.addPlaceholder(dominantSize);
@@ -669,10 +746,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::OP_EQ: {
-                    // if A ^ B is zero, equal
+                    // if ZF is set, equal
                     const std::string labelEQ = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    OUT << "xor " << regA << ", " << regB << '\n';
+                    OUT << "cmp " << regA << ", " << regB << '\n';
 
                     OUT << "jz " << labelEQ << '\n';
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // non-zero becomes 0
@@ -704,13 +781,13 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::OP_LT: {
-                    // if A < B, B-A will have carry and zero cleared
-                    OUT << "sub " << regB << ", " << regA << '\n';
+                    // if A < B, CF will be set
+                    const bool isUnsigned = resultTypes[0].isUnsigned() || resultTypes[1].isUnsigned();
+                    OUT << (isUnsigned ? "cmp " : "scmp ") << regA << ", " << regB << '\n';
 
                     const std::string labelGTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    OUT << "jz " << labelGTE << '\n'; // zero is set, A == B
-                    OUT << "jc " << labelGTE << '\n'; // carry is set, A > B
+                    OUT << "jnc " << labelGTE << '\n';
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
                     else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
@@ -726,16 +803,17 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::OP_GT: {
-                    // if A > B, A-B will have carry and zero cleared
-                    OUT << "sub " << regA << ", " << regB << '\n';
+                    // if A > B, CF will be set
+                    const bool isUnsigned = resultTypes[0].isUnsigned() || resultTypes[1].isUnsigned();
+                    OUT << (isUnsigned ? "cmp " : "scmp ") << regB << ", " << regA << '\n';
 
                     const std::string labelLTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    OUT << "jz " << labelLTE << '\n'; // zero is set, A == B
-                    OUT << "jc " << labelLTE << '\n'; // carry is set, A > B
+                    OUT << "jnc " << labelLTE << '\n';
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
                     else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
+
                     OUT << labelLTE << ":\n"; // set regA to 0
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
                     else                OUT << "mov " << regA << ", 0\n";
@@ -747,18 +825,20 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::OP_LTE: {
-                    // if A <= B, B-A will have carry cleared
-                    OUT << "sub " << regB << ", " << regA << '\n';
+                    // if A > B, CF will be set
+                    const bool isUnsigned = resultTypes[0].isUnsigned() || resultTypes[1].isUnsigned();
+                    OUT << (isUnsigned ? "cmp " : "scmp ") << regB << ", " << regA << '\n';
 
-                    const std::string labelGT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelLTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    OUT << "jc " << labelGT << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jnc " << labelLTE << '\n';
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // set regA to 0
+                    else                OUT << "mov " << regA << ", 0\n"; // set regA to 0
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    OUT << labelGT << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // set regA to 1
-                    else                OUT << "mov " << regA << ", 0\n"; // set regA to 1
+
+                    OUT << labelLTE << ":\n"; // set regA to 1
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
+                    else                OUT << "mov " << regA << ", 1\n";
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
@@ -767,18 +847,20 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::OP_GTE: {
-                    // if A >= B, A-B will have carry cleared
-                    OUT << "sub " << regA << ", " << regB << '\n';
+                    // if A < B, CF will be set
+                    const bool isUnsigned = resultTypes[0].isUnsigned() || resultTypes[1].isUnsigned();
+                    OUT << (isUnsigned ? "cmp " : "scmp ") << regA << ", " << regB << '\n';
 
-                    const std::string labelLT = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
+                    const std::string labelGTE = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                     const std::string labelMerger = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-                    OUT << "jc " << labelLT << '\n'; // carry is set, A > B
-                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // set regA to 1
-                    else                OUT << "mov " << regA << ", 1\n"; // set regA to 1
+                    OUT << "jnc " << labelGTE << '\n';
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n"; // set regA to 0
+                    else                OUT << "mov " << regA << ", 0\n"; // set regA to 0
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
-                    OUT << labelLT << ":\n"; // set regA to 0
-                    if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
-                    else                OUT << "mov " << regA << ", 0\n";
+
+                    OUT << labelGTE << ":\n"; // set regA to 1
+                    if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
+                    else                OUT << "mov " << regA << ", 1\n";
                     OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
@@ -807,7 +889,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         OUT << "mov [BP+0], BL" << '\n';
                         OUT << "mov [BP+1], BH" << '\n';
                     } else {
-                        OUT << "mov [BP-0], BL" << '\n';
+                        OUT << "mov [BP+0], BL" << '\n';
                     }
 
                     // push the value of the variable onto the stack (lowest-first)
@@ -963,21 +1045,18 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             if (pDestFunc == nullptr)
                 throw TUnknownIdentifierException(bodyNode.err);
 
-            // allocate space on the stack for return bytes
-            size_t returnSize = pDestFunc->getReturnType().getSizeBytes();
-
-            for (size_t i = 0; i < returnSize; i++) {
-                if (i+1 < returnSize) {
-                    OUT << "pushw 0\n";
-                    ++i;
-                } else {
-                    OUT << "push 0\n";
-                }
-            }
-            scope.addPlaceholder(returnSize);
-
             // call the function
             OUT << "call " << pDestFunc->getStartLabel() << '\n';
+
+            // pop args off stack after
+            size_t paramTotalSize = 0;
+            for (size_t j = 0; j < numParams; ++j) {
+                paramTotalSize += resultTypes[j].getSizeBytes();
+            }
+            if (paramTotalSize > 0) {
+                OUT << "sub SP, " << paramTotalSize << '\n';
+                scope.pop(paramTotalSize);
+            }
             resultType = pDestFunc->getReturnType();
             break;
         }
@@ -1104,7 +1183,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
                 OUT << "mul BX\n"; // scale by chunk size
             }
-            OUT << "add CX, AX\n"; // add the chunk to the pointer
+            OUT << (resultType.isUnsigned() ? "add" : "sadd") << " CX, AX\n"; // add the chunk to the pointer
             OUT << "pushw CX\n"; // put address back onto stack
             scope.pop(2); // 4 pops - 2 pushes = 2 net pops
         }
