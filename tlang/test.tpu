@@ -47,7 +47,6 @@ __UF0:
     pop DL
     mov [SP-6], DL
     sub SP, 2
-    jmp __UF0E
     __UF0E:
     ret
 __UF1:
@@ -61,7 +60,6 @@ __UF1:
     mov [SP-4], DL
     pop DL
     mov [SP-4], DL
-    jmp __UF1E
     __UF1E:
     ret
 __UF2:
@@ -117,7 +115,6 @@ __UF2:
     mov [SP-3], DL
     pop DL
     mov [SP-3], DL
-    jmp __UF2E
     __UF2E:
     ret
 __UF3:
@@ -146,14 +143,12 @@ __UF3:
     pop DL
     mov [SP-4], DL
     jmp __UF3E
-    jmp __J10
     __J10:
     push [SP-2]
     mov DL, [SP-2]
     mov [SP-4], DL
     pop DL
     mov [SP-4], DL
-    jmp __UF3E
     __UF3E:
     ret
 _main:
@@ -168,7 +163,6 @@ _main:
     pop DL
     mov [SP-4], DL
     sub SP, 2
-    jmp _mainE
     _mainE:
     movw AX, 0x03
     popw BX

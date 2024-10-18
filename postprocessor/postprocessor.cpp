@@ -257,6 +257,23 @@ int main(int argc, char* argv[]) {
                 strippedLine = strippedLineBuf;
                 continue; // skip reading another line
             }
+        } else if (strippedLine.find("jmp ") == 0) {
+            // check for the desired label immediately after this
+            const std::string labelName = strippedLine.substr(4);
+
+            // check next instruction
+            std::string lineBuf, strippedLineBuf;
+            readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
+
+            // the label is not declared right on the next line, so write this line
+            if (strippedLineBuf != labelName + ':') {
+                writeInstruction(opts, outHandle, line, strippedLine);
+            }
+
+            // regardless, write the next line
+            line = lineBuf;
+            strippedLine = strippedLineBuf;
+            continue; // skip reading another line
         } else {
             // write instruction as usual
             writeInstruction(opts, outHandle, line, strippedLine);
