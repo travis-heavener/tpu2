@@ -20,7 +20,6 @@ __UF0:
     xor AL, BL
     jz __J2
     mov AL, 1
-    jmp __J2
     __J2:
     xor AH, AH
     buf AX
@@ -49,7 +48,6 @@ __UF0:
     mov [SP-6], DL
     sub SP, 2
     jmp __UF0E
-    jmp __UF0E
     __UF0E:
     ret
 __UF1:
@@ -63,7 +61,6 @@ __UF1:
     mov [SP-4], DL
     pop DL
     mov [SP-4], DL
-    jmp __UF1E
     jmp __UF1E
     __UF1E:
     ret
@@ -79,7 +76,6 @@ __UF2:
     jmp __J4
     __J3:
     mov AL, 1
-    jmp __J4
     __J4:
     push AL
     push [SP-2]
@@ -93,7 +89,6 @@ __UF2:
     jmp __J6
     __J5:
     mov AL, 1
-    jmp __J6
     __J6:
     mov BL, AL
     xor BH, BH
@@ -102,12 +97,10 @@ __UF2:
     or AL, 0
     jz __J7
     mov AL, 1
-    jmp __J7
     __J7:
     or BL, 0
     jz __J8
     mov BL, 1
-    jmp __J8
     __J8:
     and AL, BL
     push AL
@@ -117,7 +110,6 @@ __UF2:
     buf AL
     jz __J9
     movw CX, 0xFFFF
-    jmp __J9
     __J9:
     mov BL, CL
     or BL, AL
@@ -125,7 +117,6 @@ __UF2:
     mov [SP-3], DL
     pop DL
     mov [SP-3], DL
-    jmp __UF2E
     jmp __UF2E
     __UF2E:
     ret
@@ -140,7 +131,6 @@ __UF3:
     jmp __J12
     __J11:
     movw AX, 0
-    jmp __J12
     __J12:
     xor AH, AH
     buf AX
@@ -164,7 +154,6 @@ __UF3:
     pop DL
     mov [SP-4], DL
     jmp __UF3E
-    jmp __UF3E
     __UF3E:
     ret
 _main:
@@ -179,7 +168,6 @@ _main:
     pop DL
     mov [SP-4], DL
     sub SP, 2
-    jmp _mainE
     jmp _mainE
     _mainE:
     movw AX, 0x03

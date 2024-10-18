@@ -94,7 +94,6 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     // declare end of function label
     if (!hasReturned && returnSize > 0)
         throw TMissingReturnException(funcNode.err);
-    OUT << "jmp " << asmFunc.getEndLabel() << '\n';
 
     // write return label
     OUT << asmFunc.getEndLabel() << ":\n";
@@ -484,7 +483,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                     OUT << labelZero << ":\n"; // currently zero, set to 1
                     OUT << (regA[1] == 'X' ? "movw " : "mov ") << regA << ", 1\n";
-                    OUT << "jmp " << labelMerge << '\n'; // reconvene branches
                     OUT << labelMerge << ":\n"; // reconvene branches
 
                     // push values to stack
@@ -708,7 +706,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << "jz " << labelName << '\n'; // skip over assignment to 1
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
                     else                OUT << "mov " << regA << ", 1\n";
-                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
                     OUT << labelName << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -723,7 +720,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << "jz " << labelName << '\n'; // skip over assignment to 1
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
                     else                OUT << "mov " << regA << ", 1\n";
-                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
                     OUT << labelName << ":\n"; // reconvene with other branch
 
                     // put 0 into regB if zero, 1 otherwise
@@ -735,7 +731,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         OUT << "movw " << regB << ", 1\n";
                     else
                         OUT << "mov " << regB << ", 1\n";
-                    OUT << "jmp " << labelName << '\n'; // reconvene with other branch
                     OUT << labelName << ":\n"; // reconvene with other branch
 
                     // push regA & regB (0b0 & 0b1 or some combination)
@@ -773,7 +768,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << "jz " << labelMerger << '\n';
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n"; // non-zero becomes 1
                     else                OUT << "mov " << regA << ", 1\n"; // non-zero becomes 1
-                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -795,7 +789,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << labelGTE << ":\n"; // set regA to 0
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
                     else                OUT << "mov " << regA << ", 0\n";
-                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     /// push result to stack (lowest-first)
@@ -817,7 +810,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << labelLTE << ":\n"; // set regA to 0
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 0\n";
                     else                OUT << "mov " << regA << ", 0\n";
-                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -839,7 +831,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << labelLTE << ":\n"; // set regA to 1
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
                     else                OUT << "mov " << regA << ", 1\n";
-                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -861,7 +852,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     OUT << labelGTE << ":\n"; // set regA to 1
                     if (regA[1] == 'X') OUT << "movw " << regA << ", 1\n";
                     else                OUT << "mov " << regA << ", 1\n";
-                    OUT << "jmp " << labelMerger << '\n'; // reconvene with other branch
                     OUT << labelMerger << ":\n"; // reconvene with other branch
 
                     // push result to stack (lowest-first)
@@ -1286,7 +1276,6 @@ void implicitCast(std::ofstream& outHandle, Type resultType, Type desiredType, S
                 const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
                 OUT << "jz " << mergeLabel << '\n';
                 OUT << (startSize == 2 ? "movw AX" : "mov AL") << ", 1\n";
-                OUT << "jmp " << mergeLabel << '\n';
                 OUT << mergeLabel << ":\n";
                 OUT << (startSize == 2 ? "pushw AX" : "push AL") << '\n';
             }
@@ -1305,7 +1294,6 @@ void implicitCast(std::ofstream& outHandle, Type resultType, Type desiredType, S
                     OUT << "buf AL\n";
                     OUT << "jz " << mergeLabel << '\n';
                     OUT << "movw CX, 0xFFFF\n"; // set CX to 1
-                    OUT << "jmp " << mergeLabel << '\n';
                     OUT << mergeLabel << ":\n";
                 }
 
