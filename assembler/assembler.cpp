@@ -92,9 +92,11 @@ int main(int argc, char* argv[]) {
     Memory programMemory;
     const std::string inPath( argv[1] );
 
-    u16 textStart = 0, dataStart = 0;
-    u16 requiredSizeBytes = loadFileToMemory(inPath, programMemory, textStart, dataStart);
-    u16 requiredSectorSize = requiredSizeBytes + (SECTOR_SIZE - (requiredSizeBytes % SECTOR_SIZE));
+    u16 textSize = 0, dataSize = 0;
+    u16 requiredSizeBytes = loadFileToMemory(inPath, programMemory, textSize, dataSize);
+
+    // add space for text start addr
+    u16 requiredSectorSize = requiredSizeBytes + (SECTOR_SIZE - ((requiredSizeBytes+2) % SECTOR_SIZE));
 
     // load the disk image to memory (it's 64 KiB so it has a negligible memory footprint :D)
     Memory image;
@@ -128,21 +130,19 @@ int main(int argc, char* argv[]) {
     }
 
     // starting at the free sector, move the program onto the disk
-    // first two bytes mark where the .text section starts
+    // first two bytes mark how long .data is
     pos = sectorStart;
-    image[pos++] = textStart & 0xFF; // lower-half of address
-    image[pos++] = (textStart >> 8) & 0xFF; // upper-half of address
-    
+    image[pos++] = (dataSize) & 0xFF; // lower-half of size
+    image[pos++] = ((dataSize) >> 8) & 0xFF; // upper-half of size
+
     // write data section
-    const u16 dataSectionSize = (dataStart > textStart) ? (requiredSizeBytes - dataStart) : (textStart - dataStart);
-    for (u16 i = 0; i < dataSectionSize; ++i) {
-        image[pos++] = programMemory[dataStart + i].getValue();
+    for (u16 i = 0; i < dataSize; ++i) {
+        image[pos++] = programMemory[DATA_LOWER_ADDR + i].getValue();
     }
 
-    // write text section
-    const u16 textSectionSize = requiredSizeBytes - textStart;
-    for (u16 i = 0; i < textSectionSize; ++i) {
-        image[pos++] = programMemory[textStart + i].getValue();
+    // write text section (starts at 0)
+    for (u16 i = 0; i < textSize; ++i) {
+        image[pos++] = programMemory[i].getValue();
     }
 
     // reopen drive file to overwrite in place

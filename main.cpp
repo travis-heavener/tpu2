@@ -34,29 +34,24 @@ void loadProgramFromImage(const std::string& imagePath, TPU& tpu, Memory& memory
 
     // write jump instruction from start of sector
     const u16 startPos = 128;
-    u32 pos = startPos;
-    const u16 partitionSize = 2048;
-    imageHandle.seekg(pos, std::ios::beg);
+    const u16 partitionSize = RESERVED_UPPER_ADDR - RESERVED_LOWER_ADDR - 2; // 2 bytes' space for data section size
+    imageHandle.seekg(startPos, std::ios::beg);
     
-    u16 textStartAddr = imageHandle.get();
-    textStartAddr |= ((u16)imageHandle.get() << 8);
-    memory[RESERVED_LOWER_ADDR] = OPCode::JMP; // JMP instruction
-    memory[RESERVED_LOWER_ADDR+1] = 0; // MOD byte
-    memory[RESERVED_LOWER_ADDR+2] = textStartAddr & 0xFF; // lower-half of address
-    memory[RESERVED_LOWER_ADDR+3] = (textStartAddr >> 8) & 0xFF; // upper-half of address
-    pos += 2;
+    u16 dataSectionSize = imageHandle.get();
+    dataSectionSize |= ((u16)imageHandle.get()) << 8;
+    const u16 textSectionSize = partitionSize - dataSectionSize;
 
     // write .data section
-    for (u16 i = 0; pos < textStartAddr; ++i, ++pos) {
+    for (u16 i = 0; i < dataSectionSize; ++i) {
         memory[DATA_LOWER_ADDR + i] = imageHandle.get();
     }
 
     // write .text section
-    for (u16 i = 0; pos < partitionSize + startPos; ++i, ++pos) {
+    for (u16 i = 0; i < textSectionSize; ++i) {
         memory[RESERVED_LOWER_ADDR + i] = imageHandle.get();
     }
 
-    // move the IP to the start of the reserved pool
+    // move the IP to the start of reserved memory
     tpu.moveToRegister(Register::IP, RESERVED_LOWER_ADDR);
 
     // close the file
