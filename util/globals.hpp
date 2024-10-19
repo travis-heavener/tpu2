@@ -38,6 +38,7 @@
 #define RESERVED_LOWER_ADDR   0x0000
 #define RESERVED_UPPER_ADDR   0x07FF
 #define PROGRAM_INDEX         RESERVED_UPPER_ADDR - 1
+#define MAX_OS_IMAGE_SIZE     0x0700 // 1.75KiB for the OS & kernel
 
 // allocate 2KiB for callstack
 #define CALLSTACK_LOWER_ADDR  0x0800

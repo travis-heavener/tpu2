@@ -34,7 +34,7 @@ void loadProgramFromImage(const std::string& imagePath, TPU& tpu, Memory& memory
 
     // write jump instruction from start of sector
     const u16 startPos = 128;
-    const u16 partitionSize = RESERVED_UPPER_ADDR - RESERVED_LOWER_ADDR - 2; // 2 bytes' space for data section size
+    const u16 partitionSize = MAX_OS_IMAGE_SIZE;
     imageHandle.seekg(startPos, std::ios::beg);
     
     u16 dataSectionSize = imageHandle.get();
