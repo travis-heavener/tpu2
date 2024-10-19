@@ -9,12 +9,14 @@
  * 
  * @author Travis Heavener
  * 
- * This program is used to load a specific .TPU program and generate its binary program, acting as the assembler.
+ * This program is used to load a specific .TPU program and assemble it to the given disk image.
  * 
  * These 64 KiB drives are composed of a reserved 128 bytes at the start, where each bit corresponds to whether or not the
  * corresponding sector from the other 1022 sectors (each 64 bytes) is free (0 is free, 1 is reserved).
  * 
- * The first two bytes of a binary indicate where the start of .text is (a jmp instruction to the main entry point).
+ * The first two bytes of a program stored on the disk indicate the address of the start of the .text section.
+ * The first instruction of .text is a jmp instruction to the main entry point of the program.
+ * 
  * Everything from byte #3 to byte N-1 (where byte N is the aforementioned jmp) is reserved for .data, which always has the same
  * addressing system across all programs (allowing .data addresses to be determined at assemble-time).
  * 

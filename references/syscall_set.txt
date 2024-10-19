@@ -7,3 +7,4 @@ SYSCALL CODE            COMMENTS
 0x04                    Invokes the kernel dynamic heap memory allocation function, taking the desired size in CX and returning the address of allocation in DX.
 0x05                    Invokes the kernel dynamic heap memory reallocation function, taking the existing heap allocation address in BX and the new desired size in CX, returning the address of allocation in DX.
 0x06                    Invokes the kernel dynamic heap memory deallocation function, taking the existing heap allocation address in BX.
+0x07                    Sets the addressing mode to the value in BL (0 is direct addressing, 1 is relative to the program start address stored in the first two bytes of memory).

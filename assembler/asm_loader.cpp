@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "../util/globals.hpp"
 #include "asm_loader.hpp"
 #include "../memory.hpp"
-#include "../tpu.hpp"
 
 // abstractions from processLineToText for readability
 void parseMOV(const std::vector<std::string>&, Memory&, u16&);

@@ -5,30 +5,7 @@
 #include <random>
 
 #include "tpu.hpp"
-#include "assembler/instructions.hpp"
-
-Register getRegisterFromString(const std::string& str) {
-    if (str == "AX") return Register::AX;
-    else if (str == "AL") return Register::AL;
-    else if (str == "AH") return Register::AH;
-    else if (str == "BX") return Register::BX;
-    else if (str == "BL") return Register::BL;
-    else if (str == "BH") return Register::BH;
-    else if (str == "CX") return Register::CX;
-    else if (str == "CL") return Register::CL;
-    else if (str == "CH") return Register::CH;
-    else if (str == "DX") return Register::DX;
-    else if (str == "DL") return Register::DL;
-    else if (str == "DH") return Register::DH;
-    else if (str == "SP") return Register::SP;
-    else if (str == "BP") return Register::BP;
-    else if (str == "SI") return Register::SI;
-    else if (str == "DI") return Register::DI;
-    // else if (str == "IP") return Register::IP; // IGNORE THESE TO PREVENT USER INPUTTING THEM
-    else if (str == "CP") return Register::CP;
-    // else if (str == "FLAGS") return Register::FLAGS; // IGNORE THESE TO PREVENT USER INPUTTING THEM
-    else throw std::invalid_argument("Invalid register name: " + str);
-}
+#include "instructions.hpp"
 
 void TPU::reset() {
     // clear registers
@@ -41,6 +18,9 @@ void TPU::reset() {
 
     // clear flags
     FLAGS = 0x0;
+
+    // default addressing mode
+    addressingMode = ADDRESS_MODE_ABSOLUTE;
 
     // reset halt flag
     __hasSuspended = false;
@@ -186,6 +166,11 @@ void TPU::start(Memory& memory) {
 void TPU::sleep() const {
     const long sleepTime = 1e+6 / this->clockFreq;
     std::this_thread::sleep_for(std::chrono::microseconds( sleepTime ));
+}
+
+u16 TPU::getProgramStartIndex(Memory& memory) const {
+    sleep(); sleep(); // sleep for both memory reads
+    return ((u16)memory[PROGRAM_INDEX+1].getValue() << 8) | memory[PROGRAM_INDEX].getValue();
 }
 
 // update a specific flag

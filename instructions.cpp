@@ -6,9 +6,9 @@
 #include <iostream>
 
 #include "instructions.hpp"
-#include "../tpu.hpp"
-#include "../memory.hpp"
-#include "../kernel/kernel.hpp"
+#include "tpu.hpp"
+#include "memory.hpp"
+#include "kernel/kernel.hpp"
 
 constexpr bool getParity(u32 n) {
     bool parity = false;
@@ -125,6 +125,15 @@ namespace instructions {
                 heapFree( tpu.readRegister16(Register::BX).getValue() );
                 break;
             }
+            case Syscall::ADDR_MODE: {
+                // determine addressing mode from BX
+                const u8 addrMode = tpu.readRegister8(Register::BL).getValue();
+                if (addrMode != ADDRESS_MODE_ABSOLUTE && addrMode != ADDRESS_MODE_RELATIVE) {
+                    throw std::invalid_argument("Invalid addressing mode: " + std::to_string(addrMode));
+                }
+                tpu.setAddressingMode(addrMode);
+                break;
+            }
             default: {
                 throw std::invalid_argument("Invalid syscall code: " + syscallCode);
                 break;
@@ -178,6 +187,10 @@ namespace instructions {
 
         // get operands
         u16 destAddr = tpu.readWord(memory).getValue();
+        if (tpu.getAddressingMode() == ADDRESS_MODE_RELATIVE) {
+            destAddr += tpu.getProgramStartIndex(memory);
+        }
+
         switch (mod.getValue() & 0b111) {
             case 0: { // Moves the instruction pointer to the specified label.
                 tpu.moveToRegister(Register::IP, destAddr);
