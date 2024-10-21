@@ -2,6 +2,7 @@
 #define __GLOBALS_HPP
 
 #include <cstdint>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <sys/stat.h>
