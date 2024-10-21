@@ -1,0 +1,483 @@
+section .text
+__UF0:
+    pushw 0
+    __J0:
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    sadd CX, AX
+    movw BP, CX
+    push [BP+0]
+    mov BL, 0
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    __J2:
+    xor AH, AH
+    buf AX
+    jz __J1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    movw BX, 1
+    popw AX
+    sadd AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __J0
+    __J1:
+    push [SP-2]
+    mov DL, [SP-2]
+    mov [SP-6], DL
+    pop DL
+    mov [SP-6], DL
+    sub SP, 2
+    __UF0E:
+    ret
+__UF1:
+    pushw 0
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    call __UF0
+    sub SP, 2
+    pushw 0
+    movw BP, SP
+    sub BP, 6
+    push [BP+0]
+    push [BP+1]
+    call __UF0
+    sub SP, 2
+    add SP, 2
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    movw BX, 0
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    movw AX, BX
+    buf AX
+    jz __J3
+    movw AX, 1
+    __J3:
+    pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    push BL
+    sub SP, 1
+    __J4:
+    push [SP-2]
+    push [SP-2]
+    push [SP-6]
+    push [SP-6]
+    popw BX
+    popw AX
+    scmp BX, AX
+    jnc __J6
+    movw AX, 0
+    jmp __J7
+    __J6:
+    movw AX, 1
+    __J7:
+    xor AH, AH
+    buf AX
+    jz __J5
+    movw BP, SP
+    sub BP, 10
+    push [BP+0]
+    push [BP+1]
+    push [SP-8]
+    push [SP-8]
+    push [SP-6]
+    push [SP-6]
+    popw BX
+    popw AX
+    sadd AX, BX
+    popw CX
+    sadd CX, AX
+    pushw CX
+    movw BP, SP
+    sub BP, 10
+    push [BP+0]
+    push [BP+1]
+    push [SP-6]
+    push [SP-6]
+    popw AX
+    popw CX
+    sadd CX, AX
+    movw BP, CX
+    mov BL, [BP+0]
+    xor BH, BH
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    push BL
+    sub SP, 1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    movw BX, 1
+    popw AX
+    sadd AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    movw AX, BX
+    buf AX
+    jz __J8
+    movw AX, 1
+    __J8:
+    pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    push BL
+    sub SP, 1
+    jmp __J4
+    __J5:
+    movw BP, SP
+    sub BP, 10
+    push [BP+0]
+    mov DL, [BP+1]
+    mov [SP-12], DL
+    pop DL
+    mov [SP-12], DL
+    sub SP, 6
+    __UF1E:
+    ret
+__UF2:
+    pushw 0
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    call __UF0
+    sub SP, 2
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    movw AX, 0x0
+    syscall
+    sub SP, 2
+    __UF2E:
+    ret
+__UF3:
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    movw CX, 255
+    movw AX, 0x02
+    syscall
+    add SP, 2
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    movw BX, 0
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    movw AX, BX
+    buf AX
+    jz __J9
+    movw AX, 1
+    __J9:
+    pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    push BL
+    sub SP, 1
+    __J10:
+    push [SP-2]
+    push [SP-2]
+    movw BX, 255
+    popw AX
+    scmp AX, BX
+    jnc __J12
+    movw AX, 1
+    jmp __J13
+    __J12:
+    movw AX, 0
+    __J13:
+    xor AH, AH
+    buf AX
+    jz __J11
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    sadd CX, AX
+    movw BP, CX
+    push [BP+0]
+    mov BL, 10
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    cmp AL, BL
+    jz __J15
+    mov AL, 0
+    jmp __J16
+    __J15:
+    mov AL, 1
+    __J16:
+    xor AH, AH
+    buf AX
+    jz __J14
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    sadd CX, AX
+    pushw CX
+    mov BL, 0
+    xor BH, BH
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    push BL
+    sub SP, 1
+    sub SP, 2
+    jmp __UF3E
+    __J14:
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    movw BX, 1
+    popw AX
+    sadd AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    movw AX, BX
+    buf AX
+    jz __J17
+    movw AX, 1
+    __J17:
+    pushw AX
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    push BL
+    sub SP, 1
+    jmp __J10
+    __J11:
+    sub SP, 2
+    __UF3E:
+    ret
+__UF4:
+    movw AX, 0x04
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    syscall
+    pushw DX
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    __UF4E:
+    ret
+__UF5:
+    movw AX, 0x06
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    popw BX
+    syscall
+    __UF5E:
+    ret
+__UF6:
+    push [SP-1]
+    mov BL, 48
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    scmp AL, BL
+    jnc __J18
+    mov AL, 0
+    jmp __J19
+    __J18:
+    mov AL, 1
+    __J19:
+    push AL
+    push [SP-2]
+    mov BL, 57
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    scmp BL, AL
+    jnc __J20
+    mov AL, 0
+    jmp __J21
+    __J20:
+    mov AL, 1
+    __J21:
+    mov BL, AL
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    or AL, 0
+    jz __J22
+    mov AL, 1
+    __J22:
+    or BL, 0
+    jz __J23
+    mov BL, 1
+    __J23:
+    and AL, BL
+    push AL
+    mov AL, [SP-1]
+    and AL, 0x80
+    movw CX, 0
+    buf AL
+    jz __J24
+    movw CX, 0xFFFF
+    __J24:
+    mov BL, CL
+    or BL, AL
+    mov DL, BL
+    mov [SP-3], DL
+    pop DL
+    mov [SP-3], DL
+    __UF6E:
+    ret
+__UF7:
+    push [SP-2]
+    push [SP-2]
+    movw BX, 0
+    popw AX
+    scmp AX, BX
+    jnc __J26
+    movw AX, 1
+    jmp __J27
+    __J26:
+    movw AX, 0
+    __J27:
+    xor AH, AH
+    buf AX
+    jz __J25
+    push [SP-2]
+    push [SP-2]
+    popw AX
+    not AX
+    add AX, 1
+    pushw AX
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    jmp __UF7E
+    __J25:
+    push [SP-2]
+    mov DL, [SP-2]
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    __UF7E:
+    ret
+_main:
+    add SP, 2
+    pushw __US0
+    call __UF2
+    sub SP, 2
+    pushw 0
+    pushw 255
+    call __UF4
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    call __UF3
+    sub SP, 2
+    pushw 0
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    pushw __US1
+    call __UF1
+    sub SP, 4
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    call __UF2
+    sub SP, 2
+    pushw __US2
+    call __UF2
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    call __UF5
+    sub SP, 2
+    pushw 0
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    sub SP, 2
+    _mainE:
+    movw AX, 0x03
+    popw BX
+    syscall
+    hlt
+section .data
+    __US0 .strz "Image loaded.\n"
+    __US1 .strz "\n"
+    __US2 .strz "Shutting down...\n"

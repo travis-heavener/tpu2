@@ -1,0 +1,12 @@
+#!/bin/bash
+cd "$(dirname "$0")"
+cd ..
+
+# rebuild T code
+./build/tcc ./tlang/test.t -f
+
+# reformat drive
+python3 ./os/make_boot_drive.py A
+
+# burn TPU assembly to drive
+./build/assembler ./tlang/test.tpu ./os/A.dsk

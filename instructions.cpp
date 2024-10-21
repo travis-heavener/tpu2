@@ -76,14 +76,13 @@ namespace instructions {
                     initscr();
                 #endif
 
-                // read until length is met
-                while (tpu.readRegister16(Register::SI).getValue() != DI) {
-                    for (u8 i = 0; i < length; i++) {
-                        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-                            memory[tpu.readRegister16(Register::SI)++] = getch();
-                        #else
-                            memory[tpu.readRegister16(Register::SI)++] = getch();
-                        #endif
+                // read until length is met or newline is met
+                bool hasReadNewline = false;
+                while (!hasReadNewline && tpu.readRegister16(Register::SI).getValue() != DI) {
+                    for (u8 i = 0; i < length && !hasReadNewline; i++) {
+                        char lastChar = getch();
+                        if (lastChar == '\n') hasReadNewline = true;
+                        memory[tpu.readRegister16(Register::SI)++] = lastChar;
                     }
                     
                     // sleep between reads

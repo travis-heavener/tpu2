@@ -42,3 +42,9 @@ $(ASSEMBLER): $(ASSEMBLER_DEPS)
 	@echo -n "Building assembler... "
 	@g++ $(ASSEMBLER_SRCS) -o $@ -lncurses $(GPPFLAGS)
 	@echo "Done."
+
+# for remaking the boot image
+image:
+	@./tlang/tcc ./os/os_0.0.1.t -f
+	@python3 ./os/make_boot_drive.py A
+	@./build/assembler ./os/os_0.0.1.tpu ./os/A.dsk
