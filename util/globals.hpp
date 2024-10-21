@@ -10,66 +10,61 @@
  * .--------------.
  * |- Memory Map -|
  * |--------------|
- * | RESERVED     | 0x0000 - 0x07FF (2 KiB)
- * |--------------|
- * | CALLSTACK    | 0x0800 - 0x0FFF (2 KiB)
- * |--------------|
- * | .DATA        | 0x1000 - 0x17FF (2 KiB)
- * |--------------|
  * |              |
- * | .TEXT        | 0x1800 - 0x27FF (4 KiB)
+ * | RESERVED     | 0x0000 - 0x0FFF (4 KiB)
  * |              |
  * |--------------|
+ * | CALLSTACK    | 0x1000 - 0x17FF (2 KiB)
+ * |--------------|
  * |              |
- * | STACK        | 0x2800 - 0x37FF (4 KiB)
+ * | STACK        | 0x1800 - 0x27FF (4 KiB)
  * |              |
  * |--------------|
  * |              |
  * |              |
  * |              |
- * | HEAP         | 0x3800 - 0xFFFF (50 KiB)
+ * | HEAP         | 0x2800 - 0xFFFF (54 KiB)
  * |              |
  * |              |
  * |              |
  * '--------------'
  */
 
-// allocate 2KiB for OS
+// reserve 4 KiB for OS
 #define RESERVED_LOWER_ADDR   0x0000
-#define RESERVED_UPPER_ADDR   0x07FF
+#define RESERVED_UPPER_ADDR   0x0FFF
+#define MAX_OS_IMAGE_SIZE     0x07FF // 2 KiB for the OS & kernel
 #define PROGRAM_INDEX         RESERVED_UPPER_ADDR - 1
-#define MAX_OS_IMAGE_SIZE     0x0700 // 1.75KiB for the OS & kernel
+#define INSTRUCTION_PTR_START RESERVED_LOWER_ADDR
 
 // allocate 2KiB for callstack
-#define CALLSTACK_LOWER_ADDR  0x0800
-#define CALLSTACK_UPPER_ADDR  0x0FFF
-
-// allocate 2KiB for .data section
-#define DATA_LOWER_ADDR       0x1000
-#define DATA_UPPER_ADDR       0x17FF
-
-// allocate 4KiB for .text section
-#define TEXT_LOWER_ADDR       0x1804
-#define TEXT_UPPER_ADDR       0x27FF
-#define INSTRUCTION_PTR_START TEXT_LOWER_ADDR-4 // needs 4 bytes (JMP opcode, MOD byte, lower-addr, upper-addr)
+#define CALLSTACK_LOWER_ADDR  0x1000
+#define CALLSTACK_UPPER_ADDR  0x17FF
 
 // allocate 4KiB for stack
-#define STACK_LOWER_ADDR      0x2800
-#define STACK_UPPER_ADDR      0x37FF
+#define STACK_LOWER_ADDR      0x1800
+#define STACK_UPPER_ADDR      0x27FF
 
 // allocate 50KiB remaining for free use
-#define HEAP_LOWER_ADDR       0x3800
+#define HEAP_LOWER_ADDR       0x2800
 #define HEAP_UPPER_ADDR       0xFFFF
 #define HEAP_SIZE HEAP_UPPER_ADDR - HEAP_LOWER_ADDR + 1
 
 // clock frequency for TPU
-#define CLOCK_FREQ_HZ 5'000
+#define CLOCK_FREQ_HZ   5'000
+#define CYCLE_TIME      1.0d / CLOCK_FREQ_HZ
 
 // addressing mode defines
 #define ADDRESS_MODE_ABSOLUTE 0
 #define ADDRESS_MODE_RELATIVE 1
 
 #define T_NULL 0
+
+// CPI for various instructions
+#define DISK_READ_TIME      1e-5 // response time to read 1 byte from disk (100,000 bytes/sec)
+#define DISK_WRITE_TIME     2e-6 // response time to write 1 byte to disk (20,000 bytes/sec)
+#define CPI_DISK_READ       (u16)ceil((double)DISK_READ_TIME * CLOCK_FREQ_HZ)
+#define CPI_DISK_WRITE      (u16)ceil((double)DISK_WRITE_TIME * CLOCK_FREQ_HZ)
 
 /********************************************************/
 /*                    MACROS & TYPES                    */

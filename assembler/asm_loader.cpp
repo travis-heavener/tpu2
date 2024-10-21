@@ -141,7 +141,7 @@ void loadInstructionArgs(const std::string& line, std::vector<std::string>& args
 }
 
 // responsible for taking a .tpu file and loading it into memory for main
-u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textSize, u16& dataSize) {
+u16 loadFileToMemory(const std::string& path, Memory& memory) {
     // open file
     std::ifstream inHandle(path);
 
@@ -151,11 +151,18 @@ u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textSize, u16
     }
 
     // read each line
+    u16 memIndex = 0;
     std::string line;
     label_map_t labelMap; // label name, start address
     
     // for labels that come after instIndex
     std::vector<std::pair<std::string, u16>> labelsToReplace; // [ label name, replacement start address ]
+
+    // allocate space at the start of .text to jump to the main entry point
+    memory[memIndex++] = OPCode::JMP;
+    memory[memIndex++] = 0; // MOD byte
+    labelsToReplace.push_back({RESERVED_LABEL_MAIN, memIndex}); // add this jmp instruction to labelsToReplace
+    memIndex += 2; // make space for address
 
     int currentSection = SECTION_NONE;
     try {
@@ -169,12 +176,6 @@ u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textSize, u16
                     currentSection = SECTION_DATA;
                 } else if (lineBuf.find(".text") == 8) {
                     currentSection = SECTION_TEXT;
-
-                    // allocate space at the start of .text to jump to the main entry point
-                    memory[textSize++] = OPCode::JMP;
-                    memory[textSize++] = 0; // MOD byte
-                    labelsToReplace.push_back({RESERVED_LABEL_MAIN, textSize}); // add this jmp instruction to labelsToReplace
-                    textSize += 2; // make space for address
                 } else {
                     // invalid section
                     throw std::invalid_argument("Invalid section: " + lineBuf.substr(8));
@@ -185,10 +186,10 @@ u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textSize, u16
             // switch based on the section
             switch (currentSection) {
                 case SECTION_TEXT:
-                    processLineToText(line, memory, textSize, labelMap, labelsToReplace); // process the line
+                    processLineToText(line, memory, memIndex, labelMap, labelsToReplace); // process the line
                     break;
                 case SECTION_DATA:
-                    processLineToData(line, memory, dataSize, labelMap); // process the line
+                    processLineToData(line, memory, memIndex, labelMap); // process the line
                     break;
                 case SECTION_NONE: default:
                     throw std::invalid_argument("Cannot write to this section (use `section .data` or `section .text`).");
@@ -226,11 +227,11 @@ u16 loadFileToMemory(const std::string& path, Memory& memory, u16& textSize, u16
     }
 
     // return the size taken by the binary file
-    return textSize + dataSize;
+    return memIndex;
 }
 
 // process an individual line from .data section and load it into memory
-void processLineToData(std::string& line, Memory& memory, u16& dataSize, label_map_t& labelMap) {
+void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_map_t& labelMap) {
     // normalize formatting
     trimString(line);
 
@@ -266,16 +267,16 @@ void processLineToData(std::string& line, Memory& memory, u16& dataSize, label_m
         escapeString(rawValue);
 
         // insert each character onto the document
-        u16 startIndex = dataSize;
+        u16 startIndex = memIndex;
         for (const char c : rawValue) {
-            memory[DATA_LOWER_ADDR + dataSize++] = (u8)c;
+            memory[memIndex++] = (u8)c;
         }
 
         // add null terminator
-        memory[DATA_LOWER_ADDR + dataSize++] = '\0';
+        memory[memIndex++] = '\0';
 
         // insert into label map
-        labelMap.insert({labelName, Label(dataType, DATA_LOWER_ADDR + startIndex)});
+        labelMap.insert({labelName, Label(dataType, startIndex)});
     } else {
         throw std::invalid_argument("Invalid data type: " + dataType);
     }

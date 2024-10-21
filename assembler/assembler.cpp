@@ -92,11 +92,10 @@ int main(int argc, char* argv[]) {
     Memory programMemory;
     const std::string inPath( argv[1] );
 
-    u16 textSize = 0, dataSize = 0;
-    u16 requiredSizeBytes = loadFileToMemory(inPath, programMemory, textSize, dataSize);
+    u16 requiredSizeBytes = loadFileToMemory(inPath, programMemory);
 
     // add space for text start addr
-    u16 requiredSectorSize = requiredSizeBytes + (SECTOR_SIZE - ((requiredSizeBytes+2) % SECTOR_SIZE));
+    u16 requiredSectorSize = requiredSizeBytes + (SECTOR_SIZE - (requiredSizeBytes % SECTOR_SIZE));
 
     // load the disk image to memory (it's 64 KiB so it has a negligible memory footprint :D)
     Memory image;
@@ -130,18 +129,10 @@ int main(int argc, char* argv[]) {
     }
 
     // starting at the free sector, move the program onto the disk
-    // first two bytes mark how long .data is
     pos = sectorStart;
-    image[pos++] = (dataSize) & 0xFF; // lower-half of size
-    image[pos++] = ((dataSize) >> 8) & 0xFF; // upper-half of size
 
-    // write data section
-    for (u16 i = 0; i < dataSize; ++i) {
-        image[pos++] = programMemory[DATA_LOWER_ADDR + i].getValue();
-    }
-
-    // write text section (starts at 0)
-    for (u16 i = 0; i < textSize; ++i) {
+    // write the program
+    for (u16 i = 0; i < requiredSizeBytes; ++i) {
         image[pos++] = programMemory[i].getValue();
     }
 

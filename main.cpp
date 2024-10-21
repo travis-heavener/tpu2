@@ -24,6 +24,11 @@
  *  clock speed past 1 Mhz will cause the thread to sleep for 0 microseconds (basically not sleeping).
 */
 
+u8 readFileAndSleep(TPU& tpu, std::ifstream& imageHandle) {
+    tpu.sleep(CPI_DISK_READ); // sleep one cycle for every read
+    return (u8)imageHandle.get();
+}
+
 void loadProgramFromImage(const std::string& imagePath, TPU& tpu, Memory& memory) {
     // open the file
     std::ifstream imageHandle(imagePath);
@@ -32,23 +37,13 @@ void loadProgramFromImage(const std::string& imagePath, TPU& tpu, Memory& memory
         exit(1);
     }
 
-    // write jump instruction from start of sector
+    // write the program to memory
     const u16 startPos = 128;
-    const u16 partitionSize = MAX_OS_IMAGE_SIZE;
     imageHandle.seekg(startPos, std::ios::beg);
-    
-    u16 dataSectionSize = imageHandle.get();
-    dataSectionSize |= ((u16)imageHandle.get()) << 8;
-    const u16 textSectionSize = partitionSize - dataSectionSize;
 
-    // write .data section
-    for (u16 i = 0; i < dataSectionSize; ++i) {
-        memory[DATA_LOWER_ADDR + i] = imageHandle.get();
-    }
-
-    // write .text section
-    for (u16 i = 0; i < textSectionSize; ++i) {
-        memory[RESERVED_LOWER_ADDR + i] = imageHandle.get();
+    // write the program itself
+    for (u16 i = 0; i < MAX_OS_IMAGE_SIZE; ++i) {
+        memory[RESERVED_LOWER_ADDR + i] = readFileAndSleep(tpu, imageHandle);
     }
 
     // move the IP to the start of reserved memory

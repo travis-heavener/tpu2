@@ -26,7 +26,7 @@ class Label {
 typedef std::map<std::string, Label> label_map_t;
 
 // responsible for taking a .tpu file and loading it into memory for main
-u16 loadFileToMemory(const std::string&, Memory&, u16&, u16&);
+u16 loadFileToMemory(const std::string&, Memory&);
 
 // process an individual line from .text section and load it into memory
 void processLineToText(std::string&, Memory&, u16&, label_map_t&, std::vector<std::pair<std::string, u16>>&);

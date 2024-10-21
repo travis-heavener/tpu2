@@ -163,9 +163,10 @@ void TPU::start(Memory& memory) {
 }
 
 // thread sleep between cycles
-void TPU::sleep() const {
+void TPU::sleep(int cycles) const {
     const long sleepTime = 1e+6 / this->clockFreq;
-    std::this_thread::sleep_for(std::chrono::microseconds( sleepTime ));
+    for (int i = 0; i < cycles; ++i)
+        std::this_thread::sleep_for(std::chrono::microseconds( sleepTime ));
 }
 
 u16 TPU::getProgramStartIndex(Memory& memory) const {

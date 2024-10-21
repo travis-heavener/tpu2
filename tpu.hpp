@@ -35,7 +35,7 @@ class TPU {
         void reset();
         void execute(Memory&);
         void start(Memory&); // for starting/running the clock
-        void sleep() const;
+        void sleep(int=1) const;
         bool getFlag(u8 flag) const { return (FLAGS.getValue() & (1u << flag)) > 0; };
         void setFlag(u8, bool);
         u8 getAddressingMode() const { return addressingMode; };
