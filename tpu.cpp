@@ -12,7 +12,7 @@ void TPU::reset() {
     AX = BX = CX = DX = BP = SI = DI = 0x0;
 
     // fix instruction ptr and stack ptr
-    IP = INSTRUCTION_PTR_START;
+    IP = RESERVED_LOWER_ADDR;
     SP = STACK_LOWER_ADDR; // grows upwards (away from reserved pool)
     CP = CALLSTACK_LOWER_ADDR; // grows upwards (in reserved pool)
 

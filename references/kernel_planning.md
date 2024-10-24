@@ -1,0 +1,26 @@
+Kernel:
+- Drives
+    - A: boot drive
+        - "Unformatted"
+            - No sector map, addresses are as such:
+                - 0x0000 - 0x0001:   [    2 B]   length of OS program
+                - 0x0002 - 0x0003:   [    2 B]   length of kernel program
+                - 0x0004 - 0x1003:   [  4 KiB]   OS program
+                - 0x1004 - 0x2003:   [  4 KiB]   kernel program 
+                - 0x2004 - 0xAFFF:   [~36 KiB]   OS storage+
+                - 0xB000 - 0xBFFF:   [  4 KiB]   STDIN*
+                - 0xC000 - 0xDFFF:   [  8 KiB]   STDOUT*
+                - 0xE000 - 0xFFFF:   [  8 KiB]   STDERR*
+                - *When a program exits, these files are cleared (ptrs are reset)
+                - +Will be determined later, must include a filesystem & system info
+    - B-Z: free drives
+        - First 128 bytes are for the sector bit map (1022 sectors of 64 bytes)
+-Functions needed:
+    - I/O
+        - readByteFromDrive(char driveLetter, uint_16 address)
+        - writeByteToDrive(char driveLetter, uint_16 address, uint_8 byte)
+    - Memory Allocator (gets to cause seg faults)
+        - malloc(uint_16 size)
+        - realloc(void* addr, uint_16 size)
+        - free(void* addr)
+        - readByte(uint_16 addr)
