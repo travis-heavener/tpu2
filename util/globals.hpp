@@ -24,9 +24,13 @@
  * |              |
  * |              |
  * |              |
- * | HEAP         | 0x2800 - 0xFFFF (54 KiB)
+ * | HEAP         | 0x2800 - 0xCFFF (46 KiB)
  * |              |
  * |              |
+ * |              |
+ * |--------------|
+ * |              |
+ * | FRAME BUFFER | 0xE000 - 0xFFFF (4 KiB)
  * |              |
  * '--------------'
  */
@@ -46,20 +50,30 @@
 #define STACK_LOWER_ADDR      0x1800
 #define STACK_UPPER_ADDR      0x27FF
 
-// allocate 50KiB remaining for free use
+// allocate 46KiB remaining for free use
 #define HEAP_LOWER_ADDR       0x2800
-#define HEAP_UPPER_ADDR       0xFFFF
+#define HEAP_UPPER_ADDR       0xCFFF
 #define HEAP_SIZE HEAP_UPPER_ADDR - HEAP_LOWER_ADDR + 1
 
-// clock frequency for TPU
-#define CLOCK_FREQ_HZ   5'000
-#define CYCLE_TIME      1.0d / CLOCK_FREQ_HZ
+// allocate last 8KiB for frame buffer
+#define FRAME_BUF_LOWER_ADDR  0xE000
+#define FRAME_BUF_UPPER_ADDR  0xFFFF
 
 // addressing mode defines
 #define ADDRESS_MODE_ABSOLUTE 0
 #define ADDRESS_MODE_RELATIVE 1
 
 #define T_NULL 0
+
+// clock frequency for TPU (max safe speed: 1'000'000 Hz (1 MHz))
+#define CLOCK_FREQ_HZ   50'000
+#define CYCLE_TIME      1.0d / CLOCK_FREQ_HZ
+
+// display config
+#define DISPLAY_WIDTH    120
+#define DISPLAY_HEIGHT    88
+#define DISPLAY_FREQ_HZ   30
+#define DISPLAY_BIT_DEPTH  2
 
 // CPI for various instructions
 #define DISK_READ_TIME      1e-5 // response time to read 1 byte from disk (100,000 bytes/sec)

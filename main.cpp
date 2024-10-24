@@ -4,6 +4,7 @@
 #include "util/globals.hpp"
 #include "tpu.hpp"
 #include "memory.hpp"
+#include "display.hpp"
 #include "kernel/kernel.hpp"
 
 /**
@@ -60,7 +61,8 @@ int main(int argc, char* argv[]) {
     }
 
     // initialize the processor & memory
-    TPU tpu(CLOCK_FREQ_HZ);
+    Display display;
+    TPU tpu(CLOCK_FREQ_HZ, display);
     Memory memory;
 
     // load the OS from the disk image

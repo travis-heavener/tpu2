@@ -3,13 +3,14 @@
 
 #include "util/globals.hpp"
 #include "memory.hpp"
+#include "display.hpp"
 
 // the memory module is a continuous max of 64KiB, meaning this emulation does NOT
 // handle segmented memory blocks and thus does not use segment registers
 
 class TPU {
     public:
-        TPU(int clockFreq) : clockFreq(clockFreq) { this->reset(); };
+        TPU(int clockFreq, Display& display) : clockFreq(clockFreq), display(display) { this->reset(); };
         ~TPU() { this->reset(); };
 
         // general purpose registers
@@ -51,6 +52,7 @@ class TPU {
         void setExitCode(u16 code) { this->ES = code; };
     private:
         int clockFreq;
+        Display& display;
         bool __hasSuspended = false; // true when a halt instruction is met
 };
 
