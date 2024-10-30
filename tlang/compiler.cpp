@@ -20,14 +20,14 @@ int main(int argc, char* argv[]) {
     // format: <executable> <input.t>
     if (argc < 2) {
         std::cerr << "Invalid usage, expected: <executable> <input.t>" << std::endl;
-        exit(1);
+        return 1;
     }
 
     // check input file
     const std::string inPath = std::filesystem::canonical(argv[1]).string();
     if (inPath.find(".t", inPath.size()-3) == std::string::npos) {
         std::cerr << "Input file must be a T file (.t extension)!" << std::endl;
-        exit(1);
+        return 1;
     }
 
     // verify input file exists
@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
     std::ifstream inHandle(inPath);
     if (!inHandle.is_open()) {
         std::cerr << "File does not exist: " << inPath << std::endl;
-        exit(1);
+        return 1;
     }
 
     // extract any extra arguments
@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Output file already exists: " << outPath << std::endl;
             inHandle.close();
-            exit(1);
+            return 1;
         }
     }
 
@@ -72,7 +72,7 @@ int main(int argc, char* argv[]) {
     if (!outHandle.is_open()) {
         std::cerr << "Failed to open output file: " << outPath << std::endl;
         inHandle.close();
-        exit(1);
+        return 1;
     }
 
     /********* compilation starts below *********/
