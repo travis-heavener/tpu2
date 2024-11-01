@@ -1,0 +1,211 @@
+section .text
+__UF0:
+    pushw 0
+    __J0:
+    movw BP, SP
+    sub BP, 4
+    push [BP+0]
+    push [BP+1]
+    push [SP-4]
+    push [SP-4]
+    popw AX
+    popw CX
+    sadd CX, AX
+    movw BP, CX
+    push [BP+0]
+    mov BL, 0
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    xor AL, BL
+    jz __J2
+    mov AL, 1
+    __J2:
+    xor AH, AH
+    buf AX
+    jz __J1
+    movw BP, SP
+    sub BP, 2
+    pushw BP
+    push [SP-4]
+    push [SP-4]
+    movw BX, 1
+    popw AX
+    sadd AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    jmp __J0
+    __J1:
+    push [SP-2]
+    mov DL, [SP-2]
+    mov [SP-6], DL
+    pop DL
+    mov [SP-6], DL
+    sub SP, 2
+    __UF0E:
+    ret
+__UF1:
+    movw AX, 0x04
+    push [SP-2]
+    push [SP-2]
+    popw CX
+    syscall
+    pushw DX
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    __UF1E:
+    ret
+__UF2:
+    push [SP-1]
+    mov BL, 48
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    scmp AL, BL
+    jnc __J3
+    mov AL, 0
+    jmp __J4
+    __J3:
+    mov AL, 1
+    __J4:
+    push AL
+    push [SP-2]
+    mov BL, 57
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    scmp BL, AL
+    jnc __J5
+    mov AL, 0
+    jmp __J6
+    __J5:
+    mov AL, 1
+    __J6:
+    mov BL, AL
+    xor BH, BH
+    pop AL
+    xor AH, AH
+    or AL, 0
+    jz __J7
+    mov AL, 1
+    __J7:
+    or BL, 0
+    jz __J8
+    mov BL, 1
+    __J8:
+    and AL, BL
+    push AL
+    mov AL, [SP-1]
+    and AL, 0x80
+    movw CX, 0
+    buf AL
+    jz __J9
+    movw CX, 0xFFFF
+    __J9:
+    mov BL, CL
+    or BL, AL
+    mov DL, BL
+    mov [SP-3], DL
+    pop DL
+    mov [SP-3], DL
+    __UF2E:
+    ret
+__UF3:
+    push [SP-2]
+    push [SP-2]
+    movw BX, 0
+    popw AX
+    scmp AX, BX
+    jnc __J11
+    movw AX, 1
+    jmp __J12
+    __J11:
+    movw AX, 0
+    __J12:
+    xor AH, AH
+    buf AX
+    jz __J10
+    push [SP-2]
+    push [SP-2]
+    popw AX
+    not AX
+    add AX, 1
+    pushw AX
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    jmp __UF3E
+    __J10:
+    push [SP-2]
+    mov DL, [SP-2]
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    __UF3E:
+    ret
+__UF4:
+    add SP, 5
+    pushw 5
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    push BL
+    pushw 0
+    push [SP-3]
+    mov AL, [SP-1]
+    and AL, 0x80
+    movw CX, 0
+    buf AL
+    jz __J13
+    movw CX, 0xFFFF
+    __J13:
+    mov BL, CL
+    or BL, AL
+    push BL
+    call __UF1
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    mov DL, [BP+1]
+    mov [SP-10], DL
+    pop DL
+    mov [SP-10], DL
+    sub SP, 8
+    __UF4E:
+    ret
+__UF5:
+    __UF5E:
+    ret
+_main:
+    add SP, 2
+    pushw 0
+    call __UF4
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    call __UF5
+    sub SP, 2
+    pushw 0
+    pop DL
+    mov [SP-4], DL
+    pop DL
+    mov [SP-4], DL
+    sub SP, 2
+    _mainE:
+    movw AX, 0x03
+    popw BX
+    syscall
+    hlt
+section .data

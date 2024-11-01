@@ -1,3 +1,9 @@
+/**
+ * The official TOS image.
+ * 
+ * @author Travis Heavener
+ */
+
 #include <stdlib.t>
 #include <string.t>
 #include <stdio.t>

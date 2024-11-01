@@ -22,10 +22,9 @@ AST* parseToAST(const std::vector<Token>& tokens) {
 
     // fill in the AST
     try {
-        // only allow functions in the global scope
         size_t tokensLen = tokens.size();
         for (size_t i = 0; i < tokensLen; i++) {
-            // parse the next function
+            // parse the next thing
             size_t startIndex = i, endIndex = i;
 
             // verify return type is specified
@@ -41,6 +40,16 @@ AST* parseToAST(const std::vector<Token>& tokens) {
                 // check const if first char
                 if (i == start && tokens[i].type == TokenType::CONST) {
                     type.setIsConst(true);
+                } else if (tokens[i].type == TokenType::STRUCT && (i == start || (i == start+1 && type.isConst()))) {
+                    type.setPrimType(TokenType::STRUCT);
+
+                    // verify next token is the struct's name
+                    if (i+1 == endIndex || tokens[i+1].type != TokenType::IDENTIFIER)
+                        throw TInvalidTokenException(tokens[i].err);
+
+                    type.setStructName(tokens[i+1].raw); // grab the struct's name
+                    i += 2;
+                    break;
                 } else if (isTokenSignedUnsigned(tokens[i].type)) {
                     type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
                 } else if (isTokenPrimitiveType(tokens[i].type, true)) {
@@ -59,33 +68,167 @@ AST* parseToAST(const std::vector<Token>& tokens) {
                 type.addEmptyPointer(); // add to type
                 ++i;
             }
-            
-            // verify an identifier name is present
-            if ( i == tokensLen || tokens[i].type != TokenType::IDENTIFIER )
-                throw TInvalidTokenException(tokens[i == tokensLen ? i-1 : i].err);
-            
-            // set the start index to where the identifier name is
-            startIndex = i++;
 
-            // verify opening parenthesis is present
-            if ( i == tokensLen || tokens[i].type != TokenType::LPAREN )
+            if (i == tokensLen)
                 throw TInvalidTokenException(tokens[i-1].err);
 
-            // verify closing parenthesis is present
-            endIndex = findClosingParen(tokens, i, tokensLen-1);
-            i = endIndex;
+            // check for identifier name
+            const bool isFuncVarDef = tokens[i].type == TokenType::IDENTIFIER;
 
-            // verify opening brace is present
-            if ( i+1 == tokensLen || tokens[++i].type != TokenType::LBRACE )
-                throw TInvalidTokenException(tokens[i].err);
-            
-            // verify closing brace is present
-            endIndex = findClosingBrace(tokens, i, tokensLen-1);
-            i = endIndex;
+            // parse struct definitions
+            if (!isFuncVarDef && type.isStruct()) { // handle struct definition
+                // verify no pointers or anything
+                if (type.isConst() || type.getNumPointers())
+                    throw TSyntaxException(tokens[i].err);
 
-            // all good to go
-            endIndex = i;
-            pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST, type) );
+                // verify opening brace is present
+                if ( i == tokensLen || tokens[i].type != TokenType::LBRACE )
+                    throw TInvalidTokenException(tokens[i == tokensLen ? i-1 : i].err);
+
+                // find closing brace
+                size_t braceStart = i;
+                size_t braceEnd = findClosingBrace(tokens, i, tokensLen-1);
+                endIndex = braceEnd;
+
+                // verify non-empty struct
+                if (braceEnd - braceStart == 1)
+                    throw TInvalidTokenException(tokens[braceStart].err);
+
+                // iterate over all internal statements
+                for (i = braceStart+1; i < braceEnd; ++i) {
+                    size_t varDecStart = i;
+                    // grab type
+                    Type varDecType; // default to void
+
+                    // while we have a type keyword, modify the type
+                    while (i <= endIndex && isTokenTypeKeyword(tokens[i].type)) {
+                        // check const if first char
+                        if (i == varDecStart && tokens[i].type == TokenType::CONST) {
+                            varDecType.setIsConst(true);
+                        } else if (tokens[i].type == TokenType::STRUCT && (i == varDecStart || (i == varDecStart+1 && varDecType.isConst()))) {
+                            varDecType.setPrimType(TokenType::STRUCT);
+
+                            // verify next token is the struct's name
+                            if (i+1 == endIndex || tokens[i+1].type != TokenType::IDENTIFIER)
+                                throw TInvalidTokenException(tokens[i].err);
+
+                            varDecType.setStructName(tokens[i+1].raw); // grab the struct's name
+                            i += 2;
+                            break;
+                        } else if (isTokenSignedUnsigned(tokens[i].type)) {
+                            varDecType.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
+                        } else if (isTokenPrimitiveType(tokens[i].type, true)) {
+                            varDecType.setPrimType(tokens[i].type);
+                            ++i;
+                            break; // primitive must be last
+                        } else {
+                            // invalid token
+                            throw TInvalidTokenException(tokens[i].err);
+                        }
+                        ++i;
+                    }
+
+                    // grab pointers
+                    while (i <= endIndex && tokens[i].type == TokenType::ASTERISK) {
+                        varDecType.addEmptyPointer(); // add to type
+                        ++i;
+                    }
+
+                    // verify not end of input
+                    if (i > endIndex) throw TInvalidTokenException(tokens[i-1].err);
+
+                    // only allow unsigned int or char, and disallow void non-ptrs
+                    bool isInvalidUnsigned = varDecType.isUnsigned() && varDecType.getPrimType() != TokenType::TYPE_INT &&
+                        varDecType.getPrimType() != TokenType::TYPE_CHAR;
+                    if (isInvalidUnsigned || varDecType.isVoidNonPtr()) {
+                        throw TSyntaxException(tokens[varDecStart].err);
+                    }
+
+                    // get identifier
+                    if (tokens[i].type != TokenType::IDENTIFIER)
+                        throw TInvalidTokenException(tokens[i].err);
+                    size_t idenStart = i;
+
+                    // get all array size hints (only allow integer sizes)
+                    bool hasImplicitArraySizeHints = false;
+                    if (tokens[++i].type == TokenType::LBRACKET) {
+                        size_t j, numHints = 0;
+                        for (j = i; j <= endIndex && tokens[j].type == TokenType::LBRACKET; (void)j) {
+                            if (tokens[j+1].type == TokenType::LIT_INT || numHints > 0) {
+                                // verify next token is an int literal
+                                if (tokens[j+1].type != TokenType::LIT_INT)
+                                    throw TInvalidTokenException(tokens[i+1].err);
+
+                                // verify next token is an RBRACKET
+                                if (tokens[j+2].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+2].err);
+
+                                // add with value otherwise
+                                varDecType.addHintPointer( std::stol(tokens[j+1].raw) );
+                                j += 3;
+                            } else {
+                                // verify next token is an RBRACKET
+                                if (tokens[j+1].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+1].err);
+
+                                // add empty array modifier if first bracket pair
+                                varDecType.addHintPointer( TYPE_EMPTY_PTR );
+                                j += 2;
+                                hasImplicitArraySizeHints = true;
+                            }
+                            numHints++;
+                        }
+                        i = j;
+                    }
+
+                    // prevent implicit array size hints here
+                    if (hasImplicitArraySizeHints)
+                        throw TSyntaxException(tokens[idenStart+1].err);
+
+                    // create node
+                    type.addStructField(tokens[idenStart].raw, varDecType, tokens[idenStart].err);
+
+                    // verify next token is a semicolon
+                    if (tokens[i].type != TokenType::SEMICOLON)
+                        throw TSyntaxException(tokens[i].err);
+                }
+
+                // verify semicolon ends the line
+                if (tokens[braceEnd+1].type != TokenType::SEMICOLON)
+                    throw TSyntaxException(tokens[braceEnd+1].err);
+
+                // add the struct def to the global scope
+                declareParserStruct(scopeStack, type, tokens[braceStart+1].err);
+
+                // update i
+                i = endIndex+1; // skip semicolon
+            } else if (isFuncVarDef) { // handle function definition
+                // set the start index to where the identifier name is
+                startIndex = i++;
+
+                // verify opening parenthesis is present
+                if ( i == tokensLen || tokens[i].type != TokenType::LPAREN )
+                    throw TInvalidTokenException(tokens[i-1].err);
+
+                // verify closing parenthesis is present
+                endIndex = findClosingParen(tokens, i, tokensLen-1);
+                i = endIndex;
+
+                // verify opening brace is present
+                if ( i+1 == tokensLen || tokens[++i].type != TokenType::LBRACE )
+                    throw TInvalidTokenException(tokens[i].err);
+                
+                // verify closing brace is present
+                endIndex = findClosingBrace(tokens, i, tokensLen-1);
+                i = endIndex;
+
+                // all good to go
+                endIndex = i;
+                pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST, type) );
+            } else {
+                // handle invalid usage
+                throw TSyntaxException(tokens[i].err);
+            }
         }
     } catch (TException& e) {
         while (scopeStack.size() > 0) // free ParserVar pointers
@@ -300,6 +443,16 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                         // check const if first char
                         if (i == start && tokens[i].type == TokenType::CONST) {
                             type.setIsConst(true);
+                        } else if (tokens[i].type == TokenType::STRUCT && (i == start || (i == start+1 && type.isConst()))) {
+                            type.setPrimType(TokenType::STRUCT);
+
+                            // verify next token is the struct's name
+                            if (i+1 == endIndex || tokens[i+1].type != TokenType::IDENTIFIER)
+                                throw TInvalidTokenException(tokens[i].err);
+
+                            type.setStructName(tokens[i+1].raw); // grab the struct's name
+                            i += 2;
+                            break;
                         } else if (isTokenSignedUnsigned(tokens[i].type)) {
                             type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
                         } else if (isTokenPrimitiveType(tokens[i].type, true)) {
@@ -363,6 +516,12 @@ void parseBody(ASTNode* pHead, const std::vector<Token>& tokens, const size_t st
                             numHints++;
                         }
                         i = j;
+                    }
+
+                    // if this is a struct, fetch any necessary size data
+                    if (type.isStruct()) {
+                        const Type structType = lookupParserStruct(scopeStack, type.getStructName(), tokens[start].err);
+                        type.copyStructFields(structType);
                     }
 
                     // create node
@@ -463,9 +622,19 @@ ASTNode* parseFunction(const std::vector<Token>& tokens, const size_t startIndex
                 // check const if first char
                 if (i == start && tokens[i].type == TokenType::CONST) {
                     type.setIsConst(true);
+                } else if (tokens[i].type == TokenType::STRUCT && (i == start || (i == start+1 && type.isConst()))) {
+                    type.setPrimType(TokenType::STRUCT);
+
+                    // verify next token is the struct's name
+                    if (i+1 == endIndex || tokens[i+1].type != TokenType::IDENTIFIER)
+                        throw TInvalidTokenException(tokens[i].err);
+
+                    type.setStructName(tokens[i+1].raw); // grab the struct's name
+                    i += 2;
+                    break;
                 } else if (isTokenSignedUnsigned(tokens[i].type)) {
                     type.setIsUnsigned(tokens[i].type == TokenType::UNSIGNED);
-                } else if (isTokenPrimitiveType(tokens[i].type, true)) {
+                } else if (isTokenPrimitiveType(tokens[i].type, true) && !type.isStruct()) {
                     type.setPrimType(tokens[i].type);
                     ++i;
                     break; // primitive must be last
@@ -577,7 +746,7 @@ ASTNode* parseExpression(const std::vector<Token>& tokens, const size_t startInd
         // parsing all tokens directly (recursive for subexpressions) -- (L -> R)
         parsePrecedence1(tokens, startIndex, endIndex, pHead, scopeStack);
         
-        parsePrecedence2(tokens, pHead); // combine unaries -- (R -> L)
+        parsePrecedence2(tokens, pHead, scopeStack); // combine unaries -- (R -> L)
         parsePrecedence3(pHead); // combine mult/div/mod -- (L -> R)
         parsePrecedence4(pHead); // combine add/sub -- (L -> R)
         parsePrecedence5(pHead); // combine bitshifts -- (L -> R)

@@ -16,8 +16,10 @@ size_t Scope::declareVariable(Type type, const std::string& name, ErrInfo err) {
     this->children.push_back(pVar);
 
     size_t size = type.getSizeBytes();
-    for (size_t i = 0; i < size-1; i++) // add remaining placeholders
-        this->addPlaceholder();
+    if (size > 0) {
+        for (size_t i = 0; i < size-1; i++) // add remaining placeholders
+            this->addPlaceholder();
+    }
     return size;
 }
 

@@ -51,14 +51,16 @@ class ParserScope {
     public:
         ~ParserScope();
 
-        bool isNameTaken(const std::string& name) const { return functions.count(name) > 0 || isVarNameTaken(name); };
+        bool isNameTaken(const std::string& name) const { return functions.count(name) > 0 || isVarNameTaken(name) || isStructDefined(name); };
 
         bool isVarNameTaken(const std::string& name) const { return variables.count(name) > 0; };
+        bool isStructDefined(const std::string& name) const { return structDefs.count(name) > 0; };
 
         ParserVariable* getVariable(const std::string& name) { return isVarNameTaken(name) ? variables[name] : nullptr; };
 
         std::map<std::string, ParserVariable*> variables;
         std::multimap<std::string, ParserFunction*> functions;
+        std::map<std::string, Type> structDefs;
 };
 
 typedef std::vector<ParserScope*> scope_stack_t;
@@ -69,11 +71,17 @@ ParserVariable* lookupParserVariable(scope_stack_t&, const std::string&, ErrInfo
 // lookup function from scope stack
 ParserFunction* lookupParserFunction(scope_stack_t&, const std::string&, ErrInfo, const std::vector<Type>&, int&);
 
+// lookup struct def from scope stack
+Type lookupParserStruct(scope_stack_t&, const std::string&, const ErrInfo);
+
 // declare a variable in the immediate scope
 void declareParserVariable(scope_stack_t&, const std::string&, ParserVariable*, ErrInfo);
 
 // declare a function in the immediate scope
 void declareParserFunction(scope_stack_t&, const std::string&, ParserFunction*, const std::vector<Type>&, ErrInfo);
+
+// declare a new struct definition
+void declareParserStruct(scope_stack_t&, const Type&, const ErrInfo);
 
 // used to pop off a scope stack
 void popScopeStack(scope_stack_t&);

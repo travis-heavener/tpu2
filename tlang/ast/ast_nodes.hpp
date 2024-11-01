@@ -13,7 +13,8 @@ enum class ASTNodeType {
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP, TYPE_CAST, ASM, ASM_INST,
-    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR, ARR_SUBSCRIPT
+    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR, ARR_SUBSCRIPT,
+    STRUCT_DEF
 };
 
 enum class ASTUnaryType {
@@ -55,6 +56,14 @@ class ASTReturn : public ASTNode {
     public:
         ASTReturn(const Token& token) : ASTNode(token) {};
         ASTNodeType getNodeType() const { return ASTNodeType::RETURN; };
+};
+
+class ASTVarDeclaration; // fwd dec
+class ASTStructDef : public ASTNode {
+    public:
+        ASTStructDef(const Token& token) : ASTNode(token) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::STRUCT_DEF; };
+        size_t getSizeOf() const;
 };
 
 /************* CONDITIONALS *************/
@@ -161,16 +170,21 @@ class ASTOperator : public ASTTypedNode {
 
         void setUnaryType(ASTUnaryType t) { this->unaryType = t; };
         ASTUnaryType getUnaryType() const { return this->unaryType; };
-        
+
         void inferType(scope_stack_t&);
 
         void setIsNullified(bool i) { _isNullified = i; };
         bool isNullified() const { return _isNullified; };
+
+        // for reconciling sizeofs
+        void setSizeof(size_t s) { _forcedSizeof = s; };
+        size_t getForcedSizeof() const { return _forcedSizeof; };
     private:
         ASTUnaryType unaryType = ASTUnaryType::BASE;
         TokenType opType;
         bool isUnary;
         bool _isNullified = false; // if this is chained to another operator and cancels out
+        size_t _forcedSizeof = 0; // for sizeofs directly applied to types, stores the correct size of this
 };
 
 class ASTInlineASM : public ASTTypedNode {
@@ -327,6 +341,7 @@ class ASTTypeCast : public ASTTypedNode {
         ASTNodeType getNodeType() const { return ASTNodeType::TYPE_CAST; };
 
         ASTOperator* toOperator(ASTNode*);
+        ASTOperator* toSizeofOperator(scope_stack_t&);
         const Token& getToken() const { return token; };
     private:
         Token token;

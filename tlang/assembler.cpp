@@ -431,6 +431,17 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 break;
             }
 
+            // if this is a sizeof applied directly to a type, there are no children
+            if (unaryOp.getUnaryType() == ASTUnaryType::SIZEOF) {
+                size_t resultSize = unaryOp.getForcedSizeof() & 0xFFFF;
+
+                // push the size of whatever the result on the stack is (as uint)
+                OUT << "pushw " << resultSize << '\n';
+                scope.addPlaceholder(2);
+                resultType = Type(TokenType::TYPE_INT, true);
+                break;
+            }
+
             // move argument into AX
             if (resultTypes.size() != 1)
                 throw TDevException("Invalid number of resultTypes, expected 1 for unary operation.");
@@ -521,21 +532,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     resultType.addEmptyPointer();
                     break;
                 }
-                case TokenType::SIZEOF: {
-                    // if this is a pointer TO an array, correct its size
-                    if (resultTypes[0].isArray() && resultTypes[0].getPointers().back() == TYPE_EMPTY_PTR) {
-                        // this is still just a pointer
-                        resultSize = MEM_ADDR_SIZE;
-                    } else if (resultTypes[0].isArray()) {
-                        resultSize = resultTypes[0].getSizeBytes();
-                    }
-
-                    // push the size of whatever the result on the stack is (as uint)
-                    OUT << "pushw " << resultSize << '\n';
-                    scope.addPlaceholder(2);
-                    resultType = MEM_ADDR_TYPE;
-                    break;
-                }
+                case TokenType::SIZEOF: throw TDevException("Failed to process operator: \"sizeof.\"");
                 default: {
                     // handle typecast unary
                     if (unaryOp.getUnaryType() == ASTUnaryType::TYPE_CAST) {
@@ -565,7 +562,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 throw TDevException("Invalid number of resultSizes, expected 2 for binary operation.");
 
             // get dominant type
-            const Type dominantType = getDominantType(resultTypes[0], resultTypes[1]);
+            const Type dominantType = getDominantType(resultTypes[0], resultTypes[1], bodyNode.err);
             const size_t dominantSize = dominantType.getSizeBytes(SIZE_ARR_AS_PTR);
 
             // pop in reverse (higher first, later first)

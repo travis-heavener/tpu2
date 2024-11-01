@@ -14,7 +14,7 @@ enum TokenType {
     BLOCK_COMMENT_START, BLOCK_COMMENT_END,
     COMMA,
 
-    UNSIGNED, SIGNED, CONST,
+    UNSIGNED, SIGNED, CONST, STRUCT,
 
     // operators
     OP_LT, OP_LTE, OP_GT, OP_GTE, // <, <=, >, >=

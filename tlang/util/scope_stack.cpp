@@ -106,6 +106,23 @@ ParserFunction* lookupParserFunction(scope_stack_t& scopeStack, const std::strin
     return implicitMatches[0];
 }
 
+// lookup struct def from scope stack
+Type lookupParserStruct(scope_stack_t& scopeStack, const std::string& name, const ErrInfo err) {
+    // look in the stack, up
+    auto itr = scopeStack.rbegin();
+    for ((void)itr; itr != scopeStack.rend(); ++itr) {
+        // check this scope
+        ParserScope* pScope = *itr;
+        if (!pScope->isStructDefined(name)) continue;
+
+        // base case, the struct IS defined
+        return pScope->structDefs.at(name);
+    }
+
+    // base case, not found
+    throw TUnknownIdentifierException(err);
+}
+
 // declare a variable in the immediate scope
 void declareParserVariable(scope_stack_t& scopeStack, const std::string& name, ParserVariable* pParserVar, ErrInfo err) {
     // verify this variable isn't already defined in the immediate scope
@@ -130,6 +147,18 @@ void declareParserFunction(scope_stack_t& scopeStack, const std::string& name, P
 
     // declare function
     pScope->functions.insert({name, pParserFunc});
+}
+
+// declare a new struct definition
+void declareParserStruct(scope_stack_t& scopeStack, const Type& type, const ErrInfo err) {
+    // verify the name isn't in use anywhere
+    ParserScope* pScope = scopeStack.back();
+    const std::string& name = type.getStructName();
+    if (pScope->isNameTaken(name))
+        throw TIdentifierInUseException(err);
+
+    // declare new struct def
+    pScope->structDefs.insert({name, type});
 }
 
 // used to pop off a scope stack

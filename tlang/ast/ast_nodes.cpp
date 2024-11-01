@@ -63,6 +63,19 @@ ASTFunction::~ASTFunction() {
         delete p;
 }
 
+// returns the size of the defined struct
+size_t ASTStructDef::getSizeOf() const {
+    size_t size = 0;
+
+    // recurse over children
+    for (ASTNode* pChild : children) {
+        ASTVarDeclaration* pVarDec = static_cast<ASTVarDeclaration*>(pChild);
+        size += pVarDec->getTypeRef().getSizeBytes();
+    }
+
+    return size;
+}
+
 // returns true if this ASTFunction the main function
 bool ASTFunction::isMainFunction() const {
     return name == FUNC_MAIN_NAME && type == Type(TokenType::TYPE_INT) && params.size() == 0;
@@ -100,6 +113,28 @@ ASTTypedNode::~ASTTypedNode() {
         delete pSub;
 }
 
+ASTOperator* ASTTypeCast::toSizeofOperator(scope_stack_t& scopeStack) {
+    // fix any missing struct fields
+    if (this->getTypeRef().isStruct()) {
+        const Type structType = lookupParserStruct(scopeStack, this->getTypeRef().getStructName(), err);
+        this->getTypeRef().copyStructFields(structType);
+    }
+
+    // turn this node into an operator
+    ASTOperator* pOp = new ASTOperator(token, true);
+    pOp->setUnaryType( ASTUnaryType::TYPE_CAST );
+    pOp->setType(Type(TokenType::TYPE_INT, true));
+
+    // force-set the size
+    pOp->setSizeof( this->getTypeRef().getSizeBytes() );
+
+    // append subscripts
+    for (ASTArraySubscript* pSub : subscripts)
+        pOp->addSubscript(pSub);
+
+    return pOp;
+}
+
 ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     // turn this node into an operator
     ASTOperator* pOp = new ASTOperator(token, true);
@@ -110,7 +145,7 @@ ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     // append subscripts
     for (ASTArraySubscript* pSub : subscripts)
         pOp->addSubscript(pSub);
-    
+
     // append children (shouldn't be used but just in case)
     for (ASTNode* pChild : children)
         pOp->push(pChild);
@@ -196,10 +231,30 @@ void ASTTypedNode::inferType(scope_stack_t& scopeStack) {
     // infer childrens' types
     this->inferChildTypes(scopeStack);
 
-    // infer own type from child
-    for (ASTNode* pNode : this->children) {
-        ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
-        this->type = getDominantType( this->type, pChild->type );
+    // if this is directly an ASTExpr, take the type of the child anyways
+    if (this->getNodeType() == ASTNodeType::EXPR) {
+        ASTTypedNode* pChild = static_cast<ASTTypedNode*>(children[0]);
+
+        // if the child type is a struct, lookup the struct in the scope
+        if (pChild->type.isStruct()) {
+            const Type structType = lookupParserStruct(scopeStack, pChild->type.getStructName(), pChild->err);
+            pChild->type.copyStructFields(structType);
+        }
+
+        this->type = pChild->type;
+    } else {
+        // infer own type from child
+        for (ASTNode* pNode : this->children) {
+            ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
+
+            // if the child type is a struct, lookup the struct in the scope
+            if (pChild->type.isStruct()) {
+                const Type structType = lookupParserStruct(scopeStack, pChild->type.getStructName(), pChild->err);
+                pChild->type.copyStructFields(structType);
+            }
+
+            this->type = getDominantType( this->type, pChild->type, err );
+        }
     }
 
     // infer subscripts
@@ -261,10 +316,8 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
     ASTTypedNode::inferChildTypes(scopeStack);
 
     // compare each operand
-    if (this->isUnary) {
+    if (this->isUnary && children.size() > 0) {
         // get unary operand
-        // NOTE: for typecasting, the actual argument is child #1, but the desired type is from child #0 (ASTTypeCast)
-        // so this works
         ASTTypedNode* pA = static_cast<ASTTypedNode*>(children[0]);
         Type typeA = pA->getTypeRef();
 
@@ -346,6 +399,24 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (typeA.isVoidNonPtr()) throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_INT) );
                 pA->setIsLValue(true);
+
+                // fix any missing struct fields
+                if (typeA.isStruct()) {
+                    const Type structType = lookupParserStruct(scopeStack, typeA.getStructName(), err);
+                    typeA.copyStructFields(structType);
+                }
+
+                if (typeA.isArray() && typeA.getPointers().back() == TYPE_EMPTY_PTR) {
+                    // if this is a pointer TO an array, correct its size
+                    this->setSizeof( MEM_ADDR_SIZE );
+                } else {
+                    // take the size of the child as usual
+                    this->setSizeof( typeA.getSizeBytes() );
+                }
+
+                // remove the old child
+                delete pA;
+                this->removeChild(0);
                 break;
             }
             default: {
@@ -370,7 +441,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 throw TTypeInferException(err);
             }
         }
-    } else {
+    } else if (!this->isUnary) {
         ASTTypedNode* pA = static_cast<ASTTypedNode*>(children[0]);
         ASTTypedNode* pB = static_cast<ASTTypedNode*>(children[1]);
         Type typeA = pA->getTypeRef();
@@ -405,7 +476,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     }
 
                     // assume dominant type
-                    this->setType( getDominantType(typeA, typeB) );
+                    this->setType( getDominantType(typeA, typeB, err) );
                 } else { // one is a pointer
                     // set type to pointer
                     this->setType( typeA.isPointer() ? typeA : typeB );
@@ -437,7 +508,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                     this->setType( typeA.isPointer() ? typeA : typeB );
                 } else {
                     // assume dominant type
-                    this->setType( getDominantType(typeA, typeB) );
+                    this->setType( getDominantType(typeA, typeB, err) );
 
                     // if one is unsigned and the other isn't, make both
                     if (!typeA.isPointer() && !typeB.isPointer() && typeA.isUnsigned() != typeB.isUnsigned()) {
@@ -481,7 +552,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 pB->setIsLValue(false);
 
                 // force A and B to be the same type
-                Type domType = getDominantType(pA->getTypeRef(), pB->getTypeRef());
+                Type domType = getDominantType(pA->getTypeRef(), pB->getTypeRef(), err);
                 pA->setType(domType);
                 pB->setType(domType);
                 break;
@@ -580,7 +651,7 @@ void ASTArrayLiteral::inferType(scope_stack_t& scopeStack) {
     // infer own type from child
     for (ASTNode* pNode : this->children) {
         ASTTypedNode* pChild = static_cast<ASTTypedNode*>(pNode);
-        this->setType( getDominantType( this->getTypeRef(), pChild->getTypeRef() ) );
+        this->setType( getDominantType( this->getTypeRef(), pChild->getTypeRef(), err ) );
     }
 
     // add pointer since this is an array

@@ -65,7 +65,7 @@ MAKE_EXCEPTION(FunctionParameterMismatch)
 // dev exceptions
 class TDevException : public TException {
     public:
-        TDevException(const std::string& msg) : TException(ErrInfo(0, 0, "<core>"), msg) {};
+        TDevException(const std::string& msg) : TException(ErrInfo(0, 0, "<core>"), msg) {throw 0;};
 };
 
 #endif

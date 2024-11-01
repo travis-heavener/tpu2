@@ -14,7 +14,7 @@
 // operator precedence for C: https://en.cppreference.com/w/c/language/operator_precedence
 
 void parsePrecedence1(const std::vector<Token>&, size_t, size_t, ASTNode*, scope_stack_t&);
-void parsePrecedence2(const std::vector<Token>&, ASTNode*);
+void parsePrecedence2(const std::vector<Token>&, ASTNode*, scope_stack_t&);
 void parsePrecedence3(ASTNode*);
 void parsePrecedence4(ASTNode*);
 void parsePrecedence5(ASTNode*);

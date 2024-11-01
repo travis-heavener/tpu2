@@ -2,6 +2,7 @@
 #define __TYPE_HPP
 
 #include <algorithm>
+#include <map>
 #include <vector>
 
 #include "token.hpp"
@@ -14,19 +15,21 @@
 #define TYPE_PARAM_EXACT_MATCH 1
 #define TYPE_PARAM_IMPLICIT_MATCH 2
 
+// fwd declarations
+class Type;
+
 // used to compare and implicitly cast types
-class Type; // fwd dec
-Type getDominantType(const Type&, const Type&);
+Type getDominantType(const Type&, const Type&, const ErrInfo&);
 
 class Type {
     public:
-        friend Type getDominantType(const Type&, const Type&);
+        friend Type getDominantType(const Type&, const Type&, const ErrInfo&);
 
         Type() : primitiveType(TokenType::VOID), pointers() {};
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer), _isConst(t._isConst) {};
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer), _isConst(t._isConst), structName(t.structName), structTypes(t.structTypes) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
@@ -79,6 +82,14 @@ class Type {
         // used to handle reference pointers in function arguments
         bool isReferencePointer() const { return _isReferencePointer; };
         void setIsReferencePointer(bool i) { _isReferencePointer = i; };
+
+        // used to handle struct types
+        bool isStruct() const { return primitiveType == TokenType::STRUCT; };
+        const std::string& getStructName() const { return structName; };
+        void setStructName(const std::string& s) { structName = s; };
+        void addStructField(const std::string&, const Type&, const ErrInfo);
+        void copyStructFields(const Type&);
+        bool isStructNonPtr() const { return isStruct() && getNumPointers() == 0; };
     private:
         TokenType primitiveType;
         std::vector<size_t> pointers;
@@ -93,6 +104,10 @@ class Type {
         
         // for const qualifiers
         bool _isConst = false;
+
+        // for structs
+        std::string structName = "";
+        std::map<std::string, Type> structTypes;
 };
 
 #endif

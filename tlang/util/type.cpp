@@ -1,6 +1,7 @@
 #include "token.hpp"
 #include "toolbox.hpp"
 #include "type.hpp"
+#include "scope_stack.hpp"
 
 bool doesPrimAImplicitMatchPrimB(const TokenType, const TokenType);
 
@@ -11,6 +12,8 @@ Type::Type(const Type&& B) {
     this->numArrayHints = B.numArrayHints;
     this->_isReferencePointer = B._isReferencePointer;
     this->_isConst = B._isConst;
+    this->structName = B.structName;
+    this->structTypes = B.structTypes;
 }
 
 Type& Type::operator=(const Type& B) {
@@ -19,6 +22,8 @@ Type& Type::operator=(const Type& B) {
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
     this->_isConst = B._isConst;
+    this->structName = B.structName;
+    this->structTypes = B.structTypes;
     return *this;
 }
 
@@ -28,6 +33,8 @@ Type& Type::operator=(const Type&& B) {
     this->_isUnsigned = B._isUnsigned;
     this->numArrayHints = B.numArrayHints;
     this->_isConst = B._isConst;
+    this->structName = B.structName;
+    this->structTypes = B.structTypes;
     return *this;
 }
 
@@ -53,10 +60,19 @@ size_t Type::getSizeBytes(const int opts) const {
     const size_t numPtrs = pointers.size();
 
     // if this is a POINTER TO AN ARRAY, return a pointer size
-    if (numPtrs > 0 && *pointers.rbegin() == TYPE_EMPTY_PTR)
+    if (numPtrs > 0 && pointers.back() == TYPE_EMPTY_PTR)
         return MEM_ADDR_SIZE;
 
-    size_t size = (numPtrs > numArrayHints) ? MEM_ADDR_SIZE : getSizeOfType(this->primitiveType);
+    size_t size = 0;
+    if (numPtrs <= numArrayHints && primitiveType == TokenType::STRUCT) {
+        // handle structs
+        if (structTypes.size() > 0) {
+            for (auto [name, type] : structTypes)
+                size += type.getSizeBytes();
+        }
+    } else {
+        size = (numPtrs > numArrayHints) ? MEM_ADDR_SIZE : getSizeOfType(this->primitiveType);
+    }
 
     for (size_t i = 0; i < numPtrs; ++i)
         // factor in size hints (from arrays)
@@ -71,6 +87,9 @@ bool Type::operator==(const Type& t) const {
     if (primitiveType != t.primitiveType) return false;
     if (_isUnsigned != t._isUnsigned) return false;
 
+    // if structs, check each struct's type
+    if (primitiveType == TokenType::STRUCT && structName != t.structName) return false;
+
     // check num ptrs
     if (pointers.size() != t.pointers.size()) return false;
 
@@ -78,6 +97,16 @@ bool Type::operator==(const Type& t) const {
     for (size_t i = 0; i < pointers.size(); ++i)
         if (pointers[i] != t.pointers[i])
             return false;
+
+    // if this is a struct, check all struct fields
+    if (t.isStruct() && isStruct()) {
+        if (structTypes.size() != t.structTypes.size()) return false;
+
+        auto itrA = structTypes.begin();
+        auto itrB = t.structTypes.begin();
+        for ((void)itrA; itrA != structTypes.end(); ++itrA, ++itrB)
+            if (itrA->second != itrB->second) return false;
+    }
 
     // base case, match
     return true;
@@ -102,6 +131,11 @@ int Type::isParamMatch(const Type& t, ErrInfo err) const {
             doPtrsMatch = false;
 
     /**** check for exact match ****/
+    // check structs
+    if (primA == primB && primA == TokenType::STRUCT && _isUnsigned == t._isUnsigned && doPtrsMatch && structName == t.structName)
+        return TYPE_PARAM_EXACT_MATCH;
+
+    // check non-structs
     if (primA == primB && _isUnsigned == t._isUnsigned && doPtrsMatch)
         return TYPE_PARAM_EXACT_MATCH;
 
@@ -135,6 +169,9 @@ inline unsigned char getPrimitiveTypeRank(TokenType prim, bool isUnsigned) {
 
 // returns true when two primitive types match or can be implicitly converted
 bool doesPrimAImplicitMatchPrimB(const TokenType A, const TokenType B) {
+    // if either is a struct, return false
+    if (A == TokenType::STRUCT || B == TokenType::STRUCT) return false;
+
     if (A == B) return true;
 
     const bool isAIntegral = A == TokenType::TYPE_CHAR || A == TokenType::TYPE_INT;
@@ -152,7 +189,13 @@ bool doesPrimAImplicitMatchPrimB(const TokenType A, const TokenType B) {
 }
 
 // used to compare and implicitly cast types
-Type getDominantType(const Type& A, const Type& B) {
+Type getDominantType(const Type& A, const Type& B, const ErrInfo& err) {
+    // if one is a struct and the other is not, throw an exception
+    if (A.isStruct() != B.isStruct())
+        throw TInvalidOperationException(err);
+    if (A.isStruct() && B.isStruct() && A.structName != B.structName)
+        throw TInvalidOperationException(err);
+
     /**
      * 1. char
      * 2. unsigned char (aka bool)
@@ -195,4 +238,15 @@ Type Type::getAddressPointer() const {
     clone.clearArrayHints(); // revoke hints
     clone.addEmptyPointer(); // add an extra pointer (we have the address of this now)
     return clone;
+}
+
+void Type::addStructField(const std::string& name, const Type& type, const ErrInfo err) {
+    if (structTypes.count(name) > 0)
+        throw TSyntaxException(err);
+    structTypes[name] = type;
+}
+
+void Type::copyStructFields(const Type& B) {
+    for (auto [name, type] : B.structTypes)
+        structTypes[name] = type;
 }

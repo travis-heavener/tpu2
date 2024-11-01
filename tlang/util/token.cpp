@@ -14,7 +14,7 @@ bool isTokenSignedUnsigned(const TokenType type) {
 
 // true if the token is UNSIGNED/SIGNED, CONST, or a PRIMITIVE TYPE
 bool isTokenTypeKeyword(const TokenType type) {
-    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || type == VOID || type == UNSIGNED || type == SIGNED || type == CONST;
+    return type == TYPE_BOOL || type == TYPE_CHAR || type == TYPE_FLOAT || type == TYPE_INT || type == VOID || type == UNSIGNED || type == SIGNED || type == CONST || type == STRUCT;
 }
 
 // true if the token is an unary operator (ex. ~, !)

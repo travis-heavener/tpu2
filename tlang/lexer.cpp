@@ -188,6 +188,13 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             continue;
         }
 
+        // struct keyword
+        if (isKwdPresent("struct", line, i)) {
+            i += 5; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "struct", TokenType::STRUCT));
+            continue;
+        }
+
         // sizeof keyword
         if (isKwdPresent("sizeof", line, i)) {
             i += 5; // offset by length of keyword - 1

@@ -60,6 +60,16 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
                         // check const if first char
                         if (j == start+1 && tokens[j].type == TokenType::CONST) {
                             type.setIsConst(true);
+                        } else if (tokens[j].type == TokenType::STRUCT && (j == start+1 || (j == start+1 && type.isConst()))) {
+                            type.setPrimType(TokenType::STRUCT);
+
+                            // verify next token is the struct's name
+                            if (j == i || tokens[j+1].type != TokenType::IDENTIFIER)
+                                throw TInvalidTokenException(tokens[j].err);
+
+                            type.setStructName(tokens[j+1].raw); // grab the struct's name
+                            j += 2;
+                            break;
                         } else if (isTokenSignedUnsigned(tokens[j].type)) {
                             type.setIsUnsigned(tokens[j].type == TokenType::UNSIGNED);
                         } else if (isTokenPrimitiveType(tokens[j].type, true)) {
@@ -217,7 +227,7 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
     }
 }
 
-void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
+void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead, scope_stack_t& scopeStack) {
     // combine unaries
     // precedence 2 (R -> L)
     for (long long i = pHead->size()-1; i >= 0; --i) {
@@ -229,10 +239,7 @@ void parsePrecedence2(const std::vector<Token>& tokens, ASTNode* pHead) {
                 ASTOperator* pPrevOp = dynamic_cast<ASTOperator*>(pHead->at(i-1));
                 if (pPrevOp != nullptr && pPrevOp->getOpTokenType() == TokenType::SIZEOF) {
                     // bind this as the child of sizeof
-                    pPrevOp->push(
-                        // add 0 to typecast to make it work
-                        pTypeCast->toOperator(new ASTIntLiteral(0, pTypeCast->getToken()))
-                    );
+                    pPrevOp->push( pTypeCast->toSizeofOperator(scopeStack) );
                     pHead->removeChild( i );
                     --i; // skip next node too
                     delete pTypeCast;
