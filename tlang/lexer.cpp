@@ -91,7 +91,7 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
         }
 
         // int/float literals (cannot start with a decimal/period!!)
-        if (line.find("0x") == i || line.find("0b") == i) {
+        if (line.find("0x", i) == i || line.find("0b", i) == i) {
             const bool isHex = line[i+1] == 'x';
             // parse hex/binary literal
             TokenType tokenType = TokenType::LIT_INT;
@@ -271,9 +271,17 @@ void tokenizeLine(std::string& line, std::vector<Token>& tokens, line_t lineNumb
             continue;
         }
 
+        // check for arrow operator
+        if (i+1 < lineLen && line[i] == '-' && line[i+1] == '>') {
+            ++i; // offset by length of keyword - 1
+            tokens.push_back(Token(err, "->", TokenType::ARROW));
+            continue;
+        }
+
         // check for individual characters that can't be a part of a larger operator or anything
         #define ADD_SINGLE_CHAR_TOKEN(c, type) tokens.push_back(Token(err, c, type)); continue;
         switch (line[i]) {
+            case '.': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::DOT)
             case '(': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::LPAREN)
             case ')': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::RPAREN)
             case '{': ADD_SINGLE_CHAR_TOKEN(line[i], TokenType::LBRACE)
