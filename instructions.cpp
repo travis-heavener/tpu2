@@ -1193,14 +1193,14 @@ namespace instructions {
             case 1:   // Shifts the value in the given 16-bit register left imm8 times in place.
             case 3: { // Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
                 if ((mod.getValue() & 0b111) == 3)
-                    numShifts = tpu.readRegister16(getRegister16FromCode(numShifts)).getValue();
+                    numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
                 u16 value = 0;
 
                 if (!isSignedOp) {
-                    value = A << std::min((int)numShifts, 16);
+                    value = A << std::min((int)numShifts, 8);
                 } else { // handle signed value
-                    value = (A & 0x7FFF) << std::min((int)numShifts, 16);
+                    value = (A & 0x7FFF) << std::min((int)numShifts, 8);
                     value |= A & 0x8000; // re-add sign bit
                 }
                 tpu.moveToRegister( getRegister16FromCode(opA), value );
@@ -1242,14 +1242,14 @@ namespace instructions {
             case 1:   // Shifts the value in the given 16-bit register right imm8 times in place.
             case 3: { // Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
                 if ((mod.getValue() & 0b111) == 3)
-                    numShifts = tpu.readRegister16(getRegister16FromCode(numShifts)).getValue();
+                    numShifts = tpu.readRegister8(getRegister8FromCode(numShifts)).getValue();
                 u16 A = tpu.readRegister16(getRegister16FromCode(opA)).getValue();
                 u16 value = 0;
 
                 if (!isSignedOp) {
-                    value = A >> std::min((int)numShifts, 16);
+                    value = A >> std::min((int)numShifts, 8);
                 } else { // handle signed value
-                    value = (A & 0x7FFF) >> std::min((int)numShifts, 16);
+                    value = (A & 0x7FFF) >> std::min((int)numShifts, 8);
                     value |= A & 0x8000; // re-add sign bit
                 }
                 tpu.moveToRegister( getRegister16FromCode(opA), value );
