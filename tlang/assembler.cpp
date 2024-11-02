@@ -967,6 +967,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         OUT << "sub BP, " << stackOffset << '\n';
                         OUT << "pushw BP\n";
                         scope.addPlaceholder(2);
+
+                        // if this identifier is the child of an address-of operator, force as pointer
+                        if (identifier.isChildOfAddressOp())
+                            idenType.addEmptyPointer();
                     } else { // this is an rvalue, push the value onto the stack
                         const size_t typeSize = idenType.getSizeBytes();
                         for (size_t j = 0; j < typeSize; ++j) {
@@ -1126,53 +1130,86 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         default: throw TExpressionEvalException(bodyNode.err);
     }
 
-    // handle any subscripts
+    // handle any subscripts or member accessors
     ASTTypedNode* pTypedBody = dynamic_cast<ASTTypedNode*>(&bodyNode);
     if (pTypedBody != nullptr && pTypedBody->getNumSubscripts() > 0) {
         // grab address off stack
-        if (!resultType.isPointer())
-            throw TInvalidOperationException(bodyNode.err);
-
-        const size_t numPointers = resultType.getNumPointers();
         const size_t numSubscripts = pTypedBody->getNumSubscripts();
-        const std::vector<ASTArraySubscript*>& subscripts = pTypedBody->getSubscripts();
+        const std::vector<ASTTypedNode*>& subscripts = pTypedBody->getSubscripts();
         const bool isLValue = pTypedBody->isLValue();
-
-        if (numSubscripts > numPointers)
-            throw TInvalidOperationException(bodyNode.err);
 
         // handle subscripts
         for (size_t j = 0; j < numSubscripts; ++j) {
-            const size_t lastPtrSize = resultType.getPointers().back();
-            const bool isImplicitArrayHint = resultType.getNumArrayHints() > 0 && lastPtrSize == TYPE_EMPTY_PTR;
-            ASTArraySubscript* pSub = subscripts[j];
-            resultType.popPointer();
+            // handle array subscripts
+            if (subscripts[j]->getNodeType() == ASTNodeType::ARR_SUBSCRIPT) {
+                if (!resultType.isPointer())
+                    throw TInvalidOperationException(bodyNode.err);
 
-            // determine the size of the rest of the object
-            size_t chunkSize = resultType.getSizeBytes();
+                const size_t lastPtrSize = resultType.getPointers().back();
+                const bool isImplicitArrayHint = resultType.getNumArrayHints() > 0 && lastPtrSize == TYPE_EMPTY_PTR;
+                ASTArraySubscript* pSub = static_cast<ASTArraySubscript*>( subscripts[j] );
+                resultType.popPointer();
 
-            // if this is a pointer (not an array), dereference and get its address
-            if (lastPtrSize == TYPE_EMPTY_PTR && !isImplicitArrayHint) {
-                // pop address into BP
-                OUT << "popw BP\n";
-                OUT << "push [BP+0]\n";
-                OUT << "push [BP+1]\n";
+                // determine the size of the rest of the object
+                size_t chunkSize = resultType.getSizeBytes();
+
+                // if this is a pointer (not an array), dereference and get its address
+                if (lastPtrSize == TYPE_EMPTY_PTR && !isImplicitArrayHint) {
+                    // pop address into BP
+                    OUT << "popw BP\n";
+                    OUT << "push [BP+0]\n";
+                    OUT << "push [BP+1]\n";
+                }
+
+                // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
+                assembleExpression(*pSub, outHandle, scope);
+
+                OUT << "popw AX\n"; // pop subscript off stack
+                OUT << "popw CX\n"; // pop address back into CX
+
+                // if the chunk size isn't 1, scale subscript in AX by it
+                if (chunkSize > 1) {
+                    OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
+                    OUT << "mul BX\n"; // scale by chunk size
+                }
+                OUT << (resultType.isUnsigned() ? "add" : "sadd") << " CX, AX\n"; // add the chunk to the pointer
+                OUT << "pushw CX\n"; // put address back onto stack
+                scope.pop(2); // 4 pops - 2 pushes = 2 net pops
+            } else if (subscripts[j]->getNodeType() == ASTNodeType::ARR_MEMBER_SUBSCRIPT) {
+                // handle member subscripts
+                ASTMemberAccessor* pAccessor = static_cast<ASTMemberAccessor*>(subscripts[j]);
+
+                // verify this is a struct and not an array
+                if (!resultType.isStruct() || resultType.isArray())
+                    throw TSyntaxException(bodyNode.err);
+
+                // if this is an arrow accessor, verify this is a pointer
+                if (!resultType.isPointer() && pAccessor->isByPointer)
+                    throw TSyntaxException(bodyNode.err);
+
+                // if this is an accessor by pointer, dereference
+                if (pAccessor->isByPointer) {
+                    // pop address into BP
+                    OUT << "popw BP\n";
+                    OUT << "push [BP+0]\n";
+                    OUT << "push [BP+1]\n";
+                }
+
+                // get the offset of the current member
+                size_t memOffset = resultType.getStructMemberOffset(pAccessor->name, bodyNode.err);
+
+                if (memOffset > 0) {
+                    // pop the value into CX and add the offset
+                    OUT << "popw CX\n";
+                    OUT << "add CX, " << memOffset << '\n'; // add the chunk to the pointer
+                    OUT << "pushw CX\n"; // put address back onto stack
+                }
+
+                // update the result type
+                resultType = resultType.getStructMemberType(pAccessor->name, bodyNode.err);
+            } else {
+                throw TSyntaxException(bodyNode.err);
             }
-
-            // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
-            assembleExpression(*pSub, outHandle, scope);
-
-            OUT << "popw AX\n"; // pop subscript off stack
-            OUT << "popw CX\n"; // pop address back into CX
-
-            // if the chunk size isn't 1, scale subscript in AX by it
-            if (chunkSize > 1) {
-                OUT << "movw BX, " << chunkSize << '\n'; // move chunkSize into BX to force 16-bit
-                OUT << "mul BX\n"; // scale by chunk size
-            }
-            OUT << (resultType.isUnsigned() ? "add" : "sadd") << " CX, AX\n"; // add the chunk to the pointer
-            OUT << "pushw CX\n"; // put address back onto stack
-            scope.pop(2); // 4 pops - 2 pushes = 2 net pops
         }
 
         // if this isn't an array and isn't an lvalue, dereference the final address on the stack
@@ -1188,6 +1225,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             scope.addPlaceholder(typeSize);
         }
     }
+
+    // verify the result isn't a struct
+    if (resultType.isStructNonPtr())
+        throw TSyntaxException(bodyNode.err);
 
     // implicit cast
     if (resultType != desiredType) {

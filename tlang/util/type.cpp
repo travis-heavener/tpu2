@@ -13,7 +13,7 @@ Type::Type(const Type&& B) {
     this->_isReferencePointer = B._isReferencePointer;
     this->_isConst = B._isConst;
     this->structName = B.structName;
-    this->structTypes = B.structTypes;
+    this->structMemberTypes = B.structMemberTypes;
 }
 
 Type& Type::operator=(const Type& B) {
@@ -23,7 +23,7 @@ Type& Type::operator=(const Type& B) {
     this->numArrayHints = B.numArrayHints;
     this->_isConst = B._isConst;
     this->structName = B.structName;
-    this->structTypes = B.structTypes;
+    this->structMemberTypes = B.structMemberTypes;
     return *this;
 }
 
@@ -34,7 +34,7 @@ Type& Type::operator=(const Type&& B) {
     this->numArrayHints = B.numArrayHints;
     this->_isConst = B._isConst;
     this->structName = B.structName;
-    this->structTypes = B.structTypes;
+    this->structMemberTypes = B.structMemberTypes;
     return *this;
 }
 
@@ -66,8 +66,8 @@ size_t Type::getSizeBytes(const int opts) const {
     size_t size = 0;
     if (numPtrs <= numArrayHints && primitiveType == TokenType::STRUCT) {
         // handle structs
-        if (structTypes.size() > 0) {
-            for (auto [name, type] : structTypes)
+        if (structMemberTypes.size() > 0) {
+            for (auto [name, type] : structMemberTypes)
                 size += type.getSizeBytes();
         }
     } else {
@@ -100,11 +100,11 @@ bool Type::operator==(const Type& t) const {
 
     // if this is a struct, check all struct fields
     if (t.isStruct() && isStruct()) {
-        if (structTypes.size() != t.structTypes.size()) return false;
+        if (structMemberTypes.size() != t.structMemberTypes.size()) return false;
 
-        auto itrA = structTypes.begin();
-        auto itrB = t.structTypes.begin();
-        for ((void)itrA; itrA != structTypes.end(); ++itrA, ++itrB)
+        auto itrA = structMemberTypes.begin();
+        auto itrB = t.structMemberTypes.begin();
+        for ((void)itrA; itrA != structMemberTypes.end(); ++itrA, ++itrB)
             if (itrA->second != itrB->second) return false;
     }
 
@@ -241,12 +241,30 @@ Type Type::getAddressPointer() const {
 }
 
 void Type::addStructField(const std::string& name, const Type& type, const ErrInfo err) {
-    if (structTypes.count(name) > 0)
+    if (structMemberTypes.count(name) > 0)
         throw TSyntaxException(err);
-    structTypes[name] = type;
+    structMemberTypes[name] = type;
 }
 
 void Type::copyStructFields(const Type& B) {
-    for (auto [name, type] : B.structTypes)
-        structTypes[name] = type;
+    for (auto [name, type] : B.structMemberTypes)
+        structMemberTypes[name] = type;
+}
+
+Type Type::getStructMemberType(const std::string& name, const ErrInfo err) const { 
+    if (structMemberTypes.count(name) == 0)
+        throw TUnknownIdentifierException(err);
+    return structMemberTypes.at(name);
+}
+
+size_t Type::getStructMemberOffset(const std::string& name, const ErrInfo err) const {
+    size_t size = 0;
+    auto itr = structMemberTypes.begin();
+    for ((void)itr; itr != structMemberTypes.end(); ++itr) {
+        if (itr->first == name) return size;
+        size += itr->second.getSizeBytes();
+    }
+
+    // base case
+    throw TUnknownIdentifierException(err);
 }

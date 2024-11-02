@@ -129,7 +129,7 @@ ASTOperator* ASTTypeCast::toSizeofOperator(scope_stack_t& scopeStack) {
     pOp->setSizeof( this->getTypeRef().getSizeBytes() );
 
     // append subscripts
-    for (ASTArraySubscript* pSub : subscripts)
+    for (ASTTypedNode* pSub : subscripts)
         pOp->addSubscript(pSub);
 
     return pOp;
@@ -143,7 +143,7 @@ ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     pOp->setType(this->getTypeRef());
 
     // append subscripts
-    for (ASTArraySubscript* pSub : subscripts)
+    for (ASTTypedNode* pSub : subscripts)
         pOp->addSubscript(pSub);
 
     // append children (shouldn't be used but just in case)
@@ -300,7 +300,7 @@ void ASTTypedNode::inferSubscriptTypes(scope_stack_t& scopeStack) {
     if (!this->type.isPointer())
         throw TInvalidOperationException(this->subscripts[0]->err);
 
-    for (ASTArraySubscript* pSub : subscripts) {
+    for (ASTTypedNode* pSub : subscripts) {
         pSub->inferType(scopeStack);
     }
 }
@@ -383,6 +383,8 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
 
                 this->setType( typeA );
                 this->getTypeRef().addEmptyPointer();
+                pA->getTypeRef().addEmptyPointer();
+                pA->setIsChildOfAddressOp(true);
 
                 // if getting the address of something dereferenced, nullify this and pA
                 if (pA->getNodeType() == ASTNodeType::UNARY_OP) {
@@ -399,6 +401,7 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 if (typeA.isVoidNonPtr()) throw TInvalidOperationException(err);
                 this->setType( Type(TokenType::TYPE_INT) );
                 pA->setIsLValue(true);
+                this->setUnaryType( ASTUnaryType::SIZEOF );
 
                 // fix any missing struct fields
                 if (typeA.isStruct()) {
@@ -681,18 +684,32 @@ void ASMProtectedInstruction::inferType(scope_stack_t& scopeStack) {
 void ASTIdentifier::inferType(scope_stack_t& scopeStack) {
     // lookup the variable from the scope
     Type type = lookupParserVariable(scopeStack, this->raw, this->err)->type;
+    this->originalType = type; // store original type
 
     // infer subscripts
     size_t numSubscripts = this->subscripts.size();
     for (size_t i = 0; i < numSubscripts; ++i) {
-        // infer the subscript's type
-        this->subscripts[i]->inferType(scopeStack);
+        // handle numeric subscripts vs member accessors
+        if (this->subscripts[i]->getNodeType() == ASTNodeType::ARR_SUBSCRIPT) {
+            // infer the subscript's type
+            this->subscripts[i]->inferType(scopeStack);
 
-        // strip pointers from type
-        if (type.getNumPointers() > 0)
-            type.popPointer();
-        else
-            throw TSyntaxException(this->err);
+            // strip pointers from type
+            if (type.getNumPointers() > 0)
+                type.popPointer();
+            else
+                throw TSyntaxException(this->err);
+        } else if (this->subscripts[i]->getNodeType() == ASTNodeType::ARR_MEMBER_SUBSCRIPT) {
+            // verify struct
+            if (!type.isStruct()) throw TSyntaxException(this->err);
+
+            // if this is an accessor by pointer, verify pointer
+            ASTMemberAccessor* pAccessor = static_cast<ASTMemberAccessor*>(subscripts[i]);
+            if (type.isPointer() != pAccessor->isByPointer) throw TSyntaxException(this->err);
+
+            // update the type
+            type = type.getStructMemberType(pAccessor->name, err);
+        }
     }
 
     // if this is an array and isn't fully dereferenced, force it as a pointer

@@ -13,7 +13,8 @@ enum class ASTNodeType {
     CONDITIONAL, IF_CONDITION, ELSE_IF_CONDITION, ELSE_CONDITION,
     FOR_LOOP, WHILE_LOOP,
     EXPR, UNARY_OP, BIN_OP, TYPE_CAST, ASM, ASM_INST,
-    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR, ARR_SUBSCRIPT,
+    LIT_BOOL, LIT_CHAR, LIT_FLOAT, LIT_INT, LIT_VOID, LIT_STRING, LIT_ARR,
+    ARR_SUBSCRIPT, ARR_MEMBER_SUBSCRIPT,
     STRUCT_DEF
 };
 
@@ -139,15 +140,20 @@ class ASTTypedNode : public ASTNode {
         bool isLValue() const { return _isLValue; };
         void setIsLValue(bool);
 
+        // essentially forces a pointer status
+        bool isChildOfAddressOp() const { return _isChildOfAddressOp; };
+        void setIsChildOfAddressOp(bool i) { _isChildOfAddressOp = i; };
+
         // subscripts for array accessing
-        void addSubscript(ASTArraySubscript* pSub) { this->subscripts.push_back(pSub); };
-        const std::vector<ASTArraySubscript*>& getSubscripts() { return subscripts; };
+        void addSubscript(ASTTypedNode* pSub) { this->subscripts.push_back(pSub); };
+        const std::vector<ASTTypedNode*>& getSubscripts() { return subscripts; };
         size_t getNumSubscripts() const { return subscripts.size(); };
     protected:
-        std::vector<ASTArraySubscript*> subscripts;
+        std::vector<ASTTypedNode*> subscripts;
     private:
         Type type;
         bool _isLValue = false;
+        bool _isChildOfAddressOp = false;
 };
 
 class ASTExpr : public ASTTypedNode {
@@ -217,6 +223,14 @@ class ASTArraySubscript : public ASTTypedNode {
         void inferType(scope_stack_t&);
 };
 
+class ASTMemberAccessor : public ASTTypedNode {
+    public:
+        ASTMemberAccessor(const Token& token, const std::string& name) : ASTTypedNode(token), name(name), isByPointer(token.type == TokenType::ARROW) {};
+        ASTNodeType getNodeType() const { return ASTNodeType::ARR_MEMBER_SUBSCRIPT; };
+        const std::string name;
+        const bool isByPointer;
+};
+
 class ASTFuncParam {
     public:
         ASTFuncParam(const std::string& name, Type type) : name(name), type(type) {};
@@ -260,6 +274,7 @@ class ASTIdentifier : public ASTTypedNode {
         bool isInAssignExpr; // whether the identifier is being referenced (ex. x + 1) or assigned (x = 1)
 
         void inferType(scope_stack_t&);
+        Type originalType;
 };
 
 class ASTVarDeclaration : public ASTNode {

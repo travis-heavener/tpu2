@@ -221,6 +221,23 @@ void parsePrecedence1(const std::vector<Token>& tokens, size_t startIndex, size_
             i += 3;
         } else if (isTokenProtectedASM(tokens[i].type)) {
             pHead->push( new ASMProtectedInstruction(tokens[i]) );
+        } else if (tokens[i].type == TokenType::DOT || tokens[i].type == TokenType::ARROW) {
+            // verify the next token is an identifier
+            if (i+1 > endIndex) throw TSyntaxException(tokens[i].err);
+            if (tokens[i+1].type != TokenType::IDENTIFIER) throw TSyntaxException(tokens[i+1].err);
+
+            // get previous node
+            if (pHead->size() == 0) throw TInvalidOperationException(tokens[i].err);
+            ASTTypedNode* pLastNode = dynamic_cast<ASTTypedNode*>(pHead->lastChild());
+            if (pLastNode == nullptr) // failed to cast to subscriptable type
+                throw TInvalidOperationException(tokens[startIndex].err);
+
+            // append members to typed node
+            const std::string memberName = tokens[i+1].raw;
+            pLastNode->addSubscript( new ASTMemberAccessor(tokens[i], memberName) );
+
+            // skip over next identifier
+            ++i;
         } else {
             throw TInvalidTokenException(tokens[i].err);
         }

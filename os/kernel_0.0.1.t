@@ -23,14 +23,12 @@ struct heap_t {
 // Used to initialize a new heap.
 struct heap_t* heap_init() {
     // Initialize the heap
-    struct heap_t b;
-    char a = sizeof(b);
-    struct heap_t* pHeap = (struct heap_t*)malloc( a );
+    struct heap_t* pHeap = (struct heap_t*)malloc( sizeof(struct heap_t) );
 
     // Set fields
-    // pHeap->pNext = NULL;
-    // pHeap->size = HEAP_SIZE;
-    // pHeap->isFree = 1;
+    pHeap->pNext = NULL;
+    pHeap->size = HEAP_SIZE;
+    pHeap->isFree = 1;
 
     // Return heap
     return pHeap;

@@ -25,6 +25,8 @@ enum TokenType {
     OP_EQ, OP_NEQ, // ==, !=
     SIZEOF,
 
+    DOT, ARROW,
+
     ASM, ASM_LOAD_AX, ASM_LOAD_BX, ASM_LOAD_CX, ASM_LOAD_DX,
     ASM_READ_AX, ASM_READ_BX, ASM_READ_CX, ASM_READ_DX,
 

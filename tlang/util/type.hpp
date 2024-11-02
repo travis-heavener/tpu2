@@ -29,7 +29,7 @@ class Type {
         Type(TokenType prim) : primitiveType(prim), pointers() {};
         Type(TokenType prim, bool isUnsigned) : primitiveType(prim), _isUnsigned(isUnsigned) {};
         
-        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer), _isConst(t._isConst), structName(t.structName), structTypes(t.structTypes) {};
+        Type(const Type& t) : primitiveType(t.primitiveType), pointers(t.pointers), _isUnsigned(t._isUnsigned), numArrayHints(t.numArrayHints), _isReferencePointer(t._isReferencePointer), _isConst(t._isConst), structName(t.structName), structMemberTypes(t.structMemberTypes) {};
         Type(const Type&& type);
 
         Type& operator=(const Type&);
@@ -90,6 +90,8 @@ class Type {
         void addStructField(const std::string&, const Type&, const ErrInfo);
         void copyStructFields(const Type&);
         bool isStructNonPtr() const { return isStruct() && getNumPointers() == 0; };
+        Type getStructMemberType(const std::string&, const ErrInfo) const;
+        size_t getStructMemberOffset(const std::string&, const ErrInfo) const;
     private:
         TokenType primitiveType;
         std::vector<size_t> pointers;
@@ -107,7 +109,7 @@ class Type {
 
         // for structs
         std::string structName = "";
-        std::map<std::string, Type> structTypes;
+        std::map<std::string, Type> structMemberTypes;
 };
 
 #endif

@@ -122,8 +122,9 @@ void replaceMacrodefs(std::string& line, macrodef_map& macroMap, size_t offset) 
                 line.erase(line.begin() + i, line.begin() + end);
                 line.insert(i, newStr);
                 i = end;
+            } else {
+                ++i;
             }
-            ++i;
         }
     }
 }

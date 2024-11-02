@@ -152,36 +152,76 @@ __UF3:
     __UF3E:
     ret
 __UF4:
-    add SP, 5
-    pushw 5
-    mov AL, [SP-1]
-    and AL, 0x80
-    sub SP, 1
-    pop BL
-    or BL, AL
-    push BL
     pushw 0
-    push [SP-3]
-    mov AL, [SP-1]
-    and AL, 0x80
-    movw CX, 0
-    buf AL
-    jz __J13
-    movw CX, 0xFFFF
-    __J13:
-    mov BL, CL
-    or BL, AL
-    push BL
+    pushw 2
     call __UF1
     sub SP, 2
     movw BP, SP
     sub BP, 2
     push [BP+0]
+    push [BP+1]
+    popw CX
+    add CX, 1
+    pushw CX
+    pushw 0
+    mov AL, [SP-1]
+    and AL, 0x80
+    pop BL
+    or BL, AL
+    push BL
+    popw BX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    popw CX
+    add CX, 3
+    pushw CX
+    pushw 65535
+    movw BX, 14336
+    popw AX
+    ssub AX, BX
+    pushw AX
+    movw BX, 1
+    popw AX
+    sadd AX, BX
+    movw BX, AX
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    mov [BP+1], BH
+    pushw BX
+    sub SP, 2
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
+    push [BP+1]
+    pushw 1
+    mov AL, [SP-1]
+    and AL, 0x80
+    sub SP, 1
+    pop BL
+    or BL, AL
+    xor BH, BH
+    popw AX
+    movw BP, AX
+    mov [BP+0], BL
+    push BL
+    sub SP, 1
+    movw BP, SP
+    sub BP, 2
+    push [BP+0]
     mov DL, [BP+1]
-    mov [SP-10], DL
+    mov [SP-4], DL
     pop DL
-    mov [SP-10], DL
-    sub SP, 8
+    mov [SP-4], DL
+    sub SP, 2
     __UF4E:
     ret
 __UF5:
