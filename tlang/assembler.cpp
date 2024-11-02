@@ -654,12 +654,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     // all use similar/the same process, so combined them here
                     if (isUnsigned) {
                         switch (opType) {
-                            case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break; // mul AX/AL by BX/BL
-                            case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break; // div AX/AL by BX/BL
-                            case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break; // mod AX/AL by BX/BL
-                            case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break; // bitwise or
-                            case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break; // bitwise and
-                            case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break; // bitwise xor
+                            case TokenType::ASTERISK:   OUT_BIN_OP_1B(mul); break;  // mul AX/AL by BX/BL
+                            case TokenType::OP_DIV:     OUT_BIN_OP_1B(div); break;  // div AX/AL by BX/BL
+                            case TokenType::OP_MOD:     OUT_BIN_OP_1B(div); break;  // mod AX/AL by BX/BL
+                            case TokenType::OP_BIT_OR:  OUT_BIN_OP_2(or); break;    // bitwise or
+                            case TokenType::AMPERSAND:  OUT_BIN_OP_2(and); break;   // bitwise and
+                            case TokenType::OP_BIT_XOR: OUT_BIN_OP_2(xor); break;   // bitwise xor
                             default: break; // doesn't get here
                         }
                     } else {

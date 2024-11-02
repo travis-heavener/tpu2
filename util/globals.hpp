@@ -54,7 +54,7 @@
 #define HEAP_SIZE HEAP_UPPER_ADDR - HEAP_LOWER_ADDR + 1
 
 // clock frequency for TPU
-#define CLOCK_FREQ_HZ   10'000
+#define CLOCK_FREQ_HZ   50'000
 #define CYCLE_TIME      1.0d / CLOCK_FREQ_HZ
 
 // addressing mode defines

@@ -75,11 +75,9 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
         const std::string& inPath = kwds[1].substr(1, kwds[1].size()-2);
 
         std::filesystem::path inPathAbs;
-        bool isStdlib = false;
         if (isLocalInclude) {
             inPathAbs = cwdStack.top() / std::filesystem::path(inPath);
         } else {
-            isStdlib = true;
             inPathAbs = std::filesystem::path(STDLIB_DIR) / inPath;
         }
 
@@ -97,7 +95,7 @@ bool preprocessLine(std::string line, macrodef_map& macroMap, std::vector<Token>
         cwdStack.push( std::filesystem::absolute(inPathAbs).parent_path() );
 
         // tokenize
-        tokenize(inHandle, tokens, cwdStack, inPathAbs.filename().string(), isStdlib);
+        tokenize(inHandle, tokens, cwdStack, inPathAbs.filename().string());
 
         // close file
         cwdStack.pop();
