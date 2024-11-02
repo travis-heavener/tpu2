@@ -40,4 +40,4 @@ if __name__ == "__main__":
     # load the OS image to the drive
     # TODO
 
-    print("Disk created: " + drive_path)
+    # print("Disk created: " + drive_path)

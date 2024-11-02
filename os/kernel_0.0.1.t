@@ -107,18 +107,50 @@ void heap_free() {
 
     // Find the block
     uint_16 i = 0;
+    uint_16 prevSize = 0;
 
     while (i < HEAP_SIZE) {
+        // Get the size of this block
+        uint_16 blockSize = ((uint_16)pHeap[i+1] << 8) | pHeap[i];
+
         // Check if the address matches
         if (i + HEAP_START + 3 == addr) {
             // Mark the block as free
             pHeap[i + 2] = HEAP_FREE;
+
+            // Attempt to coalesce heap blocks to prevent fragmentation
+
+            // Check if next block exists
+            if (i + blockSize + 5 < HEAP_SIZE) {
+                // Check if next block is free
+                if (pHeap[i + blockSize + 5] == HEAP_FREE) {
+                    // Get size of next block
+                    uint_16 nextBlockSize = ((uint_16)pHeap[i+blockSize+4] << 8) | pHeap[i+blockSize+3];
+
+                    // Merge into this one by updating own size
+                    blockSize = blockSize + nextBlockSize + 3; // Ignore next block's metadata
+                    pHeap[i] = (blockSize) & 0xFF;
+                    pHeap[i + 1] = (blockSize >> 8) & 0xFF;
+                }
+            }
+
+            // Check if the previous block exists
+            if (prevSize > 0) {
+                // Check if previous block is free
+                uint_16 prevIndexStart = i - prevSize - 3;
+                if (pHeap[prevIndexStart + 2] == HEAP_FREE) {
+                    // Update previous block's size by this one
+                    prevSize = prevSize + blockSize + 3; // Ignore this block's metadata
+                    pHeap[prevIndexStart] = (prevSize) & 0xFF;
+                    pHeap[prevIndexStart+1] = (prevSize >> 8) & 0xFF;
+                }
+            }
             return;
         }
 
         // Otherwise, jump to next block
-        uint_16 blockSize = ((uint_16)pHeap[i+1] << 8) | pHeap[i];
         i = i + blockSize + 3;
+        prevSize = blockSize;
     }
 }
 
@@ -130,42 +162,6 @@ int main() {
     // Initialize heap
     heap_init();
 
-    // Test allocate a block
-    uint_16* addr;
-    __load_CX(HEAP_SIZE-3);
-    heap_alloc();
-    addr = __read_DX();
-    uint_8* pHeap = HEAP_START;
-
-    // Free the block
-    __load_BX(addr);
-    heap_free();
-
-
-    __load_CX(19);
-    heap_alloc();
-    addr = __read_DX();
-    uint_16* p = addr;
-
-   
-
-    __load_CX(19);
-    heap_alloc();
-    addr = __read_DX();
-
-    __load_BX(p);
-    heap_free();
-
-
-    __load_CX(14);
-    heap_alloc();
-    addr = __read_DX();
-
-    __load_CX(1);
-    heap_alloc();
-    addr = __read_DX();
-
-    return addr;
     // Exit success
     return EXIT_SUCCESS;
 }
