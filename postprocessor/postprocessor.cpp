@@ -1,6 +1,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <regex>
 #include <string>
 #include <vector>
 
@@ -10,14 +11,25 @@
 
 #define TAB "    "
 
+const std::regex REG_IMMED("(-?((0[Bb][01]+)|(0[Xx][abcdefABCDEF\\d]+)|(\\d+)))");
+int parseInt(const std::string& str, bool ignoreNegatives=false) {
+    // verify regex matches
+    if (!std::regex_match(str, REG_IMMED)) throw std::invalid_argument("Invalid IMM8/IMM16");
+    if (str[0] == '-' && ignoreNegatives) throw std::invalid_argument("Invalid IMM8/IMM16");
+
+    bool isNeg = str[0] == '-';
+    int radix = (str[1+isNeg] == 'b' || str[1+isNeg] == 'B') ? 2 : (str[1+isNeg] == 'x' || str[1+isNeg] == 'X') ? 16 : 10;
+    return (isNeg ? -1 : 1) * std::stoll(str.substr(isNeg), nullptr, radix);
+}
+
 typedef struct post_process_opts {
-    // removes any identity operations (ex. movw AX, AX) that don't set flags (doesn't remove arithmetic identities that may be used as a buffer)
+    // removes any identity operations (ex. mov AX, AX) that don't set flags (doesn't remove arithmetic identities that may be used as a buffer)
     bool removeIdentities   = true; // default: true
 
     // combines any consecutive imm8 push operations into imm16 pushw operations
     bool mergeImm8Pushes    = true; // default: true
 
-    // combines any push/pop operations between registers to mov/movw instructions and remove redundant push/pops
+    // combines any push/pop operations between registers to mov instructions and remove redundant push/pops
     bool reducePushPops     = true; // default: true
 
     // combines any consecutive target-less pop/popw instructions to just subtracting from the SP
@@ -138,11 +150,9 @@ int main(int argc, char* argv[]) {
     while (line != "") {
         // handle arguments & such
         if (opts.removeIdentities && strippedLine.find("mov") == 0) {
-            bool isWordOp = strippedLine.find("movw") == 0;
-
             // grab both args
             const size_t commaIndex = strippedLine.find(',');
-            size_t startIndex = 4 + isWordOp;
+            size_t startIndex = 4;
             std::string argA = strippedLine.substr(startIndex, commaIndex - startIndex);
             
             startIndex = commaIndex+1;
@@ -162,8 +172,8 @@ int main(int argc, char* argv[]) {
             if (opts.mergeImm8Pushes && strippedLineBuf.find("push ") == 0) { // can be combined
                 // extract values
                 try {
-                    int valA = std::stoi( strippedLine.substr(5) );
-                    int valB = std::stoi( strippedLineBuf.substr(5) );
+                    int valA = parseInt( strippedLine.substr(5), true );
+                    int valB = parseInt( strippedLineBuf.substr(5), true );
 
                     std::string newInst = "pushw " + std::to_string( ((valB << 8) | valA) & 0xFFFF );
                     writeInstruction(opts, outHandle, newInst, newInst);
@@ -203,7 +213,7 @@ int main(int argc, char* argv[]) {
 
                 // write instruction if not the same argument
                 if (regA != regB) {
-                    std::string newInst = "movw " + regB + ", " + regA;
+                    std::string newInst = "mov " + regB + ", " + regA;
                     writeInstruction(opts, outHandle, newInst, newInst);
                 }
             } else if (strippedLineBuf != "popw") { // if popw, ignore anyways since whatever is pushed gets popped
