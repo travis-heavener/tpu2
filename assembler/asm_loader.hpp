@@ -25,6 +25,7 @@ class Label {
 };
 
 typedef std::map<std::string, Label> label_map_t;
+typedef std::vector<std::pair<std::string, u16>> label_replace_vec_t;
 
 // used to resolve an argument into its corresponding numeric value
 #define ARG_REG8            0

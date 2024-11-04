@@ -53,7 +53,7 @@ void generateAssembly(AST& ast, std::ofstream& outHandle) {
     // iterate over all data elements
     size_t dataStrId = 0;
     for (DataElem elem : dataElements) {
-        outHandle << TAB << STR_DATA_LABEL_PREFIX << dataStrId++ << ' ' <<
+        outHandle << TAB << STR_DATA_LABEL_PREFIX << dataStrId++ << ": " <<
             elem.type << ' ' << elem.raw << '\n';
     }
 }

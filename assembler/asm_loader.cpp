@@ -10,11 +10,11 @@
 #include "../memory.hpp"
 
 // abstractions from processLineToText for readability
-void parseMOV(const std::vector<std::string>&, Memory&, u16&, std::vector<std::pair<std::string, u16>>&);
+void parseMOV(const std::vector<std::string>&, Memory&, u16&, label_replace_vec_t&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseMULDIVBUF(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
-void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, std::vector<std::pair<std::string, u16>>&);
+void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, label_replace_vec_t&);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&, bool);
 
 // returns true if a string is valid
@@ -153,7 +153,7 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
     label_map_t labelMap; // label name, start address
     
     // for labels that come after instIndex
-    std::vector<std::pair<std::string, u16>> labelsToReplace; // [ label name, replacement start address ]
+    label_replace_vec_t labelsToReplace; // [ label name, replacement start address ]
 
     // allocate space at the start of .text to jump to the main entry point
     memory[memIndex++] = OPCode::JMP;
@@ -239,6 +239,8 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
     size_t startIndex = 0, spaceIndex = line.find(' ');
     if (spaceIndex == std::string::npos) throw std::invalid_argument("Invalid data declaration.");
     std::string labelName = line.substr(startIndex, spaceIndex);
+    if (labelName.back() != ':') throw std::invalid_argument("Invalid data declaration.");
+    labelName.pop_back();
 
     // check for the data type
     startIndex = spaceIndex+1;
@@ -281,7 +283,7 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
 
 // process an individual line and load it into memory
 void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_map_t& labelMap,
-                 std::vector<std::pair<std::string, u16>>& labelsToReplace) {
+                 label_replace_vec_t& labelsToReplace) {
     stripComments(line); // remove comments
     trimString(line); // ltrim & rtrim string
 
@@ -407,7 +409,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
 }
 
 // abstraction to parse a MOV instruction
-void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, std::vector<std::pair<std::string, u16>>& labelsToReplace) {
+void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, label_replace_vec_t& labelsToReplace) {
     memory[instIndex++] = OPCode::MOV;
 
     // determine MOD byte
@@ -570,7 +572,7 @@ void parseNOT(const std::vector<std::string>& args, Memory& memory, u16& instInd
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
-void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, std::vector<std::pair<std::string, u16>>& labelsToReplace) {
+void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, label_replace_vec_t& labelsToReplace) {
     memory[instIndex++] = OPCode::PUSH;
 
     // extract args
