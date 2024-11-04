@@ -400,16 +400,10 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
         // allocate space on the stack for return bytes
         size_t returnSize = pDestFunc->getReturnType().getSizeBytes();
-
-        for (size_t i = 0; i < returnSize; i++) {
-            if (i+1 < returnSize) {
-                OUT << "pushw 0\n";
-                ++i;
-            } else {
-                OUT << "push 0\n";
-            }
+        if (returnSize) {
+            OUT << "add SP, " << returnSize << '\n';
+            scope.addPlaceholder(returnSize);
         }
-        scope.addPlaceholder(returnSize);
     }
 
     // recurse this expression's children, bottom-up
@@ -501,8 +495,6 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     break;
                 }
                 case TokenType::ASTERISK: {
-                    OUT << "mov BP, AX\n"; // dereference ptr whose address is stored in AX
-
                     // pass final result size
                     resultType = resultTypes[0];
                     resultType.popPointer();
@@ -511,12 +503,18 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     if (unaryOp.isLValue() ||
                         (resultType.isPointer() && resultType.getPointers().back() != TYPE_EMPTY_PTR)) {
                         // buffer to stack
-                        OUT << "pushw BP\n";
+                        OUT << "pushw AX\n";
                         scope.addPlaceholder(2);
                     } else {
                         // move that value to the stack
                         for (size_t k = 0; k < resultType.getSizeBytes(); ++k) {
-                            OUT << "push " << k << "(BP)\n";
+                            if (k+1 < resultType.getSizeBytes()) {
+                                OUT << "pushw " << k << "(AX)\n";
+                                ++k;
+                                scope.addPlaceholder();
+                            } else {
+                                OUT << "push " << k << "(AX)\n";
+                            }
                             scope.addPlaceholder();
                         }
                     }
@@ -621,8 +619,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                         // operand already in AX; move chunk size into CX
                         if (chunkSize > 0) {
-                            OUT << "mov CX, " << chunkSize << '\n';
-                            OUT << "mul CX\n"; // other operand is in BX already
+                            OUT << "mov CX, " << chunkSize << '\n'; // forces as 16-bit
+                            OUT << "mul CX\n"; // other operand is in AX already
                         }
                     }
 
@@ -684,9 +682,8 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     if (opType == TokenType::ASTERISK && dominantSize == 2 && !isUnsigned) {
                         // grab sign from DH
                         OUT << "pop CH\n";
-                        OUT << "mov CL, DH\n";
-                        OUT << "and CL, 128\n";
-                        OUT << "or CH, CL\n";
+                        OUT << "and DH, 0x80\n";
+                        OUT << "or CH, DH\n";
                         OUT << "push CH\n";
                     }
 
@@ -852,15 +849,13 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                 }
                 case TokenType::ASSIGN: {
                     // take the address of the given lvalue from the stack and assign a value to it
-                    OUT << "mov BP, AX\n"; // move address to BP
-
                     // move the rvalue to the lvalue's address
                     const size_t rvalueSize = resultTypes[1].getSizeBytes();
                     if (rvalueSize == 2) {
-                        OUT << "mov 0(BP), BL" << '\n';
-                        OUT << "mov 1(BP), BH" << '\n';
+                        OUT << "mov 0(AX), BL" << '\n';
+                        OUT << "mov 1(AX), BH" << '\n';
                     } else {
-                        OUT << "mov 0(BP), BL" << '\n';
+                        OUT << "mov 0(AX), BL" << '\n';
                     }
 
                     // push the value of the variable onto the stack (lowest-first)
@@ -913,43 +908,53 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             // if there aren't any subscripts, handle the value here
             if (identifier.getNumSubscripts() == 0) {
                 if (idenType.isPointer()) { // handle pointers
-                    // push the address onto the stack
-                    OUT << "mov BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
-                    OUT << "sub BP, " << stackOffset << '\n';
-                    OUT << "pushw BP\n";
-                    scope.addPlaceholder(2);
-
                     // if this is a reference pointer (ie. array passed as an argument), dereference it
                     if (idenType.isReferencePointer()) {
                         // doesn't need to be a reference pointer anymore
-                        OUT << "popw BP\n"; // move address back into BP
                         idenType.setIsReferencePointer(false);
-                        scope.pop(2);
 
                         // push the referenced value
                         const size_t typeSize = idenType.getSizeBytes();
-                        for (size_t k = 0; k < typeSize; ++k)
-                            OUT << "push " << k << "(BP)\n";
+                        for (size_t k = 0; k < typeSize; ++k) {
+                            if (k+1 < typeSize) {
+                                OUT << "pushw -" << stackOffset << "(SP)\n";
+                                ++k;
+                            } else {
+                                OUT << "push -" << stackOffset << "(SP)\n";
+                            }
+                        }
                         scope.addPlaceholder(typeSize);
+                    } else {
+                        // push the address onto the stack
+                        OUT << "mov AX, SP\n"; // move SP into AX
+                        OUT << "sub AX, " << stackOffset << '\n';
+                        OUT << "pushw AX\n";
+                        scope.addPlaceholder(2);
                     }
 
                     // if this is an lvalue, leave the address on the stack
                     if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
                         const size_t typeSize = idenType.getSizeBytes();
-                        OUT << "popw BP\n"; // pop address back into BP
+                        OUT << "popw AX\n"; // pop address back into AX
                         scope.pop(2);
 
-                        for (size_t k = 0; k < typeSize; ++k)
-                            OUT << "push " << k << "(BP)\n";
+                        for (size_t k = 0; k < typeSize; ++k) {
+                            if (k+1 < typeSize) {
+                                OUT << "pushw " << k << "(AX)\n";
+                                ++k;
+                            } else {
+                                OUT << "push " << k << "(AX)\n";
+                            }
+                        }
                         scope.addPlaceholder(typeSize);
                     }
                 } else { // handle primitives
                     // if this is an lvalue, pass the address
                     if (identifier.isLValue()) {
                         // push the address onto the stack
-                        OUT << "mov BP, SP\n"; // move SP into BP for manipulation w/o affecting the SP
-                        OUT << "sub BP, " << stackOffset << '\n';
-                        OUT << "pushw BP\n";
+                        OUT << "mov AX, SP\n"; // move SP into AX
+                        OUT << "sub AX, " << stackOffset << '\n';
+                        OUT << "pushw AX\n";
                         scope.addPlaceholder(2);
 
                         // if this identifier is the child of an address-of operator, force as pointer
@@ -958,16 +963,17 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     } else { // this is an rvalue, push the value onto the stack
                         const size_t typeSize = idenType.getSizeBytes();
                         for (size_t j = 0; j < typeSize; ++j) {
-                            OUT << "push -" << stackOffset << "(SP)\n";
-                            scope.addPlaceholder();
+                            if (j+1 < typeSize) {
+                                OUT << "pushw -" << stackOffset << "(SP)\n";
+                                ++j;
+                            } else {
+                                OUT << "push -" << stackOffset << "(SP)\n";
+                            }
                         }
+                        scope.addPlaceholder(typeSize);
                     }
                 }
             } else {
-                // push the address onto the stack
-                OUT << "mov BP, SP\n"; // store the SP in BP for manipulation w/o affecting SP directly
-                OUT << "sub BP, " << stackOffset << '\n';
-
                 // if this is a reference pointer (ie. array passed as an argument), dereference it
                 if (idenType.isReferencePointer()) {
                     // doesn't need to be a reference pointer anymore
@@ -975,12 +981,20 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                     // push the referenced value
                     const size_t typeSize = idenType.getSizeBytes();
-                    for (size_t k = 0; k < typeSize; ++k)
-                        OUT << "push " << k << "(BP)\n";
+                    for (size_t k = 0; k < typeSize; ++k) {
+                        if (k+1 < typeSize) {
+                            OUT << "pushw -" << stackOffset << "(SP)\n";
+                            ++k;
+                        } else {
+                            OUT << "push -" << stackOffset << "(SP)\n";
+                        }
+                    }
                     scope.addPlaceholder(typeSize);
                 } else {
                     // not a reference pointer, push the address
-                    OUT << "pushw BP\n"; // push the address of this identifier
+                    OUT << "mov AX, SP\n"; // store the SP in AX
+                    OUT << "sub AX, " << stackOffset << '\n';
+                    OUT << "pushw AX\n"; // push the address of this identifier
                     scope.addPlaceholder(2);
                 }
             }
@@ -1139,10 +1153,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                 // if this is a pointer (not an array), dereference and get its address
                 if (lastPtrSize == TYPE_EMPTY_PTR && !isImplicitArrayHint) {
-                    // pop address into BP
-                    OUT << "popw BP\n";
-                    OUT << "push 0(BP)\n";
-                    OUT << "push 1(BP)\n";
+                    // pop address into AX
+                    OUT << "popw AX\n";
+                    OUT << "pushw 0(AX)\n";
                 }
 
                 // assemble subscript (ast_nodes.cpp makes sure these are all implicitly converted to int)
@@ -1173,10 +1186,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                 // if this is an accessor by pointer, dereference
                 if (pAccessor->isByPointer) {
-                    // pop address into BP
-                    OUT << "popw BP\n";
-                    OUT << "push 0(BP)\n";
-                    OUT << "push 1(BP)\n";
+                    // pop address into AX
+                    OUT << "popw AX\n";
+                    OUT << "pushw 0(AX)\n";
                 }
 
                 // get the offset of the current member
@@ -1199,13 +1211,19 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         // if this isn't an array and isn't an lvalue, dereference the final address on the stack
         if (!isLValue && (resultType.getNumPointers() == 0 || resultType.getPointers().back() == TYPE_EMPTY_PTR)) {
             // dereference final address on stack
-            OUT << "popw BP\n"; // move address back into BP
+            OUT << "popw AX\n"; // move address back into AX
             scope.pop(2);
 
             // push the referenced value
             const size_t typeSize = resultType.getSizeBytes();
-            for (size_t k = 0; k < typeSize; ++k)
-                OUT << "push " << k << "(BP)\n";
+            for (size_t k = 0; k < typeSize; ++k) {
+                if (k+1 < typeSize) {
+                    OUT << "pushw " << k << "(AX)\n";
+                    ++k;
+                } else {
+                    OUT << "push " << k << "(AX)\n";
+                }
+            }
             scope.addPlaceholder(typeSize);
         }
     }

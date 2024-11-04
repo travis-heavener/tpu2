@@ -280,7 +280,15 @@ namespace instructions {
                 tpu.moveToRegister(regA, tpu.readWord(memory).getValue());
                 break;
             }
-            case 6: { // reg16, reg16
+            case 6: { // reg16, addr
+                Register regA = getReg16(tpu, memory);
+                u16 addr = getAddress(tpu, memory, isArgBOffset);
+                u16 value = memory[addr].getValue();
+                value |= ((u16)memory[addr+1].getValue()) << 8;
+                tpu.moveToRegister(regA, value);
+                break;
+            }
+            case 7: { // reg16, reg16
                 Register regA = getReg16(tpu, memory);
                 tpu.moveToRegister(regA, readReg16(tpu, memory));
                 break;
@@ -324,6 +332,13 @@ namespace instructions {
             case 4: { // addr
                 u16 addr = getAddress(tpu, memory, isArgAOffset);
                 memory[oldAddr] = memory[addr];
+                break;
+            }
+            case 5: { // addr (pushw)
+                u16 addr = getAddress(tpu, memory, isArgAOffset);
+                memory[oldAddr] = memory[addr];
+                memory[oldAddr+1] = memory[addr+1];
+                ++writeSize;
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: push.");

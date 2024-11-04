@@ -49,13 +49,15 @@ mov reg8, imm8              0x06 /2         Move imm8 into 8-bit register.
 mov reg8, addr              0x06 /3         Move 8-bit value from memory address into 8-bit register.
 mov reg8, reg8              0x06 /4         Move value between reg8.
 mov reg16, imm16            0x06 /5         Move imm16 into 16-bit register.
-mov reg16, reg16            0x06 /6         Move value between reg16.
+mov reg16, addr             0x06 /6         Move 16-bit word from an address and the next address (little-endian) from memory into reg16.
+mov reg16, reg16            0x06 /7         Move value between reg16.
 
 push reg8                   0x08 /0         Pushes the value of a reg8 onto the stack.
 pushw reg16                 0x08 /1         Pushes the value of a reg16 onto the stack, lowest byte first.
 push imm8                   0x08 /2         Pushes an imm8 value onto the stack.
 pushw imm16                 0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
 push addr                   0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
+pushw addr                  0x08 /5         Pushes a 16-bit word from an address and the next address (little-endian) from memory onto the stack.
 
 pop reg8                    0x09 /0         Pops the top byte off the stack to a reg8.
 popw reg16                  0x09 /1         Pops the top two bytes off the stack to a reg16, the top byte into the upper half.

@@ -440,7 +440,7 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
         case ARG_REG16: {
             if (statusA != ARG_REG16)
                 throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 6;
+            MOD |= 7;
             break;
         }
         case ARG_IMM8: {
@@ -471,15 +471,16 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
             break;
         }
         case ARG_ADDR_DIRECT: {
-            if (statusA != ARG_REG8)
+            if (statusA != ARG_REG8 && statusA != ARG_REG16)
                 throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 3;
+            MOD |= (statusA == ARG_REG8) ? 3 : 6;
             break;
         }
         case ARG_ADDR_OFFSET: {
-            if (statusA != ARG_REG8)
+            if (statusA != ARG_REG8 && statusA != ARG_REG16)
                 throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 3 | 32; // set MOD byte to 3 and set the 6th bit to mark this as an offset address
+            MOD |= (statusA == ARG_REG8) ? 3 : 6;
+            MOD |= 32; // set the 6th bit to mark this as an offset address
             break;
         }
         default: throw std::invalid_argument("Invalid second argument to mov.");
@@ -596,12 +597,11 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
             MOD |= 3;
             break;
         case ARG_ADDR_DIRECT:
-            if (isPUSHW) throw std::invalid_argument("Invalid 8-bit operation.");
-            MOD |= 4;
+            MOD |= isPUSHW ? 5 : 4;
             break;
         case ARG_ADDR_OFFSET: {
-            if (isPUSHW) throw std::invalid_argument("Invalid 8-bit operation.");
-            MOD |= 4 | 16; // set MOD byte to 4 and set the 5th bit to mark this as an offset address
+            MOD |= isPUSHW ? 5 : 4;
+            MOD |= 16; // set the 5th bit to mark this as an offset address
             break;
         }
         case ARG_LABEL: {

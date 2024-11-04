@@ -2,10 +2,9 @@ section .text
 __UF0:
     mov AX, 14336
     pushw AX
-    mov BP, SP
-    sub BP, 2
-    push 0(BP)
-    push 1(BP)
+    mov AX, SP
+    sub AX, 2
+    pushw 0(AX)
     mov AX, 0
     popw CX
     add CX, AX
@@ -24,14 +23,12 @@ __UF0:
     pop BL
     xor BH, BH
     popw AX
-    mov BP, AX
-    mov 0(BP), BL
+    mov 0(AX), BL
     push BL
     sub SP, 1
-    mov BP, SP
-    sub BP, 2
-    push 0(BP)
-    push 1(BP)
+    mov AX, SP
+    sub AX, 2
+    pushw 0(AX)
     mov AX, 1
     popw CX
     add CX, AX
@@ -54,14 +51,12 @@ __UF0:
     pop BL
     xor BH, BH
     popw AX
-    mov BP, AX
-    mov 0(BP), BL
+    mov 0(AX), BL
     push BL
     sub SP, 1
-    mov BP, SP
-    sub BP, 2
-    push 0(BP)
-    push 1(BP)
+    mov AX, SP
+    sub AX, 2
+    pushw 0(AX)
     mov AX, 2
     popw CX
     add CX, AX
@@ -74,8 +69,7 @@ __UF0:
     or BL, AL
     xor BH, BH
     popw AX
-    mov BP, AX
-    mov 0(BP), BL
+    mov 0(AX), BL
     push BL
     sub SP, 1
     sub SP, 2
@@ -87,34 +81,27 @@ _main:
     pushw 19
     pushw 12312
     pushw 12312
-    push -4(SP)
-    push -4(SP)
+    mov AX, -4(SP)
+    pushw AX
     sub SP, 2
-    push -2(SP)
-    push -2(SP)
+    mov AX, -2(SP)
+    pushw AX
     sub SP, 2
-    mov BP, SP
-    sub BP, 4
-    pushw BP
-    push -4(SP)
-    push -4(SP)
-    push -8(SP)
-    push -8(SP)
-    popw BX
+    mov AX, SP
+    sub AX, 4
+    pushw AX
+    pushw -4(SP)
+    mov BX, -8(SP)
     popw AX
     add AX, BX
     mov BX, AX
     popw AX
-    mov BP, AX
-    mov 0(BP), BL
-    mov 1(BP), BH
+    mov 0(AX), BL
+    mov 1(AX), BH
     pushw BX
     sub SP, 2
-    push -4(SP)
-    push -4(SP)
-    push -8(SP)
-    push -8(SP)
-    popw BX
+    pushw -4(SP)
+    mov BX, -8(SP)
     popw AX
     add AX, BX
     pushw AX
