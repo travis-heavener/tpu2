@@ -1,3 +1,24 @@
+ARGUMENT TYPES:
+--------------------------------------------------------------------------------------------------------------------------------
+imm8:   An immediate, 8-bit value.
+imm16:  A label or an immediate, 16-bit value.
+addr:   A 16-bit memory address prefixed by '@' (ex. @0xBEEF or @14336), or at a 16-bit, signed offset from a register (ex. 4(SP), -8(AX)).
+reg8:   An 8-bit register.
+reg16:  A 16-bit register.
+
+MOD BYTE CONVENTION:
+The following convention applies to all arithmetic and logical operations' MOD bytes.
+MOD BYTE        1 ARGUMENT          2 ARGUMENTS
+--------------------------------------------------------------------------------------------------------------------------------
+/0              imm8                reg8,   imm8
+/1              imm16               reg16,  imm16
+/2              reg8                reg8,   reg8
+/3              reg16               reg16,  reg16
+/4              --                  --
+/5              --                  --
+/6              --                  --
+/7              --                  --
+
 INSTRUCTION                 OPCODE          COMMENTS
 --------------------------------------------------------------------------------------------------------------------------------
 nop                         0x00            No operation.
@@ -6,129 +27,129 @@ hlt                         0x01            Halts/stops the clock on the CPU.
 
 syscall                     0x02            Triggers a syscall.
 
-call label                  0x03            Moves the instruction pointer to a named label's entry address, storing the current instruction pointer on the callstack.
+call imm16                  0x03            Moves the instruction pointer to an entry address, storing the current instruction pointer on the callstack.
 
 ret                         0x04            Revert the instruction pointer to the previous memory address stored on top of the callstack.
 
-jmp label                   0x05 /0         Moves the instruction pointer to the specified label.
-jz label                    0x05 /1         Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
-jnz label                   0x05 /2         Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
-jc label                    0x05 /3         Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
-jnc label                   0x05 /4         Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
+jmp imm16                   0x05 /0         Moves the instruction pointer to the specified address.
+jz imm16                    0x05 /1         Moves the instruction pointer to the specified address, if the zero flag (ZF) is set.
+jnz imm16                   0x05 /2         Moves the instruction pointer to the specified address, if the zero flag (ZF) is cleared.
+jc imm16                    0x05 /3         Moves the instruction pointer to the specified address, if the carry flag (CF) is set.
+jnc imm16                   0x05 /4         Moves the instruction pointer to the specified address, if the carry flag (CF) is cleared.
 
-mov @addr, imm8             0x06 /0         Move imm8 into address in memory.
-mov @addr, reg              0x06 /1         Move value in 8-bit register to memory address.
-mov reg, imm8               0x06 /2         Move imm8 into 8-bit register.
-mov reg, @addr              0x06 /3         Move 8-bit value from memory address into 8-bit register.
-mov reg, reg                0x06 /4         Move value between 8-bit registers.
-mov [offset], reg           0x06 /5         Move value from a memory address at an offset to a pointer register (SP, BP, CP) to an 8-bit register.
-mov reg, [offset]           0x06 /6         Move value from an 8-bit register to the memory address at an offset from a pointer register (SP, BP, CP).
+mov addr, imm8              0x06 /0         Move imm8 into address in memory.
+mov addr, reg8              0x06 /1         Move value in 8-bit register to memory address.
+mov reg8, imm8              0x06 /2         Move imm8 into 8-bit register.
+mov reg8, addr              0x06 /3         Move 8-bit value from memory address into 8-bit register.
+mov reg8, reg8              0x06 /4         Move value between reg8.
+mov reg16, imm16            0x06 /5         Move imm16 into 16-bit register.
+mov reg16, reg16            0x06 /6         Move value between reg16.
 
-movw reg, imm16             0x07 /0         Move imm16 into 16-bit register.
-movw reg, reg               0x07 /1         Move value between 16-bit registers.
-
-push reg                    0x08 /0         Pushes the value of an 8-bit register onto the stack.
-pushw reg                   0x08 /1         Pushes the value of a 16-bit register onto the stack, lowest byte first.
+push reg8                   0x08 /0         Pushes the value of a reg8 onto the stack.
+pushw reg16                 0x08 /1         Pushes the value of a reg16 onto the stack, lowest byte first.
 push imm8                   0x08 /2         Pushes an imm8 value onto the stack.
 pushw imm16                 0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
-push @addr                  0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
-push [offset]               0x08 /5         Pushes an 8-bit value from a relative address of a pointer register onto the stack.
+push addr                   0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
 
-pop reg                     0x09 /0         Pops the top byte off the stack to an 8-bit register.
-pop                         0x09 /1         Pops the last byte off the stack without storing it.
+pop reg8                    0x09 /0         Pops the top byte off the stack to a reg8.
+popw reg16                  0x09 /1         Pops the top two bytes off the stack to a reg16, the top byte into the upper half.
+pop                         0x09 /2         Pops the top byte off the stack without storing it.
+popw                        0x09 /3         Pops the top two bytes off the stack without storing them.
 
-popw reg                    0x0A /0         Pops the top two bytes off the stack to a 16-bit register, the top byte into the upper half.
-popw                        0x0A /1         Pops the top two bytes off the stack without storing them.
+Adds both operands, storing result in first operand.
+add reg8, imm8              0x14 /0
+add reg16, imm16            0x14 /1
+add reg8, reg8              0x14 /2
+add reg16, reg16            0x14 /3
+sadd reg8, imm8             0x14 /0  (signed)
+sadd reg16, imm16           0x14 /1  (signed)
+sadd reg8, reg8             0x14 /2  (signed)
+sadd reg16, reg16           0x14 /3  (signed)
 
-add reg, imm8               0x14 /0  U      Adds 8-bit register and imm8 and stores in first operand.
-add reg, imm16              0x14 /1  U      Adds 16-bit register and imm16 and stores in first operand.
-add reg, reg                0x14 /2  U      Adds two 8-bit registers and stores in first operand.
-add reg, reg                0x14 /3  U      Adds two 16-bit registers and stores in first operand.
+Subtracts second operand from first, storing result in first operand.
+sub reg8, imm8              0x15 /0
+sub reg16, imm16            0x15 /1
+sub reg8, reg8              0x15 /2
+sub reg16, reg16            0x15 /3
+ssub reg8, imm8             0x15 /0  (signed)
+ssub reg16, imm16           0x15 /1  (signed)
+ssub reg8, reg8             0x15 /2  (signed)
+ssub reg16, reg16           0x15 /3  (signed)
 
-sadd reg, imm8              0x14 /0  S      Signed-adds 8-bit register and imm8 and stores in first operand.
-sadd reg, imm16             0x14 /1  S      Signed-adds 16-bit register and imm16 and stores in first operand.
-sadd reg, reg               0x14 /2  S      Signed-adds two 8-bit registers and stores in first operand.
-sadd reg, reg               0x14 /3  S      Signed-adds two 16-bit registers and stores in first operand.
+Multiplies the AL (8-bit) or AX (16-bit) register by the operand, storing the lower and upper halves in AL & AH (8-bit) or AX & DX (16-bit).
+mul imm8                    0x16 /0
+mul imm16                   0x16 /1
+mul reg8                    0x16 /2
+mul reg16                   0x16 /3
+smul imm8                   0x16 /0  (signed)
+smul imm16                  0x16 /1  (signed)
+smul reg8                   0x16 /2  (signed)
+smul reg16                  0x16 /3  (signed)
 
-sub reg, imm8               0x15 /0  U      Subtracts imm8 from an 8-bit register and stores in first operand.
-sub reg, imm16              0x15 /1  U      Subtracts imm16 from a 16-bit register and stores in first operand.
-sub reg, reg                0x15 /2  U      Subtracts 8-bit registers (second operand from first) and stores in first operand.
-sub reg, reg                0x15 /3  U      Subtracts 16-bit registers (second operand from first) and stores in first operand.
+Divides the AL (8-bit) or AX (16-bit) register by the operand, storing the dividend and remainder in AL & AH (8-bit) or AX & DX (16-bit).
+div imm8                    0x17 /0
+div imm16                   0x17 /1
+div reg8                    0x17 /2
+div reg16                   0x17 /3
+sdiv imm8                   0x17 /0  (signed)
+sdiv imm16                  0x17 /1  (signed)
+sdiv reg8                   0x17 /2  (signed)
+sdiv reg16                  0x17 /3  (signed)
 
-ssub reg, imm8              0x15 /0  S      Signed-subtracts imm8 from an 8-bit register and stores in first operand.
-ssub reg, imm16             0x15 /1  S      Signed-subtracts imm16 from a 16-bit register and stores in first operand.
-ssub reg, reg               0x15 /2  S      Signed-subtracts 8-bit registers (second operand from first) and stores in first operand.
-ssub reg, reg               0x15 /3  S      Signed-subtracts 16-bit registers (second operand from first) and stores in first operand.
+Compares both operands. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+cmp reg8, imm8              0x18 /0
+cmp reg16, imm16            0x18 /1
+cmp reg8, reg8              0x18 /2
+cmp reg16, reg16            0x18 /3
+scmp reg8, imm8             0x18 /0  (signed)
+scmp reg16, imm16           0x18 /1  (signed)
+scmp reg8, reg8             0x18 /2  (signed)
+scmp reg16, reg16           0x18 /3  (signed)
 
-mul imm8                    0x16 /0  U      Multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
-mul imm16                   0x16 /1  U      Multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-mul reg                     0x16 /2  U      Multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-mul reg                     0x16 /3  U      Multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+Buffers the operand, updating flags accordingly.
+buf imm8                    0x1F /0
+buf imm16                   0x1F /1
+buf reg8                    0x1F /2
+buf reg16                   0x1F /3
 
-smul imm8                   0x16 /0  S      Signed-multiplies the AL register by imm8 and stores the product in the 16-bit AX register.
-smul imm16                  0x16 /1  S      Signed-multiplies the AX register by imm16 and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
-smul reg                    0x16 /2  S      Signed-multiplies the AL register by an 8-bit register and stores the product in the 16-bit AX register.
-smul reg                    0x16 /3  S      Signed-multiplies the AX register by a 16-bit register and stores the lower half of the product in the 16-bit AX register and upper half in the 16-bit DX register.
+Logical AND between both operands, storing the result in the first.
+and reg8, imm8              0x20 /0
+and reg16, imm16            0x20 /1
+and reg8, reg8              0x20 /2
+and reg16, reg16            0x20 /3
 
-div imm8                    0x17 /0  U      Divides the AL register by imm8 and stores the dividend in AL and remainder AH.
-div imm16                   0x17 /1  U      Divides the AX register by imm16 and stores the dividend in AX and remainder DX.
-div reg                     0x17 /2  U      Divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
-div reg                     0x17 /3  U      Divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
+Logical OR between both operands, storing the result in the first.
+or reg8, imm8               0x21 /0
+or reg16, imm16             0x21 /1
+or reg8, reg8               0x21 /2
+or reg16, reg16             0x21 /3
 
-sdiv imm8                   0x17 /0  S      Signed-divides the AL register by imm8 and stores the dividend in AL and remainder AH.
-sdiv imm16                  0x17 /1  S      Signed-divides the AX register by imm16 and stores the dividend in AX and remainder DX.
-sdiv reg                    0x17 /2  S      Signed-divides the AL register by an 8-bit register and stores the dividend in AL and remainder AH.
-sdiv reg                    0x17 /3  S      Signed-divides the AX register by a 16-bit register and stores the dividend in AX and remainder DX.
+Logical XOR between both operands, storing the result in the first.
+xor reg8, imm8              0x22 /0
+xor reg16, imm16            0x22 /1
+xor reg8, reg8              0x22 /2
+xor reg16, reg16            0x22 /3
 
-cmp reg, imm8               0x18 /0  U      Compares an 8-bit register value and imm8. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-cmp reg, imm16              0x18 /1  U      Compares a 16-bit register value and imm16. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-cmp reg, reg                0x18 /2  U      Compares two 8-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-cmp reg, reg                0x18 /3  U      Compares two 16-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+Performs a bitwise NOT on the register operand and stores the result in place.
+not reg8                    0x23 /0
+not reg16                   0x23 /1
 
-scmp reg, imm8              0x18 /0  S      Signed-compares an 8-bit register value and imm8. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-scmp reg, imm16             0x18 /1  S      Signed-compares a 16-bit register value and imm16. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-scmp reg, reg               0x18 /2  S      Signed-compares two 8-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-scmp reg, reg               0x18 /3  S      Signed-compares two 16-bit registers. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
+Shifts the first operand left as many times as the value of the second operand, storing in the first operand.
+shl reg8, imm8              0x24 /0
+shl reg16, imm16            0x24 /1
+shl reg8, reg8              0x24 /2
+shl reg16, reg16            0x24 /3
+sshl reg8, imm8             0x24 /0  (signed)
+sshl reg16, imm16           0x24 /1  (signed)
+sshl reg8, reg8             0x24 /2  (signed)
+sshl reg16, reg16           0x24 /3  (signed)
 
-buf reg                     0x1F /0         Buffers a value from an 8-bit register, updating the flags according to the register value.
-buf reg                     0x1F /1         Buffers a value from a 16-bit register, updating the flags according to the register value.
-buf imm8                    0x1F /2         Buffers an imm8 value, updating the flags according to the value.
-buf imm16                   0x1F /3         Buffers an imm16 value, updating the flags according to the value.
-
-and reg, imm8               0x20 /0         Logical AND between 8-bit register and imm8, stored in first operand.
-and reg, imm16              0x20 /1         Logical AND between 16-bit register and imm16, stored in first operand.
-and reg, reg                0x20 /2         Logical AND between two 8-bit registers, stored in first operand.
-and reg, reg                0x20 /3         Logical AND between two 16-bit registers, stored in first operand.
-
-or reg, imm8                0x21 /0         Logical OR between 8-bit register and imm8, stored in first operand.
-or reg, imm16               0x21 /1         Logical OR between 16-bit register and imm16, stored in first operand.
-or reg, reg                 0x21 /2         Logical OR between two 8-bit registers, stored in first operand.
-or reg, reg                 0x21 /3         Logical OR between two 16-bit registers, stored in first operand.
-
-xor reg, imm8               0x22 /0         Logical XOR between 8-bit register and imm8, stored in first operand.
-xor reg, imm16              0x22 /1         Logical XOR between 16-bit register and imm16, stored in first operand.
-xor reg, reg                0x22 /2         Logical XOR between two 8-bit registers, stored in first operand.
-xor reg, reg                0x22 /3         Logical XOR between two 16-bit registers, stored in first operand.
-
-not reg                     0x23 /0         Performs bitwise NOT on an 8-bit register and stores in that register.
-not reg                     0x23 /1         Performs bitwise NOT on an 16-bit register and stores in that register.
-
-shl reg, imm8               0x24 /0  U      Shifts the value in the given 8-bit register left imm8 times in place.
-shl reg, imm8               0x24 /1  U      Shifts the value in the given 16-bit register left imm8 times in place.
-shl reg, reg                0x24 /2  U      Shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
-shl reg, reg                0x24 /3  U      Shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
-
-sshl reg, imm8              0x24 /0  S      Signed-shifts the value in the given 8-bit register left imm8 times in place.
-sshl reg, imm8              0x24 /1  S      Signed-shifts the value in the given 16-bit register left imm8 times in place.
-sshl reg, reg               0x24 /2  S      Signed-shifts the value in the given 8-bit register left once for the value in the 8-bit register in place.
-sshl reg, reg               0x24 /3  S      Signed-shifts the value in the given 16-bit register left once for the value in the 8-bit register in place.
-
-shr reg, imm8               0x25 /0  U      Shifts the value in the given 8-bit register right imm8 times in place.
-shr reg, imm8               0x25 /1  U      Shifts the value in the given 16-bit register right imm8 times in place.
-shr reg, reg                0x25 /2  U      Shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
-shr reg, reg                0x25 /3  U      Shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
-
-sshr reg, imm8              0x25 /0  S      Signed-shifts the value in the given 8-bit register right imm8 times in place.
-sshr reg, imm8              0x25 /1  S      Signed-shifts the value in the given 16-bit register right imm8 times in place.
-sshr reg, reg               0x25 /2  S      Signed-shifts the value in the given 8-bit register right once for the value in the 8-bit register in place.
-sshr reg, reg               0x25 /3  S      Signed-shifts the value in the given 16-bit register right once for the value in the 8-bit register in place.
+Shifts the first operand right as many times as the value of the second operand, storing in the first operand.
+shr reg8, imm8              0x25 /0
+shr reg16, imm16            0x25 /1
+shr reg8, reg8              0x25 /2
+shr reg16, reg16            0x25 /3
+sshr reg8, imm8             0x25 /0  (signed)
+sshr reg16, imm16           0x25 /1  (signed)
+sshr reg8, reg8             0x25 /2  (signed)
+sshr reg16, reg16           0x25 /3  (signed)

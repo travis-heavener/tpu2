@@ -3,7 +3,7 @@ cd "$(dirname "$0")"
 cd ..
 
 # rebuild T code
-./tlang/tcc ./os/kernel_0.0.1.t -f
+./tlang/tcc ./os/kernel_0.0.1.t -f -skip-post
 
 # reformat drive
 python3 ./os/make_boot_drive.py A

@@ -162,6 +162,15 @@ int main() {
     // Initialize heap
     heap_init();
 
+    unsigned int cx = 19;
+    unsigned int ff = 12312;
+    unsigned int ffa = 12312;
+    (void)ff;
+    (void)ffa;
+    ff = ffa + ff;
+
+    return ff + cx;
+
     // Exit success
     return EXIT_SUCCESS;
 }

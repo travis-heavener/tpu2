@@ -1,22 +1,31 @@
 section .text
 __UF0:
-    movw AX, 14336
+    pushw 14336
+    popw AX
     pushw AX
-    movw BP, SP
+    mov BP, SP
     sub BP, 2
-    push [BP+0]
-    push [BP+1]
-    movw AX, 0
+    pushw BP
+    popw BP
+    push 0(BP)
+    push 1(BP)
+    pushw 0
+    popw AX
     popw CX
     add CX, AX
     pushw CX
     pushw 255
-    movw AX, 51200
+    pushw 51200
+    popw AX
     pushw AX
-    movw BX, 3
+    pushw 3
+    popw BX
     popw AX
     sub AX, BX
-    movw BX, AX
+    pushw AX
+    popw AX
+    pushw AX
+    popw BX
     popw AX
     and AX, BX
     pushw AX
@@ -24,29 +33,38 @@ __UF0:
     pop BL
     xor BH, BH
     popw AX
-    movw BP, AX
-    mov [BP+0], BL
+    mov BP, AX
+    mov 0(BP), BL
     push BL
     sub SP, 1
-    movw BP, SP
+    mov BP, SP
     sub BP, 2
-    push [BP+0]
-    push [BP+1]
-    movw AX, 1
+    pushw BP
+    popw BP
+    push 0(BP)
+    push 1(BP)
+    pushw 1
+    popw AX
     popw CX
     add CX, AX
     pushw CX
     pushw 255
-    movw AX, 51200
+    pushw 51200
+    popw AX
     pushw AX
-    movw BX, 3
+    pushw 3
+    popw BX
     popw AX
     sub AX, BX
     pushw AX
-    movw BX, 8
+    popw AX
+    pushw AX
+    pushw 8
+    popw BX
     popw AX
     shr AX, BL
-    movw BX, AX
+    pushw AX
+    popw BX
     popw AX
     and AX, BX
     pushw AX
@@ -54,28 +72,33 @@ __UF0:
     pop BL
     xor BH, BH
     popw AX
-    movw BP, AX
-    mov [BP+0], BL
+    mov BP, AX
+    mov 0(BP), BL
     push BL
     sub SP, 1
-    movw BP, SP
+    mov BP, SP
     sub BP, 2
-    push [BP+0]
-    push [BP+1]
-    movw AX, 2
+    pushw BP
+    popw BP
+    push 0(BP)
+    push 1(BP)
+    pushw 2
+    popw AX
     popw CX
     add CX, AX
     pushw CX
     pushw 0
-    mov AL, [SP-1]
+    mov AL, -1(SP)
     and AL, 0x80
     sub SP, 1
     pop BL
     or BL, AL
+    push BL
+    pop BL
     xor BH, BH
     popw AX
-    movw BP, AX
-    mov [BP+0], BL
+    mov BP, AX
+    mov 0(BP), BL
     push BL
     sub SP, 1
     sub SP, 2
@@ -84,13 +107,53 @@ __UF0:
 _main:
     add SP, 2
     call __UF0
-    pushw 0
+    pushw 19
+    pushw 12312
+    pushw 12312
+    push -4(SP)
+    push -4(SP)
+    popw AX
+    pushw AX
+    sub SP, 2
+    push -2(SP)
+    push -2(SP)
+    popw AX
+    pushw AX
+    sub SP, 2
+    mov BP, SP
+    sub BP, 4
+    pushw BP
+    push -4(SP)
+    push -4(SP)
+    push -8(SP)
+    push -8(SP)
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
+    popw BX
+    popw AX
+    mov BP, AX
+    mov 0(BP), BL
+    mov 1(BP), BH
+    pushw BX
+    sub SP, 2
+    push -4(SP)
+    push -4(SP)
+    push -8(SP)
+    push -8(SP)
+    popw BX
+    popw AX
+    add AX, BX
+    pushw AX
     pop DL
-    mov [SP-2], DL
+    mov -8(SP), DL
     pop DL
-    mov [SP-2], DL
+    mov -8(SP), DL
+    sub SP, 6
+    jmp _mainE
     _mainE:
-    movw AX, 0x03
+    mov AX, 0x03
     popw BX
     syscall
     hlt

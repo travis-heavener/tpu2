@@ -25,20 +25,6 @@
 #define SECTOR_SIZE 64
 #define DRIVE_SIZE 64 * 1024
 
-// the issue now is that i need a way to store literally where each program is, like a filesystem
-// i need a naming system for files, since the bytes here don't mean anything unless I can name the programs and all that
-
-// this is where the reserved partition comes in, the OS needs names for all the programs it knows, thus I need an index
-
-/**
-     * ^^^^^^^ the above has issues
-     * X) need to find a way to store .data section into binary
-     * 2) need to store program start index in the first 2 bytes of reserved memory
-     * X) since one program can run at once, we can store things in .data as usual (it resets for each program)
-     * X) ^^^^^ this might actually not be true if we need .data for the kernel/OS (but then again, we have reserved pool for this)
-     * 5) most importantly, we need to store the end instruction index somewhere so we know how many sectors are needed
-     */
-
 // finds the next available sector start address on the given drive
 u16 getAvailableSectorStart(Memory& image, const u16 sizeRequired) {
     // determine the number of consecutive sectors needed

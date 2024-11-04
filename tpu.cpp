@@ -128,19 +128,21 @@ void TPU::execute(Memory& memory) {
         caseInstruction(RET)
         caseInstruction(JMP)
         caseInstruction(MOV)
-        caseInstruction(MOVW)
         caseInstruction(PUSH)
         caseInstruction(POP)
-        caseInstruction(POPW)
         caseInstruction(ADD)
         caseInstruction(SUB)
         caseInstruction(MUL)
         caseInstruction(DIV)
         caseInstruction(CMP)
         caseInstruction(BUF)
-        caseInstruction(AND)
-        caseInstruction(OR)
-        caseInstruction(XOR)
+        case OPCode::AND:
+        case OPCode::OR:
+        case OPCode::XOR: {
+            instructions::processANDORXOR(*this, memory, opCode);
+            this->sleep();
+            break;
+        }
         caseInstruction(NOT)
         caseInstruction(SHL)
         caseInstruction(SHR)

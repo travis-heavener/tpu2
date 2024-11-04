@@ -111,7 +111,7 @@ bool isReservedKernelFuncLabel(const std::string& label);
 #define OVERFLOW 11 // set if the result of arithmetic operation overflows/underflows
 
 // instruction set opcodes
-enum OPCode {
+enum OPCode : u8 {
     NOP         = 0x00,
     HLT         = 0x01,
     SYSCALL     = 0x02,
@@ -119,10 +119,8 @@ enum OPCode {
     RET         = 0x04,
     JMP         = 0x05,
     MOV         = 0x06,
-    MOVW        = 0x07,
     PUSH        = 0x08,
     POP         = 0x09,
-    POPW        = 0x0A,
     ADD         = 0x14,
     SUB         = 0x15,
     MUL         = 0x16,
