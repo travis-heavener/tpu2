@@ -10,11 +10,11 @@
 #include "../memory.hpp"
 
 // abstractions from processLineToText for readability
-void parseMOV(const std::vector<std::string>&, Memory&, u16&, label_replace_vec_t&);
+void parseMOV(const std::vector<std::string>&, Memory&, u16&, label_replace_vec_t&, label_map_t&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseMULDIVBUF(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
-void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, label_replace_vec_t&);
+void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, label_replace_vec_t&, label_map_t&);
 void parsePOP(const std::vector<std::string>&, Memory&, u16&, bool);
 
 // returns true if a string is valid
@@ -367,10 +367,10 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
         for (u8 b : bytesToWrite) memory[instIndex++] = b;
     } else if (kwd == "mov") {
         checkArgs(args, 2); // check for extra args
-        parseMOV(args, memory, instIndex, labelsToReplace);
+        parseMOV(args, memory, instIndex, labelsToReplace, labelMap);
     } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
-        parsePUSH(args, memory, instIndex, kwd == "pushw", labelsToReplace);
+        parsePUSH(args, memory, instIndex, kwd == "pushw", labelsToReplace, labelMap);
     } else if (kwd == "pop" || kwd == "popw") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOP(args, memory, instIndex, kwd == "popw");
@@ -409,7 +409,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
 }
 
 // abstraction to parse a MOV instruction
-void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, label_replace_vec_t& labelsToReplace) {
+void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, label_replace_vec_t& labelsToReplace, label_map_t& labelMap) {
     memory[instIndex++] = OPCode::MOV;
 
     // determine MOD byte
@@ -465,11 +465,18 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
                 throw std::invalid_argument("Invalid second argument to mov.");
             MOD |= 5;
 
-            // add to labels to replace
-            u16 labelAddr = instIndex + 2; // skip MOD byte & reg16
-            labelsToReplace.push_back({args[1], labelAddr});
-            bytesToWrite.push_back(0); // add placeholder bytes
-            bytesToWrite.push_back(0); // add placeholder bytes
+            // get labels
+            if (labelMap.count(args[1]) == 0) {
+                // add to labels to replace
+                u16 labelAddr = instIndex + 2; // skip MOD byte & reg16
+                labelsToReplace.push_back({args[1], labelAddr});
+                bytesToWrite.push_back(0); // add placeholder bytes
+                bytesToWrite.push_back(0); // add placeholder bytes
+            } else {
+                u16 destAddr = labelMap[args[1]].value;
+                bytesToWrite.push_back( destAddr & 0xFF ); // lower-half
+                bytesToWrite.push_back( (destAddr >> 8) & 0xFF ); // upper-half
+            }
             break;
         }
         case ARG_ADDR_DIRECT: {
@@ -572,7 +579,7 @@ void parseNOT(const std::vector<std::string>& args, Memory& memory, u16& instInd
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
-void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, label_replace_vec_t& labelsToReplace) {
+void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, label_replace_vec_t& labelsToReplace, label_map_t& labelMap) {
     memory[instIndex++] = OPCode::PUSH;
 
     // extract args
@@ -609,11 +616,19 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
         case ARG_LABEL: {
             if (!isPUSHW) throw std::invalid_argument("Invalid 16-bit operation.");
             MOD |= 3;
-            // add to labels to replace
-            u16 labelAddr = instIndex + 1; // skip MOD byte
-            labelsToReplace.push_back({args[0], labelAddr});
-            bytesToWrite.push_back(0); // add placeholder bytes
-            bytesToWrite.push_back(0); // add placeholder bytes
+
+            // get labels
+            if (labelMap.count(args[0]) == 0) {
+                // add to labels to replace
+                u16 labelAddr = instIndex + 1; // skip MOD byte
+                labelsToReplace.push_back({args[0], labelAddr});
+                bytesToWrite.push_back(0); // add placeholder bytes
+                bytesToWrite.push_back(0); // add placeholder bytes
+            } else {
+                u16 destAddr = labelMap[args[0]].value;
+                bytesToWrite.push_back( destAddr & 0xFF ); // lower-half
+                bytesToWrite.push_back( (destAddr >> 8) & 0xFF ); // upper-half
+            }
             break;
         }
         default: throw std::invalid_argument("Invalid first argument to push.");
