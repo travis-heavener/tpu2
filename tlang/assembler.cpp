@@ -101,8 +101,8 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     // stop clock after execution is done IF MAIN or return to previous label
     if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN) {
         // handle return status
-        OUT << "mov AX, 0x03\n"; // specify syscall type
         OUT << "popw BX\n"; // pop return status to AX
+        OUT << "mov AX, 3\n"; // specify syscall type
         OUT << "syscall\n"; // trigger syscall
         OUT << "hlt\n";
     } else { // return to previous label from call instruction
@@ -142,14 +142,14 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                 // load result to AL/AX
                 if (resultSize == 2) {
-                    OUT << "pop AX\n"; // load value to AH
-                    scope.pop();
+                    OUT << "popw AX\n"; // load value to AH
+                    OUT << "buf AX\n"; // test ZF flag
+                    scope.pop(2);
                 } else {
                     OUT << "pop AL\n";
-                    OUT << "xor AH, AH\n"; // clear AH if no value is there
+                    OUT << "buf AL\n"; // test ZF flag
+                    scope.pop();
                 }
-                scope.pop();
-                OUT << "buf AX\n"; // test ZF flag
 
                 // if the result sets the ZF flag, it's false so jmp to mergeLabel
                 OUT << "jz " << mergeLabel << "\n";
@@ -189,13 +189,13 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 // load result to AL/AX
                 if (resultSize == 2) {
                     OUT << "popw AX\n"; // load value to AH
-                    scope.pop();
+                    OUT << "buf AX\n"; // test ZF flag
+                    scope.pop(2);
                 } else {
                     OUT << "pop AL\n";
-                    OUT << "xor AH, AH\n"; // clear AH if no value is there
+                    OUT << "buf AL\n"; // test ZF flag
+                    scope.pop();
                 }
-                scope.pop();
-                OUT << "buf AX\n"; // test ZF flag
 
                 // if the result sets the ZF flag, it's false so jmp to mergeLabel
                 OUT << "jz " << mergeLabel << "\n";
@@ -238,11 +238,10 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                         // pop the result off the stack to AL
                         OUT << "pop AL\n"; // pop to AL
-                        OUT << "xor AH, AH\n"; // clear AH since no value is put there
                         scope.pop();
 
                         // if false, jump to next condition
-                        OUT << "buf AX\n"; // set ZF if false
+                        OUT << "buf AL\n"; // set ZF if false
                         OUT << "jz " << nextLabel << '\n';
                     }
 
@@ -295,13 +294,24 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                     // move result bytes to their place earlier on the stack
                     for (size_t j = 0; j < returnSize; ++j) {
-                        // pop top of stack into DL
-                        OUT << "pop DL\n";
-                        scope.pop();
+                        // pop top of stack
+                        if (j+1 < returnSize) {
+                            OUT << "popw DX\n";
+                            scope.pop(2);
 
-                        // mov DL to return bytes location
-                        size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
-                        OUT << "mov -" << index << "(SP), DL\n";
+                            // mov DX to return bytes location
+                            size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
+                            OUT << "mov -" << (index+1) << "(SP), DL\n";
+                            OUT << "mov -" << (index) << "(SP), DH\n";
+                            ++j;
+                        } else {
+                            OUT << "pop DL\n";
+                            scope.pop();
+
+                            // mov DL to return bytes location
+                            size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
+                            OUT << "mov -" << index << "(SP), DL\n";
+                        }
                     }
                 }
 

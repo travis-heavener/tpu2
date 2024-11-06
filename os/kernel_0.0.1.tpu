@@ -18,8 +18,7 @@ __UF0:
     jz __J2
     mov AL, 1
     __J2:
-    xor AH, AH
-    buf AX
+    buf AL
     jz __J1
     mov AX, SP
     sub AX, 2
@@ -36,11 +35,9 @@ __UF0:
     sub SP, 2
     jmp __J0
     __J1:
-    pushw -2(SP)
-    pop DL
+    mov DX, -2(SP)
     mov -6(SP), DL
-    pop DL
-    mov -6(SP), DL
+    mov -5(SP), DH
     sub SP, 2
     __UF0E:
     ret
@@ -116,8 +113,7 @@ __UF2:
     jz __J8
     mov AL, 1
     __J8:
-    xor AH, AH
-    buf AX
+    buf AL
     jz __J3
     mov DX, 0
     sub SP, 2
@@ -138,8 +134,7 @@ __UF2:
     __J11:
     mov AX, 0
     __J12:
-    xor AH, AH
-    buf AX
+    buf AL
     jz __J10
     mov AX, SP
     sub AX, 4
@@ -251,8 +246,7 @@ __UF2:
     mov BL, 1
     __J22:
     and AL, BL
-    xor AH, AH
-    buf AX
+    buf AL
     jz __J15
     mov AX, SP
     sub AX, 7
@@ -285,8 +279,7 @@ __UF2:
     __J24:
     mov AX, 0
     __J25:
-    xor AH, AH
-    buf AX
+    buf AL
     jz __J23
     mov AX, SP
     sub AX, 7
@@ -438,14 +431,11 @@ _main:
     call __UF1
     mov CX, 12
     call __UF2
-    pushw DX
-    pop DL
     mov -2(SP), DL
-    pop DL
-    mov -2(SP), DL
+    mov -1(SP), DH
     _mainE:
-    mov AX, 0x03
     popw BX
+    mov AX, 3
     syscall
     hlt
 section .data
