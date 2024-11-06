@@ -301,8 +301,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                             // mov DX to return bytes location
                             size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
-                            OUT << "mov -" << (index+1) << "(SP), DL\n";
-                            OUT << "mov -" << (index) << "(SP), DH\n";
+                            OUT << "sw DX, -" << (index+1) << "(SP)\n";
                             ++j;
                         } else {
                             OUT << "pop DL\n";
@@ -310,7 +309,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
 
                             // mov DL to return bytes location
                             size_t index = scope.getOffset(SCOPE_RETURN_START, retNode.err) - (returnSize - 1 - j);
-                            OUT << "mov -" << index << "(SP), DL\n";
+                            OUT << "sb DL, -" << index << "(SP)\n";
                         }
                     }
                 }
@@ -862,10 +861,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                     // move the rvalue to the lvalue's address
                     const size_t rvalueSize = resultTypes[1].getSizeBytes();
                     if (rvalueSize == 2) {
-                        OUT << "mov 0(AX), BL" << '\n';
-                        OUT << "mov 1(AX), BH" << '\n';
+                        OUT << "sw BX, 0(AX)" << '\n';
                     } else {
-                        OUT << "mov 0(AX), BL" << '\n';
+                        OUT << "sb BL, 0(AX)" << '\n';
                     }
 
                     // push the value of the variable onto the stack (lowest-first)
@@ -1332,7 +1330,7 @@ void implicitCast(std::ofstream& outHandle, Type resultType, Type desiredType, S
 
             // preserve sign bit in AL
             if (!resultType.isUnsigned()) {
-                OUT << "mov AL, -1(SP)\n";
+                OUT << "lb AL, -1(SP)\n";
                 OUT << "and AL, 0x80\n"; // get sign bit
             }
 

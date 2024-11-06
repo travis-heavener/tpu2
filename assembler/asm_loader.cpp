@@ -10,8 +10,8 @@
 #include "../memory.hpp"
 
 // abstractions from processLineToText for readability
-void parseMOV(const std::vector<std::string>&, Memory&, u16&, label_replace_vec_t&, label_map_t&);
-void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
+void parseLBSB(const std::vector<std::string>&, Memory&, u16&, u8, const bool);
+void parseMOVADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseMULDIVBUF(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
 void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, label_replace_vec_t&, label_map_t&);
@@ -365,22 +365,22 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
 
         // write bytes
         for (u8 b : bytesToWrite) memory[instIndex++] = b;
-    } else if (kwd == "mov") {
+    } else if (kwd == "lb" || kwd == "lw" || kwd == "sb" || kwd == "sw") {
         checkArgs(args, 2); // check for extra args
-        parseMOV(args, memory, instIndex, labelsToReplace, labelMap);
+        parseLBSB(args, memory, instIndex, kwd[0] == 'l' ? OPCode::LB : OPCode::SB, kwd[1] == 'w');
     } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
         parsePUSH(args, memory, instIndex, kwd == "pushw", labelsToReplace, labelMap);
     } else if (kwd == "pop" || kwd == "popw") {
         if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
         parsePOP(args, memory, instIndex, kwd == "popw");
-    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp" || kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr") {
+    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp" || kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr" || kwd == "mov") {
         checkArgs(args, 2); // check for extra args
         OPCode code = (kwd == "add" || kwd == "sadd") ? OPCode::ADD : (kwd == "ssub" || kwd == "sub") ? OPCode::SUB :
                       kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : (kwd == "cmp" || kwd == "scmp") ? OPCode::CMP :
-                      (kwd == "shl" || kwd == "sshl") ? OPCode::SHL : (kwd == "shr" || kwd == "sshr") ? OPCode::SHR : OPCode::XOR;
+                      (kwd == "shl" || kwd == "sshl") ? OPCode::SHL : (kwd == "shr" || kwd == "sshr") ? OPCode::SHR : (kwd == "mov") ? OPCode::MOV : OPCode::XOR;
         bool isSignedOp = kwd == "sadd" || kwd == "ssub" || kwd == "scmp" || kwd == "sshl" || kwd == "sshr";
-        parseADDSUBLogic(args, memory, instIndex, code, isSignedOp);
+        parseMOVADDSUBLogic(args, memory, instIndex, code, isSignedOp);
     } else if (kwd == "mul" || kwd == "div" || kwd == "smul" || kwd == "sdiv" || kwd == "buf") {
         checkArgs(args, 1); // check for extra args
         bool isSignedOp = kwd == "smul" || kwd == "sdiv";
@@ -409,90 +409,24 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
 }
 
 // abstraction to parse a MOV instruction
-void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, label_replace_vec_t& labelsToReplace, label_map_t& labelMap) {
-    memory[instIndex++] = OPCode::MOV;
+void parseLBSB(const std::vector<std::string>& args, Memory& memory, u16& instIndex, u8 opCode, const bool isWide) {
+    memory[instIndex++] = opCode;
 
     // determine MOD byte
     std::vector<u8> bytesToWrite;
-    u8 MOD = 0;
 
     // determine arg A
     u8 statusA = resolveArgument(args[0], bytesToWrite);
-    switch (statusA) {
-        case ARG_REG8: case ARG_REG16: case ARG_ADDR_DIRECT: break;
-        case ARG_ADDR_OFFSET: {
-            MOD |= 16; // set 5th bit to mark this as an offset address
-            break;
-        }
-        default: throw std::invalid_argument("Invalid first argument to mov.");
-    }
+    if ((statusA != ARG_REG16 && isWide) || (statusA != ARG_REG8 && !isWide))
+        throw std::invalid_argument("Invalid first argument to lb/lw/sb/sw.");
 
     // determine arg B
     u8 statusB = resolveArgument(args[1], bytesToWrite, statusA == ARG_REG16, true);
+    u8 MOD = (statusA == ARG_REG8) ? 0 : 1;
     switch (statusB) {
-        case ARG_REG8: {
-            if (statusA == ARG_REG8)
-                MOD |= 4;
-            else if (statusA == ARG_ADDR_DIRECT || statusA == ARG_ADDR_OFFSET)
-                MOD |= 1;
-            else
-                throw std::invalid_argument("Invalid second argument to mov.");
-            break;
-        }
-        case ARG_REG16: {
-            if (statusA != ARG_REG16)
-                throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 7;
-            break;
-        }
-        case ARG_IMM8: {
-            if (statusA == ARG_REG8)
-                MOD |= 2;
-            else if (statusA == ARG_ADDR_DIRECT || statusA == ARG_ADDR_OFFSET)
-                MOD |= 0;
-            else
-                throw std::invalid_argument("Invalid second argument to mov.");
-            break;
-        }
-        case ARG_IMM16: {
-            if (statusA != ARG_REG16)
-                throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 5;
-            break;
-        }
-        case ARG_LABEL: {
-            if (statusA != ARG_REG16)
-                throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= 5;
-
-            // get labels
-            if (labelMap.count(args[1]) == 0) {
-                // add to labels to replace
-                u16 labelAddr = instIndex + 2; // skip MOD byte & reg16
-                labelsToReplace.push_back({args[1], labelAddr});
-                bytesToWrite.push_back(0); // add placeholder bytes
-                bytesToWrite.push_back(0); // add placeholder bytes
-            } else {
-                u16 destAddr = labelMap[args[1]].value;
-                bytesToWrite.push_back( destAddr & 0xFF ); // lower-half
-                bytesToWrite.push_back( (destAddr >> 8) & 0xFF ); // upper-half
-            }
-            break;
-        }
-        case ARG_ADDR_DIRECT: {
-            if (statusA != ARG_REG8 && statusA != ARG_REG16)
-                throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= (statusA == ARG_REG8) ? 3 : 6;
-            break;
-        }
-        case ARG_ADDR_OFFSET: {
-            if (statusA != ARG_REG8 && statusA != ARG_REG16)
-                throw std::invalid_argument("Invalid second argument to mov.");
-            MOD |= (statusA == ARG_REG8) ? 3 : 6;
-            MOD |= 32; // set the 6th bit to mark this as an offset address
-            break;
-        }
-        default: throw std::invalid_argument("Invalid second argument to mov.");
+        case ARG_ADDR_DIRECT: break;
+        case ARG_ADDR_OFFSET: MOD |= 32; break; // set the 6th bit to mark this as an offset address
+        default: throw std::invalid_argument("Invalid second argument to lb/lw/sb/sw.");
     }
 
     // write bytes
@@ -501,7 +435,7 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
 }
 
 // most arithmetic operations follow this convention
-void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction, bool isSignedOp) {
+void parseMOVADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction, bool isSignedOp) {
     // extract args
     std::vector<u8> bytesToWrite;
     u8 MOD = isSignedOp ? 8 : 0;

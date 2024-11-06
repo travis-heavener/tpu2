@@ -134,6 +134,8 @@ void TPU::execute(Memory& memory) {
         caseInstruction(RET)
         caseInstruction(JMP)
         caseInstruction(MOV)
+        caseInstruction(LB)
+        caseInstruction(SB)
         caseInstruction(PUSH)
         caseInstruction(POP)
         caseInstruction(ADD)

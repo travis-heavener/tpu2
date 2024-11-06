@@ -13,7 +13,7 @@ Bit 5:    set if arg A is an offset address
 Bit 6:    set if arg B is an offset address
 
 MOD BYTE CONVENTION:
-The following convention applies to all arithmetic and logical operations' MOD bytes.
+The following convention applies to move instructions and all arithmetic and logical operations' MOD bytes.
 MOD BYTE        1 ARGUMENT          2 ARGUMENTS
 --------------------------------------------------------------------------------------------------------------------------------
 /0              imm8                reg8,   imm8
@@ -43,26 +43,28 @@ jnz imm16                   0x05 /2         Moves the instruction pointer to the
 jc imm16                    0x05 /3         Moves the instruction pointer to the specified address, if the carry flag (CF) is set.
 jnc imm16                   0x05 /4         Moves the instruction pointer to the specified address, if the carry flag (CF) is cleared.
 
-mov addr, imm8              0x06 /0         Move imm8 into address in memory.
-mov addr, reg8              0x06 /1         Move value in 8-bit register to memory address.
-mov reg8, imm8              0x06 /2         Move imm8 into 8-bit register.
-mov reg8, addr              0x06 /3         Move 8-bit value from memory address into 8-bit register.
-mov reg8, reg8              0x06 /4         Move value between reg8.
-mov reg16, imm16            0x06 /5         Move imm16 into 16-bit register.
-mov reg16, addr             0x06 /6         Move 16-bit word from an address and the next address (little-endian) from memory into reg16.
-mov reg16, reg16            0x06 /7         Move value between reg16.
+mov reg8, imm8              0x06 /0         Move imm8 into 8-bit register.
+mov reg16, imm16            0x06 /1         Move imm16 into 16-bit register.
+mov reg8, reg8              0x06 /2         Move value between reg8.
+mov reg16, reg16            0x06 /3         Move value between reg16.
 
-push reg8                   0x08 /0         Pushes the value of a reg8 onto the stack.
-pushw reg16                 0x08 /1         Pushes the value of a reg16 onto the stack, lowest byte first.
-push imm8                   0x08 /2         Pushes an imm8 value onto the stack.
-pushw imm16                 0x08 /3         Pushes an imm16 value onto the stack, lowest byte first.
-push addr                   0x08 /4         Pushes an 8-bit value from an address in memory onto the stack.
-pushw addr                  0x08 /5         Pushes a 16-bit word from an address and the next address (little-endian) from memory onto the stack.
+lb reg8, addr               0x07 /0         Loads a byte from the address into a reg8.
+lw reg16, addr              0x07 /1         Loads a word (little-endian) from the address into a reg16.
 
-pop reg8                    0x09 /0         Pops the top byte off the stack to a reg8.
-popw reg16                  0x09 /1         Pops the top two bytes off the stack to a reg16, the top byte into the upper half.
-pop                         0x09 /2         Pops the top byte off the stack without storing it.
-popw                        0x09 /3         Pops the top two bytes off the stack without storing them.
+sb reg8, addr               0x08 /0         Stores a reg8 byte at an address in memory.
+sw reg16, addr              0x08 /1         Stores a reg16 word at an address in memory (little-endian).
+
+push reg8                   0x09 /0         Pushes the value of a reg8 onto the stack.
+pushw reg16                 0x09 /1         Pushes the value of a reg16 onto the stack, lowest byte first.
+push imm8                   0x09 /2         Pushes an imm8 value onto the stack.
+pushw imm16                 0x09 /3         Pushes an imm16 value onto the stack, lowest byte first.
+push addr                   0x09 /4         Pushes an 8-bit value from an address in memory onto the stack.
+pushw addr                  0x09 /5         Pushes a 16-bit word from an address and the next address (little-endian) from memory onto the stack.
+
+pop reg8                    0x0A /0         Pops the top byte off the stack to a reg8.
+popw reg16                  0x0A /1         Pops the top two bytes off the stack to a reg16, the top byte into the upper half.
+pop                         0x0A /2         Pops the top byte off the stack without storing it.
+popw                        0x0A /3         Pops the top two bytes off the stack without storing them.
 
 Adds both operands, storing result in first operand.
 add reg8, imm8              0x14 /0

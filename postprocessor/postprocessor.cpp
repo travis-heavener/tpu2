@@ -11,6 +11,8 @@
 
 #define TAB "    "
 
+const std::regex RE_ARG_REG8("([ABCD][LH])");
+const std::regex RE_ARG_REG16("^(([ABCD]X)|([SBCI]P)|([SD]I))$");
 const std::regex REG_IMMED("(-?((0[Bb][01]+)|(0[Xx][abcdefABCDEF\\d]+)|(\\d+)))");
 int parseInt(const std::string& str, bool ignoreNegatives=false) {
     // verify regex matches
@@ -186,12 +188,24 @@ int main(int argc, char* argv[]) {
                 }
             } else if (opts.reducePushPops && strippedLineBuf.find("pop ") == 0) {
                 // move the value between registers
-                std::string regA = strippedLine.substr(5);
+                std::string valA = strippedLine.substr(5);
                 std::string regB = strippedLineBuf.substr(4);
 
+                // verify both values are valid
+                bool isAValid = std::regex_match(valA, RE_ARG_REG8) || std::regex_match(valA, REG_IMMED);
+                bool isBValid = std::regex_match(regB, RE_ARG_REG8);
+
+                if (!isAValid || !isBValid) {
+                    // base case, current instruction not matched, so write that and pass along the next one
+                    writeInstruction(opts, outHandle, line, strippedLine);
+                    line = lineBuf;
+                    strippedLine = strippedLineBuf;
+                    continue; // skip reading another line
+                }
+
                 // write instruction if not the same argument
-                if (regA != regB) {
-                    std::string newInst = "mov " + regB + ", " + regA;
+                if (valA != regB) {
+                    std::string newInst = "mov " + regB + ", " + valA;
                     writeInstruction(opts, outHandle, newInst, newInst);
                 }
             } else {
@@ -208,12 +222,24 @@ int main(int argc, char* argv[]) {
 
             if (strippedLineBuf.find("popw ") == 0) {
                 // move the value between registers
-                std::string regA = strippedLine.substr(6);
+                std::string valA = strippedLine.substr(6);
                 std::string regB = strippedLineBuf.substr(5);
 
+                // verify both values are valid
+                bool isAValid = std::regex_match(valA, RE_ARG_REG16) || std::regex_match(valA, REG_IMMED);
+                bool isBValid = std::regex_match(regB, RE_ARG_REG16);
+
+                if (!isAValid || !isBValid) {
+                    // base case, current instruction not matched, so write that and pass along the next one
+                    writeInstruction(opts, outHandle, line, strippedLine);
+                    line = lineBuf;
+                    strippedLine = strippedLineBuf;
+                    continue; // skip reading another line
+                }
+
                 // write instruction if not the same argument
-                if (regA != regB) {
-                    std::string newInst = "mov " + regB + ", " + regA;
+                if (valA != regB) {
+                    std::string newInst = "mov " + regB + ", " + valA;
                     writeInstruction(opts, outHandle, newInst, newInst);
                 }
             } else if (strippedLineBuf != "popw") { // if popw, ignore anyways since whatever is pushed gets popped

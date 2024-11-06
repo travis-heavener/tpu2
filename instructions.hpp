@@ -11,6 +11,8 @@ namespace instructions {
     void processRET(TPU& tpu, Memory& memory);
     void processJMP(TPU& tpu, Memory& memory);
     void processMOV(TPU& tpu, Memory& memory);
+    void processLB(TPU& tpu, Memory& memory);
+    void processSB(TPU& tpu, Memory& memory);
     void processPUSH(TPU& tpu, Memory& memory);
     void processPOP(TPU& tpu, Memory& memory);
     void processADD(TPU& tpu, Memory& memory);

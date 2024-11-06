@@ -5,7 +5,8 @@ __UF0:
     mov AX, SP
     sub AX, 4
     pushw 0(AX)
-    mov AX, -4(SP)
+    pushw -4(SP)
+    popw AX
     popw CX
     sadd CX, AX
     mov AX, CX
@@ -29,15 +30,14 @@ __UF0:
     sadd AX, BX
     mov BX, AX
     popw AX
-    mov 0(AX), BL
-    mov 1(AX), BH
+    sw BX, 0(AX)
     pushw BX
     sub SP, 2
     jmp __J0
     __J1:
-    mov DX, -2(SP)
-    mov -6(SP), DL
-    mov -5(SP), DH
+    pushw -2(SP)
+    popw DX
+    sw DX, -6(SP)
     sub SP, 2
     __UF0E:
     ret
@@ -46,16 +46,14 @@ __UF1:
     pushw AX
     mov AX, SP
     sub AX, 2
-    mov AX, 0(AX)
-    pushw AX
+    pushw 0(AX)
     pushw 51200
     mov BX, 3
     popw AX
     ssub AX, BX
     mov BX, AX
     popw AX
-    mov 0(AX), BL
-    mov 1(AX), BH
+    sw BX, 0(AX)
     pushw BX
     sub SP, 2
     mov AX, SP
@@ -66,14 +64,14 @@ __UF1:
     add CX, AX
     pushw CX
     pushw 0
-    mov AL, -1(SP)
+    lb AL, -1(SP)
     and AL, 0x80
     sub SP, 1
     pop BL
     or BL, AL
     xor BH, BH
     popw AX
-    mov 0(AX), BL
+    sb BL, 0(AX)
     push BL
     sub SP, 1
     sub SP, 2
@@ -97,7 +95,8 @@ __UF2:
     mov AX, 0
     __J5:
     push AL
-    mov AX, -3(SP)
+    pushw -3(SP)
+    popw AX
     add AX, 0
     jz __J6
     mov AX, 0
@@ -159,7 +158,7 @@ __UF2:
     mov AX, 1
     __J14:
     push AL
-    mov AL, -1(SP)
+    lb AL, -1(SP)
     and AL, 0x80
     pop BL
     or BL, AL
@@ -167,7 +166,8 @@ __UF2:
     mov AX, SP
     sub AX, 5
     pushw 0(AX)
-    mov AX, -5(SP)
+    pushw -5(SP)
+    popw AX
     popw CX
     add CX, AX
     mov AX, CX
@@ -182,7 +182,8 @@ __UF2:
     popw CX
     add CX, AX
     mov AX, CX
-    mov AL, 0(AX)
+    push 0(AX)
+    pop AL
     xor AH, AH
     push AL
     mov CX, 0
@@ -197,7 +198,8 @@ __UF2:
     pushw AX
     push -3(SP)
     pushw -3(SP)
-    mov BX, -12(SP)
+    pushw -12(SP)
+    popw BX
     popw AX
     cmp AX, BX
     jz __J16
@@ -230,7 +232,7 @@ __UF2:
     mov AL, 1
     __J20:
     push AL
-    mov AL, -1(SP)
+    lb AL, -1(SP)
     and AL, 0x80
     pop BL
     or BL, AL
@@ -259,18 +261,19 @@ __UF2:
     add CX, AX
     pushw CX
     pushw 1
-    mov AL, -1(SP)
+    lb AL, -1(SP)
     and AL, 0x80
     sub SP, 1
     pop BL
     or BL, AL
     xor BH, BH
     popw AX
-    mov 0(AX), BL
+    sb BL, 0(AX)
     push BL
     sub SP, 1
     pushw -2(SP)
-    mov BX, -11(SP)
+    pushw -11(SP)
+    popw BX
     popw AX
     cmp BX, AX
     jnc __J24
@@ -284,21 +287,23 @@ __UF2:
     mov AX, SP
     sub AX, 7
     pushw 0(AX)
-    mov BX, -7(SP)
+    pushw -7(SP)
+    popw BX
     mov AX, 1
     mul BX
     mov BX, AX
     popw AX
     add AX, BX
     pushw AX
-    mov BX, -11(SP)
+    pushw -11(SP)
+    popw BX
     popw AX
-    mov 0(AX), BL
-    mov 1(AX), BH
+    sw BX, 0(AX)
     pushw BX
     sub SP, 2
     pushw -2(SP)
-    mov BX, -11(SP)
+    pushw -11(SP)
+    popw BX
     popw AX
     sub AX, BX
     pushw AX
@@ -310,7 +315,8 @@ __UF2:
     sub AX, 9
     pushw 0(AX)
     pushw -9(SP)
-    mov BX, -15(SP)
+    pushw -15(SP)
+    popw BX
     popw AX
     add AX, BX
     pushw AX
@@ -329,14 +335,15 @@ __UF2:
     pop BL
     xor BH, BH
     popw AX
-    mov 0(AX), BL
+    sb BL, 0(AX)
     push BL
     sub SP, 1
     mov AX, SP
     sub AX, 9
     pushw 0(AX)
     pushw -9(SP)
-    mov BX, -15(SP)
+    pushw -15(SP)
+    popw BX
     popw AX
     add AX, BX
     pushw AX
@@ -359,14 +366,15 @@ __UF2:
     pop BL
     xor BH, BH
     popw AX
-    mov 0(AX), BL
+    sb BL, 0(AX)
     push BL
     sub SP, 1
     mov AX, SP
     sub AX, 9
     pushw 0(AX)
     pushw -9(SP)
-    mov BX, -15(SP)
+    pushw -15(SP)
+    popw BX
     popw AX
     add AX, BX
     pushw AX
@@ -377,14 +385,14 @@ __UF2:
     add CX, AX
     pushw CX
     pushw 0
-    mov AL, -1(SP)
+    lb AL, -1(SP)
     and AL, 0x80
     sub SP, 1
     pop BL
     or BL, AL
     xor BH, BH
     popw AX
-    mov 0(AX), BL
+    sb BL, 0(AX)
     push BL
     sub SP, 1
     sub SP, 2
@@ -406,7 +414,8 @@ __UF2:
     sub AX, 5
     pushw AX
     pushw -7(SP)
-    mov BX, -6(SP)
+    pushw -6(SP)
+    popw BX
     popw AX
     add AX, BX
     pushw AX
@@ -415,8 +424,7 @@ __UF2:
     add AX, BX
     mov BX, AX
     popw AX
-    mov 0(AX), BL
-    mov 1(AX), BH
+    sw BX, 0(AX)
     pushw BX
     sub SP, 2
     sub SP, 3
@@ -431,8 +439,7 @@ _main:
     call __UF1
     mov CX, 12
     call __UF2
-    mov -2(SP), DL
-    mov -1(SP), DH
+    sw DX, -2(SP)
     _mainE:
     popw BX
     mov AX, 3

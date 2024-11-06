@@ -246,41 +246,47 @@ namespace instructions {
 
         // get operands
         const u8 argsFormat = mod.getValue() & 7;
-        const bool isArgAOffset = mod.getValue() & 16;
-        const bool isArgBOffset = mod.getValue() & 32;
         switch (argsFormat) {
-            case 0: { // addr, imm8
-                u16 addr = getAddress(tpu, memory, isArgAOffset);
-                memory[addr] = tpu.readByte(memory).getValue();
-                break;
-            }
-            case 1: { // addr, reg8
-                u16 addr = getAddress(tpu, memory, isArgAOffset);
-                memory[addr] = readReg8(tpu, memory);
-                break;
-            }
-            case 2: { // reg8, imm8
+            case 0: { // reg8, imm8
                 Register regA = getReg8(tpu, memory);
                 tpu.moveToRegister(regA, tpu.readByte(memory).getValue());
                 break;
             }
-            case 3: { // reg8, addr
+            case 1: { // reg16, imm16
+                Register regA = getReg16(tpu, memory);
+                tpu.moveToRegister(regA, tpu.readWord(memory).getValue());
+                break;
+            }
+            case 2: { // reg8, reg8
+                Register regA = getReg8(tpu, memory);
+                tpu.moveToRegister(regA, readReg8(tpu, memory));
+                break;
+            }
+            case 3: { // reg16, reg16
+                Register regA = getReg16(tpu, memory);
+                tpu.moveToRegister(regA, readReg16(tpu, memory));
+                break;
+            }
+            default: throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+        }
+    }
+
+    void processLB(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        const u8 argsFormat = mod.getValue() & 7;
+        const bool isArgBOffset = mod.getValue() & 32;
+        switch (argsFormat) {
+            case 0: { // reg8, addr
                 Register regA = getReg8(tpu, memory);
                 u16 addr = getAddress(tpu, memory, isArgBOffset);
                 tpu.moveToRegister(regA, memory[addr].getValue());
                 break;
             }
-            case 4: { // reg8, reg8
-                Register regA = getReg8(tpu, memory);
-                tpu.moveToRegister(regA, readReg8(tpu, memory));
-                break;
-            }
-            case 5: { // reg16, imm16
-                Register regA = getReg16(tpu, memory);
-                tpu.moveToRegister(regA, tpu.readWord(memory).getValue());
-                break;
-            }
-            case 6: { // reg16, addr
+            case 1: { // reg16, addr
                 Register regA = getReg16(tpu, memory);
                 u16 addr = getAddress(tpu, memory, isArgBOffset);
                 u16 value = memory[addr].getValue();
@@ -288,12 +294,33 @@ namespace instructions {
                 tpu.moveToRegister(regA, value);
                 break;
             }
-            case 7: { // reg16, reg16
-                Register regA = getReg16(tpu, memory);
-                tpu.moveToRegister(regA, readReg16(tpu, memory));
+            default: throw std::invalid_argument("Invalid MOD byte for operation: lb/lw.");
+        }
+    }
+
+    void processSB(TPU& tpu, Memory& memory) {
+        // determine operands from mod byte
+        Byte mod = tpu.readByte(memory);
+        tpu.sleep(); // wait since TPU has to process mod byte
+
+        // get operands
+        const u8 argsFormat = mod.getValue() & 7;
+        const bool isArgBOffset = mod.getValue() & 32;
+        switch (argsFormat) {
+            case 0: { // reg8, addr (src, dest)
+                u8 value = readReg8(tpu, memory);
+                u16 addr = getAddress(tpu, memory, isArgBOffset);
+                memory[addr] = value;
                 break;
             }
-            default: throw std::invalid_argument("Invalid MOD byte for operation: mov.");
+            case 1: { // reg16, addr (src, dest)
+                u16 value = readReg16(tpu, memory);
+                u16 addr = getAddress(tpu, memory, isArgBOffset);
+                memory[addr] = value & 0xFF;
+                memory[addr+1] = (value >> 8) & 0xFF;
+                break;
+            }
+            default: throw std::invalid_argument("Invalid MOD byte for operation: sb/sw.");
         }
     }
 
