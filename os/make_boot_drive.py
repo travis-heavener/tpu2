@@ -30,14 +30,11 @@ if __name__ == "__main__":
 
     # write boot instructions
     with open(drive_path, "r+b") as f:
-        # mark the first sector as in use (boot process only needs one sector)
+        # mark the first two sectors as in use (for the sector map)
         f.seek(0)
-        f.write(b"\x03") # mark the first two sectors as in use (for the sector map)
+        f.write(b"\x03")
 
         # close the file handle
         f.close()
-
-    # load the OS image to the drive
-    # TODO
 
     # print("Disk created: " + drive_path)
