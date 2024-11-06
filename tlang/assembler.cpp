@@ -272,7 +272,7 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                     assembleExpression(*pVarChild->pExpr, outHandle, scope);
 
                     // remove any placeholders
-                    for (size_t j = 0; j < typeSize; j++) scope.pop();
+                    scope.pop(typeSize);
                 }
 
                 // add variable to scope
@@ -483,11 +483,11 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
                     OUT << "add " << regA << ", 0\n";
                     OUT << "jz " << labelZero << '\n'; // zero, set to 1
-                    OUT << "mov" << regA << ", 0\n"; // currently non-zero, set to 0
+                    OUT << "mov " << regA << ", 0\n"; // currently non-zero, set to 0
                     OUT << "jmp " << labelMerge << '\n'; // reconvene branches
 
                     OUT << labelZero << ":\n"; // currently zero, set to 1
-                    OUT << "mov" << regA << ", 1\n";
+                    OUT << "mov " << regA << ", 1\n";
                     OUT << labelMerge << ":\n"; // reconvene branches
 
                     // push values to stack
@@ -1040,7 +1040,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
             // pop args off stack after
             size_t paramTotalSize = 0;
             for (size_t j = 0; j < numParams; ++j) {
-                paramTotalSize += resultTypes[j].getSizeBytes();
+                paramTotalSize += resultTypes[j].getSizeBytes(SIZE_ARR_AS_PTR);
             }
             if (paramTotalSize > 0) {
                 OUT << "sub SP, " << paramTotalSize << '\n';

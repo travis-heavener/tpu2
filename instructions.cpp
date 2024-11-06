@@ -324,8 +324,9 @@ namespace instructions {
                 break;
             }
             case 3: { // imm16
-                memory[oldAddr]   = tpu.readByte(memory);
-                memory[oldAddr+1] = tpu.readByte(memory);
+                u16 value = tpu.readWord(memory).getValue();
+                memory[oldAddr]   = value & 0xFF;
+                memory[oldAddr+1] = (value >> 8) & 0xFF;
                 ++writeSize;
                 break;
             }
@@ -412,7 +413,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, sum8 );
-                setFlags(tpu, isCarry, getParity(sum8), sum8, sum8 & 0x80, isCarry);
+                setFlags(tpu, isCarry, getParity(sum8), sum8 == 0, sum8 & 0x80, isCarry);
                 break;
             }
             case 1:   // reg16, imm16
@@ -432,7 +433,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, sum16 );
-                setFlags(tpu, isCarry, getParity(sum16), sum16, sum16 & 0x8000, isCarry);
+                setFlags(tpu, isCarry, getParity(sum16), sum16 == 0, sum16 & 0x8000, isCarry);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: add/sadd.");
@@ -469,7 +470,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, diff8 );
-                setFlags(tpu, isBorrow, getParity(diff8), diff8, diff8 & 0x80, isBorrow);
+                setFlags(tpu, isBorrow, getParity(diff8), diff8 == 0, diff8 & 0x80, isBorrow);
                 break;
             }
             case 1:   // reg16, imm16
@@ -488,7 +489,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, diff16 );
-                setFlags(tpu, isBorrow, getParity(diff16), diff16, diff16 & 0x8000, isBorrow);
+                setFlags(tpu, isBorrow, getParity(diff16), diff16 == 0, diff16 & 0x8000, isBorrow);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: sub/ssub.");
@@ -520,11 +521,11 @@ namespace instructions {
 
                 // move value & update flags
                 tpu.moveToRegister(Register::AX, product);
-                setFlags(tpu, isCarry, getParity(product), product, product & 0x8000, isCarry);
+                setFlags(tpu, isCarry, getParity(product), product == 0, product & 0x8000, isCarry);
                 break;
             }
             case 1: case 3: { // imm16 & reg16
-                u16 uA = tpu.readRegister8(Register::AX).getValue();
+                u16 uA = tpu.readRegister16(Register::AX).getValue();
                 u16 uB = (argsFormat == 1) ? tpu.readWord(memory).getValue() : readReg16(tpu, memory);
                 u32 product = uA * uB;
                 bool isCarry = product > 0xFFFF;
@@ -540,7 +541,7 @@ namespace instructions {
                 // move value & update flags
                 tpu.moveToRegister(Register::AX, product);
                 tpu.moveToRegister(Register::DX, product >> 16);
-                setFlags(tpu, isCarry, getParity(product), product, product & 0x8000'0000, isCarry);
+                setFlags(tpu, isCarry, getParity(product), product == 0, product & 0x8000'0000, isCarry);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: mul/smul.");
@@ -573,11 +574,11 @@ namespace instructions {
                 bool isCarry = remainder == 0;
                 tpu.moveToRegister(Register::AL, dividend);
                 tpu.moveToRegister(Register::AH, remainder);
-                setFlags(tpu, isCarry, getParity(dividend), dividend, dividend & 0x80, isCarry);
+                setFlags(tpu, isCarry, getParity(dividend), dividend == 0, dividend & 0x80, isCarry);
                 break;
             }
             case 1: case 3: { // imm16 & reg16
-                u16 uA = tpu.readRegister8(Register::AX).getValue();
+                u16 uA = tpu.readRegister16(Register::AX).getValue();
                 u16 uB = (argsFormat == 1) ? tpu.readWord(memory).getValue() : readReg16(tpu, memory);
                 u16 dividend = uA / uB;
                 u16 remainder = uA % uB;
@@ -593,7 +594,7 @@ namespace instructions {
                 bool isCarry = remainder == 0;
                 tpu.moveToRegister(Register::AX, dividend);
                 tpu.moveToRegister(Register::DX, remainder);
-                setFlags(tpu, isCarry, getParity(dividend), dividend, dividend & 0x8000, isCarry);
+                setFlags(tpu, isCarry, getParity(dividend), dividend == 0, dividend & 0x8000, isCarry);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: div/sdiv.");
@@ -630,7 +631,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, diff8 );
-                setFlags(tpu, isBorrow, getParity(diff8), diff8, diff8 & 0x80, isBorrow);
+                setFlags(tpu, isBorrow, getParity(diff8), diff8 == 0, diff8 & 0x80, isBorrow);
                 break;
             }
             case 1:   // reg16, imm16
@@ -649,7 +650,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, diff16 );
-                setFlags(tpu, isBorrow, getParity(diff16), diff16, diff16 & 0x8000, isBorrow);
+                setFlags(tpu, isBorrow, getParity(diff16), diff16 == 0, diff16 & 0x8000, isBorrow);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: cmp/scmp.");
@@ -663,7 +664,9 @@ namespace instructions {
 
         // get operands
         u16 value;
-        switch (mod.getValue() & 7) {
+        const u8 argsFormat = mod.getValue() & 7;
+        const bool is16Bit = argsFormat & 1; // 1 or 3
+        switch (argsFormat) {
             case 0: value = tpu.readByte(memory).getValue(); break; // imm8
             case 1: value = tpu.readWord(memory).getValue(); break; // imm16
             case 2: value = readReg8(tpu, memory); break; // reg8
@@ -672,7 +675,7 @@ namespace instructions {
         }
 
         // update flags
-        setFlags(tpu, 0, getParity(value), value, value & 0x80, 0);
+        setFlags(tpu, 0, getParity(value), value == 0, value & (is16Bit ? 0x8000 : 0x80), 0);
     }
 
     void processANDORXOR(TPU& tpu, Memory& memory, u8 opCode) {
@@ -695,7 +698,7 @@ namespace instructions {
                 // store result & update flags
                 tpu.moveToRegister( regA, result );
                 tpu.setFlag(PARITY, getParity(result));
-                tpu.setFlag(ZERO, result);
+                tpu.setFlag(ZERO, result == 0);
                 tpu.setFlag(SIGN, result & 0x80);
                 break;
             }
@@ -708,7 +711,7 @@ namespace instructions {
                 // store result & update flags
                 tpu.moveToRegister( regA, result );
                 tpu.setFlag(PARITY, getParity(result));
-                tpu.setFlag(ZERO, result);
+                tpu.setFlag(ZERO, result == 0);
                 tpu.setFlag(SIGN, result & 0x8000);
                 break;
             }
@@ -769,7 +772,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, value );
-                setFlags(tpu, isCarry, getParity(value), value, value & 0x80, isOverflow);
+                setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x80, isOverflow);
                 break;
             }
             case 1:   // reg16, imm16
@@ -784,7 +787,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, value );
-                setFlags(tpu, isCarry, getParity(value), value, value & 0x8000, isOverflow);
+                setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x8000, isOverflow);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: shl/sshl.");
@@ -817,7 +820,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, value );
-                setFlags(tpu, isCarry, getParity(value), value, value & 0x80, isOverflow);
+                setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x80, isOverflow);
                 break;
             }
             case 1:   // reg16, imm16
@@ -832,7 +835,7 @@ namespace instructions {
 
                 // store result & update flags
                 tpu.moveToRegister( regA, value );
-                setFlags(tpu, isCarry, getParity(value), value, value & 0x8000, isOverflow);
+                setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x8000, isOverflow);
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: shr/sshr.");

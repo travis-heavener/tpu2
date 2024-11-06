@@ -80,7 +80,10 @@ Word& TPU::readRegister16(Register reg) {
         case Register::CP: return CP;
         case Register::ES: return ES;
         case Register::FLAGS: return FLAGS;
-        default: throw std::invalid_argument("Invalid 16-bit register for get: " + reg);
+        default: {
+            const std::string msg = "Invalid 16-bit register for get: " + std::to_string(reg);
+            throw std::invalid_argument(msg);
+        }
     }
 }
 
@@ -94,7 +97,10 @@ Byte& TPU::readRegister8(Register reg) {
         case Register::CH: return (Byte&)CX.getUpper();
         case Register::DL: return (Byte&)DX.getLower();
         case Register::DH: return (Byte&)DX.getUpper();
-        default: throw std::invalid_argument("Invalid 8-bit register for get: " + reg);
+        default: {
+            const std::string msg = "Invalid 8-bit register for get: " + std::to_string(reg);
+            throw std::invalid_argument(msg);
+        }
     }
 }
 

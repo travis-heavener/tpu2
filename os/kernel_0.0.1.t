@@ -4,6 +4,8 @@
  * @author Travis Heavener
  */
 
+#include <stdio.t>
+
 #define uint_16 unsigned int
 #define uint_8 unsigned char
 
@@ -28,8 +30,9 @@ void heap_init() {
     uint_8* pHeap = HEAP_START;
 
     // Store the size of this block
-    pHeap[0] = ((uint_16)(HEAP_SIZE - 3)) & 0xFF;
-    pHeap[1] = ((uint_16)(HEAP_SIZE - 3) >> 8) & 0xFF;
+    *(uint_16*)(pHeap) = 0xC800 - 3;
+    // pHeap[0] = 253; // Precompiled: ((uint_16)(HEAP_SIZE - 3)) & 0xFF;
+    // pHeap[1] = 199; // Precompiled: ((uint_16)(HEAP_SIZE - 3) >> 8) & 0xFF;
 
     // Mark this block as free
     pHeap[2] = HEAP_FREE;
@@ -43,7 +46,7 @@ void heap_alloc() {
     const uint_16 size = __read_CX();
 
     // Return NULL if the size is larger than the heap or is zero
-    if (size > HEAP_SIZE - 3 || size == 0) {
+    if (size > HEAP_SIZE - 3 || !size) {
         __load_DX( NULL );
         return;
     }
@@ -66,8 +69,9 @@ void heap_alloc() {
             // If more space is in the block, create a new free block after it
             if (blockSize > size) {
                 // Update this block's size
-                pHeap[i] = size & 0xFF;
-                pHeap[i + 1] = (size >> 8) & 0xFF;
+                *(uint_16*)(pHeap+i) = size;
+                // pHeap[i] = size & 0xFF;
+                // pHeap[i + 1] = (size >> 8) & 0xFF;
 
                 // Create new block
                 uint_16 remainingSize = blockSize - size - 3; // 3 bytes for metadata
@@ -162,14 +166,10 @@ int main() {
     // Initialize heap
     heap_init();
 
-    unsigned int cx = 19;
-    unsigned int ff = 12312;
-    unsigned int ffa = 12312;
-    (void)ff;
-    (void)ffa;
-    ff = ffa + ff;
-
-    return ff + cx;
+    // ALSO NOT WORKING
+    __load_CX(12);
+    heap_alloc();
+    return __read_DX();
 
     // Exit success
     return EXIT_SUCCESS;
