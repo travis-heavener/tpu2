@@ -8,13 +8,15 @@
 namespace instructions {
     void executeSyscall(TPU& tpu, Memory& memory);
     void processCALL(TPU& tpu, Memory& memory);
+    void processJMP(TPU& tpu, Memory& memory, u8);
     void processRET(TPU& tpu, Memory& memory);
-    void processJMP(TPU& tpu, Memory& memory);
-    void processMOV(TPU& tpu, Memory& memory);
+    void processMOV(TPU& tpu, Memory& memory, u8);
     void processLB(TPU& tpu, Memory& memory);
+    void processLW(TPU& tpu, Memory& memory);
     void processSB(TPU& tpu, Memory& memory);
-    void processPUSH(TPU& tpu, Memory& memory);
-    void processPOP(TPU& tpu, Memory& memory);
+    void processSW(TPU& tpu, Memory& memory);
+    void processPUSH(TPU& tpu, Memory& memory, u8);
+    void processPOP(TPU& tpu, Memory& memory, u8);
     void processADD(TPU& tpu, Memory& memory);
     void processSUB(TPU& tpu, Memory& memory);
     void processMUL(TPU& tpu, Memory& memory);

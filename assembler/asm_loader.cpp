@@ -10,8 +10,9 @@
 #include "../memory.hpp"
 
 // abstractions from processLineToText for readability
-void parseLBSB(const std::vector<std::string>&, Memory&, u16&, u8, const bool);
-void parseMOVADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
+void parseLBLWSBSW(const std::vector<std::string>&, Memory&, u16&, u8);
+void parseMOV(const std::vector<std::string>&, Memory&, u16&);
+void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseMULDIVBUF(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
 void parsePUSH(const std::vector<std::string>&, Memory&, u16&, bool, label_replace_vec_t&, label_map_t&);
@@ -157,7 +158,6 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
 
     // allocate space at the start of .text to jump to the main entry point
     memory[memIndex++] = OPCode::JMP;
-    memory[memIndex++] = 0; // MOD byte
     labelsToReplace.push_back({RESERVED_LABEL_MAIN, memIndex}); // add this jmp instruction to labelsToReplace
     memIndex += 2; // make space for address
 
@@ -339,8 +339,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
         memory[instIndex++] = OPCode::RET;
     } else if (kwd == "jmp" || kwd == "jz" || kwd == "jnz" || kwd == "jc" || kwd == "jnc") {
         checkArgs(args, 1); // check for extra args
-        memory[instIndex++] = OPCode::JMP;
-        memory[instIndex++] = kwd == "jmp" ? 0 : kwd == "jz" ? 1 : kwd == "jnz" ? 2 : kwd == "jc" ? 3 : 4; // MOD byte
+        memory[instIndex++] = kwd == "jmp" ? OPCode::JMP : kwd == "jz" ? OPCode::JZ : kwd == "jnz" ? OPCode::JNZ : kwd == "jc" ? OPCode::JC : OPCode::JNC;
 
         std::vector<u8> bytesToWrite;
         u8 status = resolveArgument(args[0], bytesToWrite);
@@ -367,20 +366,24 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
         for (u8 b : bytesToWrite) memory[instIndex++] = b;
     } else if (kwd == "lb" || kwd == "lw" || kwd == "sb" || kwd == "sw") {
         checkArgs(args, 2); // check for extra args
-        parseLBSB(args, memory, instIndex, kwd[0] == 'l' ? OPCode::LB : OPCode::SB, kwd[1] == 'w');
+        u8 opCode = kwd == "lb" ? OPCode::LB : kwd == "lw" ? OPCode::LW : kwd == "sb" ? OPCode::SB : OPCode::SW;
+        parseLBLWSBSW(args, memory, instIndex, opCode);
     } else if (kwd == "push" || kwd == "pushw") {
         checkArgs(args, 1); // check for extra args
         parsePUSH(args, memory, instIndex, kwd == "pushw", labelsToReplace, labelMap);
     } else if (kwd == "pop" || kwd == "popw") {
-        if (args.size() > 1) throw std::invalid_argument("Invalid number of arguments.");
+        checkArgs(args, 1); // check for extra args
         parsePOP(args, memory, instIndex, kwd == "popw");
-    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp" || kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr" || kwd == "mov") {
+    } else if (kwd == "mov") {
+        checkArgs(args, 2); // check for extra args
+        parseMOV(args, memory, instIndex);
+    } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp" || kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr") {
         checkArgs(args, 2); // check for extra args
         OPCode code = (kwd == "add" || kwd == "sadd") ? OPCode::ADD : (kwd == "ssub" || kwd == "sub") ? OPCode::SUB :
                       kwd == "and" ? OPCode::AND : kwd == "or" ? OPCode::OR : (kwd == "cmp" || kwd == "scmp") ? OPCode::CMP :
-                      (kwd == "shl" || kwd == "sshl") ? OPCode::SHL : (kwd == "shr" || kwd == "sshr") ? OPCode::SHR : (kwd == "mov") ? OPCode::MOV : OPCode::XOR;
+                      (kwd == "shl" || kwd == "sshl") ? OPCode::SHL : (kwd == "shr" || kwd == "sshr") ? OPCode::SHR : OPCode::XOR;
         bool isSignedOp = kwd == "sadd" || kwd == "ssub" || kwd == "scmp" || kwd == "sshl" || kwd == "sshr";
-        parseMOVADDSUBLogic(args, memory, instIndex, code, isSignedOp);
+        parseADDSUBLogic(args, memory, instIndex, code, isSignedOp);
     } else if (kwd == "mul" || kwd == "div" || kwd == "smul" || kwd == "sdiv" || kwd == "buf") {
         checkArgs(args, 1); // check for extra args
         bool isSignedOp = kwd == "smul" || kwd == "sdiv";
@@ -409,7 +412,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
 }
 
 // abstraction to parse a MOV instruction
-void parseLBSB(const std::vector<std::string>& args, Memory& memory, u16& instIndex, u8 opCode, const bool isWide) {
+void parseLBLWSBSW(const std::vector<std::string>& args, Memory& memory, u16& instIndex, u8 opCode) {
     memory[instIndex++] = opCode;
 
     // determine MOD byte
@@ -417,25 +420,51 @@ void parseLBSB(const std::vector<std::string>& args, Memory& memory, u16& instIn
 
     // determine arg A
     u8 statusA = resolveArgument(args[0], bytesToWrite);
+    const bool isWide = opCode == OPCode::LW || opCode == OPCode::SW;
     if ((statusA != ARG_REG16 && isWide) || (statusA != ARG_REG8 && !isWide))
         throw std::invalid_argument("Invalid first argument to lb/lw/sb/sw.");
 
     // determine arg B
-    u8 statusB = resolveArgument(args[1], bytesToWrite, statusA == ARG_REG16, true);
-    u8 MOD = (statusA == ARG_REG8) ? 0 : 1;
-    switch (statusB) {
-        case ARG_ADDR_DIRECT: break;
-        case ARG_ADDR_OFFSET: MOD |= 32; break; // set the 6th bit to mark this as an offset address
-        default: throw std::invalid_argument("Invalid second argument to lb/lw/sb/sw.");
+    u8 statusB = resolveArgument(args[1], bytesToWrite);
+    if (statusB != ARG_ADDR_OFFSET)
+        throw std::invalid_argument("Invalid second argument to lb/lw/sb/sw.");
+
+    // write bytes
+    for (u8 b : bytesToWrite) memory[instIndex++] = b;
+}
+
+void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+    // extract args
+    std::vector<u8> bytesToWrite;
+    u8 opCode;
+    u8 statusA = resolveArgument(args[0], bytesToWrite);
+
+    // only allow register as first operand
+    if (statusA != ARG_REG8 && statusA != ARG_REG16)
+        throw std::invalid_argument("Invalid first argument to mov.");
+
+    u8 statusB = resolveArgument(args[1], bytesToWrite, statusA == ARG_REG16);
+    if (statusB != ARG_REG8 && statusB != ARG_REG16 && statusB != ARG_IMM8 && statusB != ARG_IMM16)
+        throw std::invalid_argument("Invalid second argument to mov.");
+
+    // determine MOD byte
+    if (statusA == ARG_REG8) {
+        if      (statusB == ARG_REG8)   opCode = OPCode::MOV;
+        else if (statusB == ARG_IMM8)   opCode = OPCode::MOVI;
+        else throw std::invalid_argument("8-bit and 16-bit register mismatch in mov.");
+    } else {
+        if      (statusB == ARG_REG16)  opCode = OPCode::MOVW;
+        else if (statusB == ARG_IMM16)  opCode = OPCode::MOVWI;
+        else throw std::invalid_argument("8-bit and 16-bit register mismatch in mov.");
     }
 
     // write bytes
-    memory[instIndex++] = MOD;
+    memory[instIndex++] = opCode;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
 // most arithmetic operations follow this convention
-void parseMOVADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction, bool isSignedOp) {
+void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16& instIndex, OPCode instruction, bool isSignedOp) {
     // extract args
     std::vector<u8> bytesToWrite;
     u8 MOD = isSignedOp ? 8 : 0;
@@ -514,42 +543,36 @@ void parseNOT(const std::vector<std::string>& args, Memory& memory, u16& instInd
 }
 
 void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPUSHW, label_replace_vec_t& labelsToReplace, label_map_t& labelMap) {
-    memory[instIndex++] = OPCode::PUSH;
-
     // extract args
     std::vector<u8> bytesToWrite;
-    u8 MOD = 0;
+    u8 opCode;
     u8 statusA = resolveArgument(args[0], bytesToWrite, isPUSHW);
 
     // only allow register as first operand
     switch (statusA) {
         case ARG_REG8:
             if (isPUSHW) throw std::invalid_argument("Invalid 8-bit operation.");
-            MOD |= 0;
+            opCode = OPCode::PUSH;
             break;
         case ARG_REG16:
             if (!isPUSHW) throw std::invalid_argument("Invalid 16-bit operation.");
-            MOD |= 1;
+            opCode = OPCode::PUSHW;
             break;
         case ARG_IMM8:
             if (isPUSHW) throw std::invalid_argument("Invalid 8-bit operation.");
-            MOD |= 2;
+            opCode = OPCode::PUSHI;
             break;
         case ARG_IMM16:
             if (!isPUSHW) throw std::invalid_argument("Invalid 16-bit operation.");
-            MOD |= 3;
-            break;
-        case ARG_ADDR_DIRECT:
-            MOD |= isPUSHW ? 5 : 4;
+            opCode = OPCode::PUSHWI;
             break;
         case ARG_ADDR_OFFSET: {
-            MOD |= isPUSHW ? 5 : 4;
-            MOD |= 16; // set the 5th bit to mark this as an offset address
+            opCode = isPUSHW ? OPCode::PUSHWA : OPCode::PUSHA;
             break;
         }
         case ARG_LABEL: {
             if (!isPUSHW) throw std::invalid_argument("Invalid 16-bit operation.");
-            MOD |= 3;
+            opCode = OPCode::PUSHWI;
 
             // get labels
             if (labelMap.count(args[0]) == 0) {
@@ -569,38 +592,31 @@ void parsePUSH(const std::vector<std::string>& args, Memory& memory, u16& instIn
     }
 
     // write bytes
-    memory[instIndex++] = MOD;
+    memory[instIndex++] = opCode;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
 void parsePOP(const std::vector<std::string>& args, Memory& memory, u16& instIndex, bool isPOPW) {
-    memory[instIndex++] = OPCode::POP;
-
-    // check for any args
+    // extract args
     std::vector<u8> bytesToWrite;
-    u8 MOD = 0;
-    if (args.size() == 1) {
-        // extract args
-        u8 statusA = resolveArgument(args[0], bytesToWrite);
+    u8 opCode;
+    u8 statusA = resolveArgument(args[0], bytesToWrite);
 
-        // only allow register as first operand
-        switch (statusA) {
-            case ARG_REG8:
-                if (isPOPW) throw std::invalid_argument("Invalid 8-bit operation.");
-                MOD |= 0;
-                break;
-            case ARG_REG16:
-                if (!isPOPW) throw std::invalid_argument("Invalid 16-bit operation.");
-                MOD |= 1;
-                break;
-            default: throw std::invalid_argument("Invalid first argument to pop.");
-        }
-    } else {
-        MOD |= isPOPW ? 3 : 2;
+    // only allow register as first operand
+    switch (statusA) {
+        case ARG_REG8:
+            if (isPOPW) throw std::invalid_argument("Invalid 8-bit operation.");
+            opCode = OPCode::POP;
+            break;
+        case ARG_REG16:
+            if (!isPOPW) throw std::invalid_argument("Invalid 16-bit operation.");
+            opCode = OPCode::POPW;
+            break;
+        default: throw std::invalid_argument("Invalid first argument to pop.");
     }
 
     // write bytes
-    memory[instIndex++] = MOD;
+    memory[instIndex++] = opCode;
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
@@ -613,12 +629,6 @@ u8 resolveArgument(const std::string& arg, std::vector<u8>& bytesToWrite, const 
     } else if (std::regex_match(arg, RE_ARG_REG8)) { // treat as reg8
         bytesToWrite.push_back( getRegisterFromString(arg) );
         return ARG_REG8;
-    } else if (std::regex_match(arg, RE_ARG_ADDR_DIRECT)) { // treat as direct addr
-        u8 radix = (arg[2] == 'b' || arg[2] == 'B') ? 2 : (arg[2] == 'x' || arg[2] == 'X') ? 16 : 10;
-        u16 addr = std::stoull(arg, nullptr, radix);
-        bytesToWrite.push_back( addr & 0xFF );
-        bytesToWrite.push_back( (addr >> 8) & 0xFF );
-        return ARG_ADDR_DIRECT;
     } else if (std::regex_match(arg, RE_ARG_ADDR_OFFSET)) { // treat as offset addr
         // extract register
         const std::string offsetStr = arg.substr(0, arg.size()-4);

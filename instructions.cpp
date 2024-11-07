@@ -34,16 +34,11 @@ constexpr bool getParity(u8 n) {
     return parity;
 }
 
-u16 getAddress(TPU& tpu, Memory& memory, const bool isOffset) {
-    if (isOffset) {
-        // read the 16-bit offset & 8-bit op code for register
-        s16 offset = tpu.readWord(memory).getValue();
-        Register regCode = getRegister16FromCode( tpu.readByte(memory).getValue() );
-        return (s32)tpu.readRegister16(regCode).getValue() + offset;
-    } else {
-        // read the address from memory
-        return tpu.readWord(memory).getValue();
-    }
+u16 getAddress(TPU& tpu, Memory& memory) {
+    // read the 16-bit offset & 8-bit op code for register
+    s16 offset = tpu.readWord(memory).getValue();
+    Register regCode = getRegister16FromCode( tpu.readByte(memory).getValue() );
+    return (s32)tpu.readRegister16(regCode).getValue() + offset;
 }
 
 Register getReg8(TPU& tpu, Memory& memory) {
@@ -181,6 +176,26 @@ namespace instructions {
         }
     }
 
+    void processJMP(TPU& tpu, Memory& memory, u8 opCode) {
+        // get operands
+        u16 destAddr = tpu.readWord(memory).getValue();
+        if (tpu.getAddressingMode() == ADDRESS_MODE_RELATIVE)
+            destAddr += tpu.getProgramStartIndex(memory);
+
+        bool isPermitted;
+        switch (opCode) {
+            case OPCode::JMP: isPermitted = true; break;
+            case OPCode::JZ:  isPermitted = tpu.getFlag(ZERO); break;
+            case OPCode::JNZ: isPermitted = !tpu.getFlag(ZERO); break;
+            case OPCode::JC:  isPermitted = tpu.getFlag(CARRY); break;
+            case OPCode::JNC: isPermitted = !tpu.getFlag(CARRY); break;
+            default: throw std::invalid_argument("Invalid MOD byte for operation: JMP/JZ/JNZ/JC/JNC.");
+        }
+
+        // jump if needed
+        if (isPermitted) tpu.moveToRegister(Register::IP, destAddr);
+    }
+
     void processCALL(TPU& tpu, Memory& memory) {
         // Moves the instruction pointer to a named label's entry address, storing the current instruction pointer on the callstack.
 
@@ -209,60 +224,25 @@ namespace instructions {
         tpu.sleep(); // sleep after storing IP
     }
 
-    void processJMP(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
-
+    void processMOV(TPU& tpu, Memory& memory, u8 opCode) {
         // get operands
-        u16 destAddr = tpu.readWord(memory).getValue();
-        if (tpu.getAddressingMode() == ADDRESS_MODE_RELATIVE)
-            destAddr += tpu.getProgramStartIndex(memory);
-
-        bool isPermitted;
-        switch (mod.getValue() & 0b111) {
-            // Moves the instruction pointer to the specified label.
-            case 0: isPermitted = true; break;
-            // Moves the instruction pointer to the specified label, if the zero flag (ZF) is set.
-            case 1: isPermitted = tpu.getFlag(ZERO); break;
-            // Moves the instruction pointer to the specified label, if the zero flag (ZF) is cleared.
-            case 2: isPermitted = !tpu.getFlag(ZERO); break;
-            // Moves the instruction pointer to the specified label, if the carry flag (CF) is set.
-            case 3: isPermitted = tpu.getFlag(CARRY); break;
-            // Moves the instruction pointer to the specified label, if the carry flag (CF) is cleared.
-            case 4: isPermitted = !tpu.getFlag(CARRY); break;
-            default: throw std::invalid_argument("Invalid MOD byte for operation: JMP.");
-        }
-
-        // jump if needed
-        if (isPermitted)
-            tpu.moveToRegister(Register::IP, destAddr);
-    }
-
-    void processMOV(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
-
-        // get operands
-        const u8 argsFormat = mod.getValue() & 7;
-        switch (argsFormat) {
-            case 0: { // reg8, imm8
+        switch (opCode) {
+            case OPCode::MOVI: { // reg8, imm8
                 Register regA = getReg8(tpu, memory);
                 tpu.moveToRegister(regA, tpu.readByte(memory).getValue());
                 break;
             }
-            case 1: { // reg16, imm16
+            case OPCode::MOVWI: { // reg16, imm16
                 Register regA = getReg16(tpu, memory);
                 tpu.moveToRegister(regA, tpu.readWord(memory).getValue());
                 break;
             }
-            case 2: { // reg8, reg8
+            case OPCode::MOV: { // reg8, reg8
                 Register regA = getReg8(tpu, memory);
                 tpu.moveToRegister(regA, readReg8(tpu, memory));
                 break;
             }
-            case 3: { // reg16, reg16
+            case OPCode::MOVW: { // reg16, reg16
                 Register regA = getReg16(tpu, memory);
                 tpu.moveToRegister(regA, readReg16(tpu, memory));
                 break;
@@ -272,127 +252,90 @@ namespace instructions {
     }
 
     void processLB(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Register regA = getReg8(tpu, memory);
+        u16 addr = getAddress(tpu, memory);
+        tpu.moveToRegister(regA, memory[addr].getValue());
+    }
 
-        // get operands
-        const u8 argsFormat = mod.getValue() & 7;
-        const bool isArgBOffset = mod.getValue() & 32;
-        switch (argsFormat) {
-            case 0: { // reg8, addr
-                Register regA = getReg8(tpu, memory);
-                u16 addr = getAddress(tpu, memory, isArgBOffset);
-                tpu.moveToRegister(regA, memory[addr].getValue());
-                break;
-            }
-            case 1: { // reg16, addr
-                Register regA = getReg16(tpu, memory);
-                u16 addr = getAddress(tpu, memory, isArgBOffset);
-                u16 value = memory[addr].getValue();
-                value |= ((u16)memory[addr+1].getValue()) << 8;
-                tpu.moveToRegister(regA, value);
-                break;
-            }
-            default: throw std::invalid_argument("Invalid MOD byte for operation: lb/lw.");
-        }
+    void processLW(TPU& tpu, Memory& memory) {
+        Register regA = getReg16(tpu, memory);
+        u16 addr = getAddress(tpu, memory);
+        u16 value = memory[addr].getValue();
+        value |= ((u16)memory[addr+1].getValue()) << 8;
+        tpu.moveToRegister(regA, value);
     }
 
     void processSB(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
-
-        // get operands
-        const u8 argsFormat = mod.getValue() & 7;
-        const bool isArgBOffset = mod.getValue() & 32;
-        switch (argsFormat) {
-            case 0: { // reg8, addr (src, dest)
-                u8 value = readReg8(tpu, memory);
-                u16 addr = getAddress(tpu, memory, isArgBOffset);
-                memory[addr] = value;
-                break;
-            }
-            case 1: { // reg16, addr (src, dest)
-                u16 value = readReg16(tpu, memory);
-                u16 addr = getAddress(tpu, memory, isArgBOffset);
-                memory[addr] = value & 0xFF;
-                memory[addr+1] = (value >> 8) & 0xFF;
-                break;
-            }
-            default: throw std::invalid_argument("Invalid MOD byte for operation: sb/sw.");
-        }
+        u8 value = readReg8(tpu, memory);
+        u16 addr = getAddress(tpu, memory);
+        memory[addr] = value;
     }
 
-    void processPUSH(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+    void processSW(TPU& tpu, Memory& memory) {
+        u16 value = readReg16(tpu, memory);
+        u16 addr = getAddress(tpu, memory);
+        memory[addr] = value & 0xFF;
+        memory[addr+1] = (value >> 8) & 0xFF;
+    }
 
+    void processPUSH(TPU& tpu, Memory& memory, u8 opCode) {
         // get operands
-        const u8 argsFormat = mod.getValue() & 7;
-        const bool isArgAOffset = mod.getValue() & 16;
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
         u8 writeSize = 1;
-        switch (argsFormat) {
-            case 0: { // reg8
+        switch (opCode) {
+            case OPCode::PUSH: { // reg8
                 memory[oldAddr] = readReg8(tpu, memory);
                 break;
             }
-            case 1: { // reg16
+            case OPCode::PUSHW: { // reg16
                 u16 value = readReg16(tpu, memory);
                 memory[oldAddr] = value & 0xFF;
                 memory[oldAddr+1] = (value >> 8) & 0xFF;
                 ++writeSize;
                 break;
             }
-            case 2: { // imm8
+            case OPCode::PUSHI: { // imm8
                 memory[oldAddr] = tpu.readByte(memory);
                 break;
             }
-            case 3: { // imm16
+            case OPCode::PUSHWI: { // imm16
                 u16 value = tpu.readWord(memory).getValue();
                 memory[oldAddr]   = value & 0xFF;
                 memory[oldAddr+1] = (value >> 8) & 0xFF;
                 ++writeSize;
                 break;
             }
-            case 4: { // addr
-                u16 addr = getAddress(tpu, memory, isArgAOffset);
+            case OPCode::PUSHA: { // addr
+                u16 addr = getAddress(tpu, memory);
                 memory[oldAddr] = memory[addr];
                 break;
             }
-            case 5: { // addr (pushw)
-                u16 addr = getAddress(tpu, memory, isArgAOffset);
+            case OPCode::PUSHWA: { // addr (pushw)
+                u16 addr = getAddress(tpu, memory);
                 memory[oldAddr] = memory[addr];
                 memory[oldAddr+1] = memory[addr+1];
                 ++writeSize;
                 break;
             }
-            default: throw std::invalid_argument("Invalid MOD byte for operation: push.");
+            default: throw std::invalid_argument("Invalid MOD byte for operation: push/pushw.");
         }
 
         // move stack pointer up
         tpu.moveToRegister(Register::SP, oldAddr + writeSize);
     }
 
-    void processPOP(TPU& tpu, Memory& memory) {
-        // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
-
+    void processPOP(TPU& tpu, Memory& memory, u8 opCode) {
         // get operands
-        const u8 argsFormat = mod.getValue() & 7;
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
         u8 writeSize = 1;
-        switch (argsFormat) {
-            case 0: { // reg8
+        switch (opCode) {
+            case OPCode::POP: { // reg8
                 Register regA = getReg8(tpu, memory);
                 u8 value = memory[oldAddr-1].getValue();
                 tpu.moveToRegister(regA, value);
                 break;
             }
-            case 1: { // reg16
+            case OPCode::POPW: { // reg16
                 Register regA = getReg16(tpu, memory);
                 u16 value = memory[oldAddr-2].getValue();
                 value |= ((u16)memory[oldAddr-1].getValue()) << 8;
@@ -400,9 +343,7 @@ namespace instructions {
                 ++writeSize;
                 break;
             }
-            case 2: break; // no-args
-            case 3: ++writeSize; break; // no-args
-            default: throw std::invalid_argument("Invalid MOD byte for operation: pop.");
+            default: throw std::invalid_argument("Invalid MOD byte for operation: pop/popw.");
         }
 
         // move stack pointer up

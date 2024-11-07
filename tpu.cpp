@@ -130,23 +130,40 @@ void TPU::execute(Memory& memory) {
             this->sleep(); // wait since the TPU has just completed a syscall
             break;
         }
+        case OPCode::JMP: case OPCode::JZ: case OPCode::JNZ: case OPCode::JC: case OPCode::JNC: {
+            instructions::processJMP(*this, memory, opCode);
+            this->sleep();
+            break;
+        }
         caseInstruction(CALL)
         caseInstruction(RET)
-        caseInstruction(JMP)
-        caseInstruction(MOV)
+        case OPCode::MOV: case OPCode::MOVW: case OPCode::MOVI: case OPCode::MOVWI: {
+            instructions::processMOV(*this, memory, opCode);
+            this->sleep();
+            break;
+        }
         caseInstruction(LB)
+        caseInstruction(LW)
         caseInstruction(SB)
-        caseInstruction(PUSH)
-        caseInstruction(POP)
+        caseInstruction(SW)
+        case OPCode::PUSH: case OPCode::PUSHW: case OPCode::PUSHI:
+        case OPCode::PUSHWI: case OPCode::PUSHA: case OPCode::PUSHWA: {
+            instructions::processPUSH(*this, memory, opCode);
+            this->sleep();
+            break;
+        }
+        case OPCode::POP: case OPCode::POPW: {
+            instructions::processPOP(*this, memory, opCode);
+            this->sleep();
+            break;
+        }
         caseInstruction(ADD)
         caseInstruction(SUB)
         caseInstruction(MUL)
         caseInstruction(DIV)
         caseInstruction(CMP)
         caseInstruction(BUF)
-        case OPCode::AND:
-        case OPCode::OR:
-        case OPCode::XOR: {
+        case OPCode::AND: case OPCode::OR: case OPCode::XOR: {
             instructions::processANDORXOR(*this, memory, opCode);
             this->sleep();
             break;

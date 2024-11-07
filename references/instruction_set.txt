@@ -2,15 +2,13 @@ ARGUMENT TYPES:
 --------------------------------------------------------------------------------------------------------------------------------
 imm8:   An immediate, 8-bit value.
 imm16:  A label or an immediate, 16-bit value.
-addr:   A 16-bit memory address prefixed by '@' (ex. @0xBEEF or @14336), or at a 16-bit, signed offset from a register (ex. 4(SP), -8(AX)).
+addr:   A 16-bit memory address at a 16-bit, signed offset from a register (ex. 4(SP), -8(AX)).
 reg8:   An 8-bit register.
 reg16:  A 16-bit register.
 
 MOD BYTE:
 Bits 1-3: args format
 Bit 4:    signedness
-Bit 5:    set if arg A is an offset address
-Bit 6:    set if arg B is an offset address
 
 MOD BYTE CONVENTION:
 The following convention applies to move instructions and all arithmetic and logical operations' MOD bytes.
@@ -33,133 +31,130 @@ hlt                         0x01            Halts/stops the clock on the CPU.
 
 syscall                     0x02            Triggers a syscall.
 
-call imm16                  0x03            Moves the instruction pointer to an entry address, storing the current instruction pointer on the callstack.
+jmp imm16                   0x03            Moves IP to specified address.
+jz imm16                    0x04            Moves IP to specified address, if the zero flag (ZF) is set.
+jnz imm16                   0x05            Moves IP to specified address, if the zero flag (ZF) is cleared.
+jc imm16                    0x06            Moves IP to specified address, if the carry flag (CF) is set.
+jnc imm16                   0x07            Moves IP to specified address, if the carry flag (CF) is cleared.
+call imm16                  0x08            Moves IP to specified address and stores current IP on callstack.
 
-ret                         0x04            Revert the instruction pointer to the previous memory address stored on top of the callstack.
+ret                         0x09            Reverts IP to the previous address on top of the callstack.
 
-jmp imm16                   0x05 /0         Moves the instruction pointer to the specified address.
-jz imm16                    0x05 /1         Moves the instruction pointer to the specified address, if the zero flag (ZF) is set.
-jnz imm16                   0x05 /2         Moves the instruction pointer to the specified address, if the zero flag (ZF) is cleared.
-jc imm16                    0x05 /3         Moves the instruction pointer to the specified address, if the carry flag (CF) is set.
-jnc imm16                   0x05 /4         Moves the instruction pointer to the specified address, if the carry flag (CF) is cleared.
+mov reg8, imm8              0x0A            Move imm8 into 8-bit register.
+mov reg16, imm16            0x0B            Move imm16 into 16-bit register.
+mov reg8, reg8              0x0C            Move value between reg8.
+mov reg16, reg16            0x0D            Move value between reg16.
 
-mov reg8, imm8              0x06 /0         Move imm8 into 8-bit register.
-mov reg16, imm16            0x06 /1         Move imm16 into 16-bit register.
-mov reg8, reg8              0x06 /2         Move value between reg8.
-mov reg16, reg16            0x06 /3         Move value between reg16.
+lb reg8, addr               0x0E            Loads a byte from the address into a reg8.
+lw reg16, addr              0x0F            Loads a word (little-endian) from the address into a reg16.
 
-lb reg8, addr               0x07 /0         Loads a byte from the address into a reg8.
-lw reg16, addr              0x07 /1         Loads a word (little-endian) from the address into a reg16.
+sb reg8, addr               0x10            Stores a reg8 byte at an address in memory.
+sw reg16, addr              0x11            Stores a reg16 word at an address in memory (little-endian).
 
-sb reg8, addr               0x08 /0         Stores a reg8 byte at an address in memory.
-sw reg16, addr              0x08 /1         Stores a reg16 word at an address in memory (little-endian).
+push reg8                   0x12            Pushes the value of a reg8 onto the stack.
+pushw reg16                 0x13            Pushes the value of a reg16 onto the stack, lowest byte first.
+push imm8                   0x14            Pushes an imm8 value onto the stack.
+pushw imm16                 0x15            Pushes an imm16 value onto the stack, lowest byte first.
+push addr                   0x16            Pushes an 8-bit value from an address in memory onto the stack.
+pushw addr                  0x17            Pushes a 16-bit word from an address and the next address (little-endian) from memory onto the stack.
 
-push reg8                   0x09 /0         Pushes the value of a reg8 onto the stack.
-pushw reg16                 0x09 /1         Pushes the value of a reg16 onto the stack, lowest byte first.
-push imm8                   0x09 /2         Pushes an imm8 value onto the stack.
-pushw imm16                 0x09 /3         Pushes an imm16 value onto the stack, lowest byte first.
-push addr                   0x09 /4         Pushes an 8-bit value from an address in memory onto the stack.
-pushw addr                  0x09 /5         Pushes a 16-bit word from an address and the next address (little-endian) from memory onto the stack.
-
-pop reg8                    0x0A /0         Pops the top byte off the stack to a reg8.
-popw reg16                  0x0A /1         Pops the top two bytes off the stack to a reg16, the top byte into the upper half.
-pop                         0x0A /2         Pops the top byte off the stack without storing it.
-popw                        0x0A /3         Pops the top two bytes off the stack without storing them.
+pop reg8                    0x18            Pops the top byte off the stack to a reg8.
+popw reg16                  0x19            Pops the top two bytes off the stack to a reg16, the top byte into the upper half.
 
 Adds both operands, storing result in first operand.
-add reg8, imm8              0x14 /0
-add reg16, imm16            0x14 /1
-add reg8, reg8              0x14 /2
-add reg16, reg16            0x14 /3
-sadd reg8, imm8             0x14 /0  (signed)
-sadd reg16, imm16           0x14 /1  (signed)
-sadd reg8, reg8             0x14 /2  (signed)
-sadd reg16, reg16           0x14 /3  (signed)
+add reg8, imm8              0x20 /0
+add reg16, imm16            0x20 /1
+add reg8, reg8              0x20 /2
+add reg16, reg16            0x20 /3
+sadd reg8, imm8             0x20 /0  (signed)
+sadd reg16, imm16           0x20 /1  (signed)
+sadd reg8, reg8             0x20 /2  (signed)
+sadd reg16, reg16           0x20 /3  (signed)
 
 Subtracts second operand from first, storing result in first operand.
-sub reg8, imm8              0x15 /0
-sub reg16, imm16            0x15 /1
-sub reg8, reg8              0x15 /2
-sub reg16, reg16            0x15 /3
-ssub reg8, imm8             0x15 /0  (signed)
-ssub reg16, imm16           0x15 /1  (signed)
-ssub reg8, reg8             0x15 /2  (signed)
-ssub reg16, reg16           0x15 /3  (signed)
+sub reg8, imm8              0x21 /0
+sub reg16, imm16            0x21 /1
+sub reg8, reg8              0x21 /2
+sub reg16, reg16            0x21 /3
+ssub reg8, imm8             0x21 /0  (signed)
+ssub reg16, imm16           0x21 /1  (signed)
+ssub reg8, reg8             0x21 /2  (signed)
+ssub reg16, reg16           0x21 /3  (signed)
 
 Multiplies the AL (8-bit) or AX (16-bit) register by the operand, storing the lower and upper halves in AL & AH (8-bit) or AX & DX (16-bit).
-mul imm8                    0x16 /0
-mul imm16                   0x16 /1
-mul reg8                    0x16 /2
-mul reg16                   0x16 /3
-smul imm8                   0x16 /0  (signed)
-smul imm16                  0x16 /1  (signed)
-smul reg8                   0x16 /2  (signed)
-smul reg16                  0x16 /3  (signed)
+mul imm8                    0x22 /0
+mul imm16                   0x22 /1
+mul reg8                    0x22 /2
+mul reg16                   0x22 /3
+smul imm8                   0x22 /0  (signed)
+smul imm16                  0x22 /1  (signed)
+smul reg8                   0x22 /2  (signed)
+smul reg16                  0x22 /3  (signed)
 
 Divides the AL (8-bit) or AX (16-bit) register by the operand, storing the dividend and remainder in AL & AH (8-bit) or AX & DX (16-bit).
-div imm8                    0x17 /0
-div imm16                   0x17 /1
-div reg8                    0x17 /2
-div reg16                   0x17 /3
-sdiv imm8                   0x17 /0  (signed)
-sdiv imm16                  0x17 /1  (signed)
-sdiv reg8                   0x17 /2  (signed)
-sdiv reg16                  0x17 /3  (signed)
+div imm16                   0x23 /1
+div imm8                    0x23 /0
+div reg8                    0x23 /2
+div reg16                   0x23 /3
+sdiv imm8                   0x23 /0  (signed)
+sdiv imm16                  0x23 /1  (signed)
+sdiv reg8                   0x23 /2  (signed)
+sdiv reg16                  0x23 /3  (signed)
 
 Compares both operands. If A < B, ZF=0 and CF=1; if A == B, ZF=1 and CF=0; if A > B, ZF=0 and CF=1.
-cmp reg8, imm8              0x18 /0
-cmp reg16, imm16            0x18 /1
-cmp reg8, reg8              0x18 /2
-cmp reg16, reg16            0x18 /3
-scmp reg8, imm8             0x18 /0  (signed)
-scmp reg16, imm16           0x18 /1  (signed)
-scmp reg8, reg8             0x18 /2  (signed)
-scmp reg16, reg16           0x18 /3  (signed)
+cmp reg8, imm8              0x24 /0
+cmp reg16, imm16            0x24 /1
+cmp reg8, reg8              0x24 /2
+cmp reg16, reg16            0x24 /3
+scmp reg8, imm8             0x24 /0  (signed)
+scmp reg16, imm16           0x24 /1  (signed)
+scmp reg8, reg8             0x24 /2  (signed)
+scmp reg16, reg16           0x24 /3  (signed)
 
 Buffers the operand, updating flags accordingly.
-buf imm8                    0x1F /0
-buf imm16                   0x1F /1
-buf reg8                    0x1F /2
-buf reg16                   0x1F /3
+buf imm8                    0x25 /0
+buf imm16                   0x25 /1
+buf reg8                    0x25 /2
+buf reg16                   0x25 /3
 
 Logical AND between both operands, storing the result in the first.
-and reg8, imm8              0x20 /0
-and reg16, imm16            0x20 /1
-and reg8, reg8              0x20 /2
-and reg16, reg16            0x20 /3
+and reg8, imm8              0x26 /0
+and reg16, imm16            0x26 /1
+and reg8, reg8              0x26 /2
+and reg16, reg16            0x26 /3
 
 Logical OR between both operands, storing the result in the first.
-or reg8, imm8               0x21 /0
-or reg16, imm16             0x21 /1
-or reg8, reg8               0x21 /2
-or reg16, reg16             0x21 /3
+or reg8, imm8               0x27 /0
+or reg16, imm16             0x27 /1
+or reg8, reg8               0x27 /2
+or reg16, reg16             0x27 /3
 
 Logical XOR between both operands, storing the result in the first.
-xor reg8, imm8              0x22 /0
-xor reg16, imm16            0x22 /1
-xor reg8, reg8              0x22 /2
-xor reg16, reg16            0x22 /3
+xor reg8, imm8              0x28 /0
+xor reg16, imm16            0x28 /1
+xor reg8, reg8              0x28 /2
+xor reg16, reg16            0x28 /3
 
 Performs a bitwise NOT on the register operand and stores the result in place.
-not reg8                    0x23 /0
-not reg16                   0x23 /1
+not reg8                    0x29 /0
+not reg16                   0x29 /1
 
 Shifts the first operand left as many times as the value of the second operand, storing in the first operand.
-shl reg8, imm8              0x24 /0
-shl reg16, imm16            0x24 /1
-shl reg8, reg8              0x24 /2
-shl reg16, reg16            0x24 /3
-sshl reg8, imm8             0x24 /0  (signed)
-sshl reg16, imm16           0x24 /1  (signed)
-sshl reg8, reg8             0x24 /2  (signed)
-sshl reg16, reg16           0x24 /3  (signed)
+shl reg8, imm8              0x2A /0
+shl reg16, imm16            0x2A /1
+shl reg8, reg8              0x2A /2
+shl reg16, reg16            0x2A /3
+sshl reg8, imm8             0x2A /0  (signed)
+sshl reg16, imm16           0x2A /1  (signed)
+sshl reg8, reg8             0x2A /2  (signed)
+sshl reg16, reg16           0x2A /3  (signed)
 
 Shifts the first operand right as many times as the value of the second operand, storing in the first operand.
-shr reg8, imm8              0x25 /0
-shr reg16, imm16            0x25 /1
-shr reg8, reg8              0x25 /2
-shr reg16, reg16            0x25 /3
-sshr reg8, imm8             0x25 /0  (signed)
-sshr reg16, imm16           0x25 /1  (signed)
-sshr reg8, reg8             0x25 /2  (signed)
-sshr reg16, reg16           0x25 /3  (signed)
+shr reg8, imm8              0x2B /0
+shr reg16, imm16            0x2B /1
+shr reg8, reg8              0x2B /2
+shr reg16, reg16            0x2B /3
+sshr reg8, imm8             0x2B /0  (signed)
+sshr reg16, imm16           0x2B /1  (signed)
+sshr reg8, reg8             0x2B /2  (signed)
+sshr reg16, reg16           0x2B /3  (signed)
