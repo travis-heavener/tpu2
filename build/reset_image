@@ -10,3 +10,6 @@ python3 ./os/make_boot_drive.py A
 
 # burn TPU assembly to drive
 ./build/assembler ./os/kernel_0.0.1.tpu ./os/A.dsk
+
+# print drive usage
+python3 ./os/read_disk_usage.py A
