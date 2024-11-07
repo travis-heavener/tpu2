@@ -11,12 +11,17 @@
 
 #define TAB "    "
 
-const std::regex RE_ARG_REG8("([ABCD][LH])");
-const std::regex RE_ARG_REG16("^(([ABCD]X)|([SBCI]P)|([SD]I))$");
-const std::regex REG_IMMED("(-?((0[Bb][01]+)|(0[Xx][abcdefABCDEF\\d]+)|(\\d+)))");
+#define __REGEX_REG16 "(([ABCD]X)|([SBCI]P)|([SD]I))"
+#define __REGEX_IMMED "(-?((0[Bb][01]+)|(0[Xx][abcdefABCDEF\\d]+)|(\\d+)))"
+const std::regex RE_REG8("^([ABCD][LH])$");
+const std::regex RE_REG16("^" __REGEX_REG16 "$");
+const std::regex RE_IMMED("^" __REGEX_IMMED "$");
+const std::regex RE_ADDR("^(" __REGEX_IMMED "\\(" __REGEX_REG16 "\\))$");
+const std::regex RE_POP("^\\s*sub\\s+SP\\s*,\\s*1\\s*$");
+const std::regex RE_POPW("^\\s*sub\\s+SP\\s*,\\s*2\\s*$");
 int parseInt(const std::string& str, bool ignoreNegatives=false) {
     // verify regex matches
-    if (!std::regex_match(str, REG_IMMED)) throw std::invalid_argument("Invalid IMM8/IMM16");
+    if (!std::regex_match(str, RE_IMMED)) throw std::invalid_argument("Invalid IMM8/IMM16");
     if (str[0] == '-' && ignoreNegatives) throw std::invalid_argument("Invalid IMM8/IMM16");
 
     bool isNeg = str[0] == '-';
@@ -192,23 +197,25 @@ int main(int argc, char* argv[]) {
                 std::string regB = strippedLineBuf.substr(4);
 
                 // verify both values are valid
-                bool isAValid = std::regex_match(valA, RE_ARG_REG8) || std::regex_match(valA, REG_IMMED);
-                bool isBValid = std::regex_match(regB, RE_ARG_REG8);
+                bool isAValidMov = std::regex_match(valA, RE_REG8) || std::regex_match(valA, RE_IMMED);
+                bool isBValid = std::regex_match(regB, RE_REG8);
 
-                if (!isAValid || !isBValid) {
+                // write instruction if not the same argument
+                if (isAValidMov && isBValid && valA != regB) {
+                    std::string newInst = "mov " + regB + ", " + valA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                } else if (std::regex_match(valA, RE_ADDR) && isBValid) { 
+                    // write as lb instruction
+                    std::string newInst = "lb " + regB + ", " + valA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                } else if (valA != regB) {
                     // base case, current instruction not matched, so write that and pass along the next one
                     writeInstruction(opts, outHandle, line, strippedLine);
                     line = lineBuf;
                     strippedLine = strippedLineBuf;
                     continue; // skip reading another line
                 }
-
-                // write instruction if not the same argument
-                if (valA != regB) {
-                    std::string newInst = "mov " + regB + ", " + valA;
-                    writeInstruction(opts, outHandle, newInst, newInst);
-                }
-            } else {
+            } else if (!std::regex_match(strippedLineBuf, RE_POP)) {
                 // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
                 line = lineBuf;
@@ -223,26 +230,73 @@ int main(int argc, char* argv[]) {
             if (strippedLineBuf.find("popw ") == 0) {
                 // move the value between registers
                 std::string valA = strippedLine.substr(6);
+                trimString(valA);
                 std::string regB = strippedLineBuf.substr(5);
+                trimString(regB);
 
                 // verify both values are valid
-                bool isAValid = std::regex_match(valA, RE_ARG_REG16) || std::regex_match(valA, REG_IMMED);
-                bool isBValid = std::regex_match(regB, RE_ARG_REG16);
+                bool isAValidMov = std::regex_match(valA, RE_REG16) || std::regex_match(valA, RE_IMMED);
+                bool isBValid = std::regex_match(regB, RE_REG16);
 
-                if (!isAValid || !isBValid) {
+                // write instruction if not the same argument
+                if (isAValidMov && isBValid && valA != regB) {
+                    std::string newInst = "mov " + regB + ", " + valA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                } else if (std::regex_match(valA, RE_ADDR) && isBValid) { 
+                    // write as lw instruction
+                    std::string newInst = "lw " + regB + ", " + valA;
+                    writeInstruction(opts, outHandle, newInst, newInst);
+                } else if (valA != regB) {
                     // base case, current instruction not matched, so write that and pass along the next one
                     writeInstruction(opts, outHandle, line, strippedLine);
                     line = lineBuf;
                     strippedLine = strippedLineBuf;
                     continue; // skip reading another line
                 }
+            } else if (strippedLineBuf.find("mov ") == 0) {
+                std::string valA = strippedLine.substr(6);
+                trimString(valA);
 
-                // write instruction if not the same argument
-                if (valA != regB) {
-                    std::string newInst = "mov " + regB + ", " + valA;
-                    writeInstruction(opts, outHandle, newInst, newInst);
+                // remove a potentially redundant pushw/popw
+                std::string movArgA = strippedLineBuf.substr(4);
+                movArgA = movArgA.substr(0, movArgA.find(','));
+                trimString(movArgA);
+
+                if (movArgA != valA) {
+                    // check if next line is a pop
+                    std::string lineBuf2, strippedLineBuf2;
+                    readNextLine(opts, lineBuf2, strippedLineBuf2, inHandle);
+
+                    if (strippedLineBuf2.find("popw ") == 0) {
+                        std::string popwArgA = strippedLineBuf2.substr(5);
+                        trimString(popwArgA);
+                        if (popwArgA == valA) {
+                            // only write mov instruction
+                            writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                        } else {
+                            // write all three instructions
+                            writeInstruction(opts, outHandle, line, strippedLine);
+                            writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                            line = lineBuf2;
+                            strippedLine = strippedLineBuf2;
+                            continue; // skip reading another line
+                        }
+                    } else {
+                        // write all three instructions
+                        writeInstruction(opts, outHandle, line, strippedLine);
+                        writeInstruction(opts, outHandle, lineBuf, strippedLineBuf);
+                        line = lineBuf2;
+                        strippedLine = strippedLineBuf2;
+                        continue; // skip reading another line
+                    }
+                } else {
+                    // write both instructions
+                    writeInstruction(opts, outHandle, line, strippedLine);
+                    line = lineBuf;
+                    strippedLine = strippedLineBuf;
+                    continue; // skip reading another line
                 }
-            } else if (strippedLineBuf != "popw") { // if popw, ignore anyways since whatever is pushed gets popped
+            } else if (!std::regex_match(strippedLineBuf, RE_POPW)) { // if popw, ignore anyways since whatever is pushed gets popped
                 // base case, current instruction not matched, so write that and pass along the next one
                 writeInstruction(opts, outHandle, line, strippedLine);
                 line = lineBuf;
@@ -255,22 +309,7 @@ int main(int argc, char* argv[]) {
             readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
 
             // fetch any successive pop/popw to combine
-            if (opts.dissolvePops && (strippedLine == "popw" || strippedLine == "pop")) {
-                size_t popSize = strippedLine == "popw" ? 2 : 1;
-                while (strippedLineBuf == "popw" || strippedLineBuf == "pop") {
-                    popSize += strippedLineBuf == "popw" ? 2 : 1;
-                    readNextLine(opts, lineBuf, strippedLineBuf, inHandle);
-                }
-
-                // write SP substraction instruction
-                const std::string subInst = "sub SP, " + std::to_string(popSize);
-                writeInstruction(opts, outHandle, subInst, subInst);
-
-                // stopped on a non-matching line, so pass along
-                line = lineBuf;
-                strippedLine = strippedLineBuf;
-                continue; // skip reading another line
-            } else if (opts.reducePushPops &&
+            if (opts.reducePushPops &&
                        ((strippedLineBuf.find("pushw ") == 0 && strippedLine.find("popw ") == 0) ||
                        (strippedLineBuf.find("push ") == 0 && strippedLine.find("pop ") == 0))) {
                 // verify that the two arguments match

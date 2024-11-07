@@ -41,7 +41,7 @@ int main(int argc, char* argv[]) {
     // extract any extra arguments
     bool forceOverwrite = false;
     bool skipPostprocessor = false;
-    DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = true;
+    DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = false;
 
     for (int i = 2; i < argc; ++i) {
         std::string arg( argv[i] );
@@ -49,8 +49,8 @@ int main(int argc, char* argv[]) {
             forceOverwrite = true;
         } else if (arg == "-skip-post") {
             skipPostprocessor = true;
-        } else if (arg == "-keep-unused") {
-            DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = false;
+        } else if (arg == "-remove-unused") {
+            DELETE_UNUSED_VARIABLES = DELETE_UNUSED_FUNCTIONS = true;
         } else {
             std::cout << "Warning: Skipping invalid argument: " << arg << '\n';
         }

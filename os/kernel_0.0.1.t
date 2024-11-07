@@ -4,8 +4,6 @@
  * @author Travis Heavener
  */
 
-#include <stdio.t>
-
 #define uint_16 unsigned int
 #define uint_8 unsigned char
 
@@ -20,23 +18,10 @@
 #define HEAP_START  (uint_16)0x3800
 #define HEAP_END    (uint_16)0xFFFF
 #define HEAP_SIZE   (uint_16)0xC800
+#define USABLE_HEAP_SIZE   (uint_16)0xC800 - 3
 
 #define HEAP_FREE   0
 #define HEAP_USED   1
-
-// Used to initialize a new heap.
-void heap_init() {
-    // Initialize the heap
-    uint_8* pHeap = HEAP_START;
-
-    // Store the size of this block
-    *(uint_16*)(pHeap) = 0xC800 - 3;
-    // pHeap[0] = 253; // Precompiled: ((uint_16)(HEAP_SIZE - 3)) & 0xFF;
-    // pHeap[1] = 199; // Precompiled: ((uint_16)(HEAP_SIZE - 3) >> 8) & 0xFF;
-
-    // Mark this block as free
-    pHeap[2] = HEAP_FREE;
-}
 
 // Used to allocate a new block on the heap.
 // Register CX: The size of allocation
@@ -46,7 +31,7 @@ void heap_alloc() {
     const uint_16 size = __read_CX();
 
     // Return NULL if the size is larger than the heap or is zero
-    if (size > HEAP_SIZE - 3 || !size) {
+    if (size > USABLE_HEAP_SIZE || !size) {
         __load_DX( NULL );
         return;
     }
@@ -59,27 +44,21 @@ void heap_alloc() {
 
     while (i < HEAP_SIZE) {
         // Check if the current block is free and is large enough
-        uint_8 isFree = pHeap[i+2] == HEAP_FREE;
-        uint_16 blockSize = ((uint_16)pHeap[i+1] << 8) | pHeap[i];
+        uint_16 blockSize = *(uint_16*)(pHeap+i);
 
-        if (isFree && (blockSize == size || (blockSize >= size + 3))) {
+        if (pHeap[i+2] == HEAP_FREE && (blockSize == size || (blockSize >= size + 3))) {
             // Mark block as in use
-            pHeap[i + 2] = HEAP_USED;
+            pHeap[i+2] = HEAP_USED;
 
             // If more space is in the block, create a new free block after it
             if (blockSize > size) {
                 // Update this block's size
                 *(uint_16*)(pHeap+i) = size;
-                // pHeap[i] = size & 0xFF;
-                // pHeap[i + 1] = (size >> 8) & 0xFF;
 
                 // Create new block
-                uint_16 remainingSize = blockSize - size - 3; // 3 bytes for metadata
-
-                // Set new block's size & mark as free
-                pHeap[i + size + 3] = remainingSize & 0xFF;
-                pHeap[i + size + 4] = (remainingSize >> 8) & 0xFF;
-                pHeap[i + size + 5] = HEAP_FREE;
+                uint_16 nextStatusIndex = i + size + 3;
+                *((uint_16*)(pHeap + nextStatusIndex)) = blockSize - size - 3; // 3 bytes for metadata
+                pHeap[nextStatusIndex+2] = HEAP_FREE;
             }
 
             // Return the address in DX
@@ -115,7 +94,7 @@ void heap_free() {
 
     while (i < HEAP_SIZE) {
         // Get the size of this block
-        uint_16 blockSize = ((uint_16)pHeap[i+1] << 8) | pHeap[i];
+        uint_16 blockSize = *(uint_16*)(pHeap+i);
 
         // Check if the address matches
         if (i + HEAP_START + 3 == addr) {
@@ -125,16 +104,16 @@ void heap_free() {
             // Attempt to coalesce heap blocks to prevent fragmentation
 
             // Check if next block exists
-            if (i + blockSize + 5 < HEAP_SIZE) {
+            uint_16 nextStatusIndex = i + blockSize + 5;
+            if (nextStatusIndex < HEAP_SIZE) {
                 // Check if next block is free
-                if (pHeap[i + blockSize + 5] == HEAP_FREE) {
+                if (pHeap[nextStatusIndex] == HEAP_FREE) {
                     // Get size of next block
-                    uint_16 nextBlockSize = ((uint_16)pHeap[i+blockSize+4] << 8) | pHeap[i+blockSize+3];
+                    uint_16 nextBlockSize = *(uint_16*)(pHeap + nextStatusIndex - 2);
 
                     // Merge into this one by updating own size
-                    blockSize = blockSize + nextBlockSize + 3; // Ignore next block's metadata
-                    pHeap[i] = (blockSize) & 0xFF;
-                    pHeap[i + 1] = (blockSize >> 8) & 0xFF;
+                    // Ignore next block's metadata
+                    *(uint_16*)(pHeap+i) = blockSize = blockSize + nextBlockSize + 3;
                 }
             }
 
@@ -144,9 +123,8 @@ void heap_free() {
                 uint_16 prevIndexStart = i - prevSize - 3;
                 if (pHeap[prevIndexStart + 2] == HEAP_FREE) {
                     // Update previous block's size by this one
-                    prevSize = prevSize + blockSize + 3; // Ignore this block's metadata
-                    pHeap[prevIndexStart] = (prevSize) & 0xFF;
-                    pHeap[prevIndexStart+1] = (prevSize >> 8) & 0xFF;
+                    // Ignore this block's metadata
+                    *(uint_16*)(pHeap + prevIndexStart) = prevSize = prevSize + blockSize + 3;
                 }
             }
             return;
@@ -164,12 +142,8 @@ void heap_free() {
 
 int main() {
     // Initialize heap
-    heap_init();
-
-    // ALSO NOT WORKING
-    __load_CX(12);
-    heap_alloc();
-    return __read_DX();
+    *(uint_16*)(HEAP_START) = USABLE_HEAP_SIZE; // Store size of this block
+    *(uint_8*)(HEAP_START+2) = HEAP_FREE; // Mark as free
 
     // Exit success
     return EXIT_SUCCESS;

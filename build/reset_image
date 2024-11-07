@@ -5,6 +5,9 @@ cd ..
 # rebuild T code
 ./tlang/tcc ./os/kernel_0.0.1.t -f
 
+# re-run the postprocessor
+./tlang/postproc ./os/kernel_0.0.1.tpu -f
+
 # reformat drive
 python3 ./os/make_boot_drive.py A
 

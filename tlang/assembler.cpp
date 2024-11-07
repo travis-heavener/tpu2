@@ -339,27 +339,30 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
     // remove extra scope variables after the scope closes
     long long sizeFreed = scope.size() - startingScopeSize;
 
-    // move back SP
-    if (sizeFreed > 0) {
-        OUT << "sub SP, " << sizeFreed << '\n';
-        scope.pop(sizeFreed);
-    }
-
     // jump to end if returned
     if (hasReturned) {
         // remove everything else in the scope except the return bytes
         // DON'T USE scope.pop SINCE THIS ISN'T A GUARANTEED RETURN
         if (!isTopScope) {
             size_t argSizes = 0;
+            // pop arguments off with remaining scoped stuff
             for (const Type& t : asmFunc.getParamTypes())
                 argSizes += t.getSizeBytes();
 
             long long popSize = scope.size() - returnSize - argSizes; // argSizes popped by caller
+            popSize += sizeFreed;
 
             if (popSize > 0) OUT << "sub SP, " << popSize << '\n';
+        } else {
+            if (sizeFreed > 0) // move back SP
+                OUT << "sub SP, " << sizeFreed << '\n';
         }
         OUT << "jmp " << asmFunc.getEndLabel() << '\n';
+    } else {
+        if (sizeFreed > 0) // move back SP
+            OUT << "sub SP, " << sizeFreed << '\n';
     }
+    scope.pop(sizeFreed);
 
     return hasReturned;
 }
@@ -1047,9 +1050,9 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
 
             // pop args off stack after
             size_t paramTotalSize = 0;
-            for (size_t j = 0; j < numParams; ++j) {
+            for (size_t j = 0; j < numParams; ++j)
                 paramTotalSize += resultTypes[j].getSizeBytes(SIZE_ARR_AS_PTR);
-            }
+
             if (paramTotalSize > 0) {
                 OUT << "sub SP, " << paramTotalSize << '\n';
                 scope.pop(paramTotalSize);
