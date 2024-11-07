@@ -58,9 +58,6 @@ __UF0:
     sub AX, 4
     pushw 0(AX)
     lw BX, -4(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw 0(AX)
@@ -170,9 +167,6 @@ __UF0:
     sub AX, 6
     pushw 0(AX)
     lw BX, -6(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw AX
@@ -190,9 +184,6 @@ __UF0:
     sub AX, 8
     pushw 0(AX)
     lw BX, -4(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw AX
@@ -316,9 +307,6 @@ __UF1:
     sub AX, 6
     pushw 0(AX)
     lw BX, -6(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw 0(AX)
@@ -405,26 +393,15 @@ __UF1:
     sub AX, 10
     pushw 0(AX)
     lw BX, -4(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
-    pushw AX
     mov BX, 2
-    mov AX, 1
-    mul BX
-    mov BX, AX
-    popw AX
     sub AX, BX
     pushw 0(AX)
     mov AX, SP
     sub AX, 12
     pushw 0(AX)
     lw BX, -12(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw AX
@@ -492,9 +469,6 @@ __UF1:
     sub AX, 12
     pushw 0(AX)
     lw BX, -4(SP)
-    mov AX, 1
-    mul BX
-    mov BX, AX
     popw AX
     add AX, BX
     pushw AX

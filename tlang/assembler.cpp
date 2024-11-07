@@ -618,7 +618,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         const size_t chunkSize = typeA.getSizeBytes();
 
                         // mul needs AX register, so move it temporarily (don't need to do scope.pop/addPlaceholder)
-                        if (chunkSize > 0) {
+                        if (chunkSize > 1) {
                             OUT << "pushw AX\n";
                             OUT << "mov AX, " << chunkSize << '\n';
                             OUT << "mul BX\n"; // other operand is in BX already
@@ -630,7 +630,7 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         const size_t chunkSize = typeB.getSizeBytes();
 
                         // operand already in AX; move chunk size into CX
-                        if (chunkSize > 0) {
+                        if (chunkSize > 1) {
                             OUT << "mov CX, " << chunkSize << '\n'; // forces as 16-bit
                             OUT << "mul CX\n"; // other operand is in AX already
                         }
