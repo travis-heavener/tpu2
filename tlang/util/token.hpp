@@ -23,6 +23,9 @@ enum TokenType {
     OP_BIT_OR, AMPERSAND, OP_BIT_NOT, OP_BIT_XOR, // |, &, ~, ^
     OP_BOOL_OR, OP_BOOL_AND, OP_BOOL_NOT, // ||, &&, !
     OP_EQ, OP_NEQ, // ==, !=
+    OP_ADD_EQ, OP_SUB_EQ, OP_MUL_EQ, OP_DIV_EQ, OP_MOD_EQ, // +=, -=, *=, /=, %=
+    OP_BIT_AND_EQ, OP_BIT_OR_EQ, OP_BIT_XOR_EQ, // &=, |=, ^=
+    OP_LSHIFT_EQ, OP_RSHIFT_EQ, // <<=, >>=
     SIZEOF,
 
     DOT, ARROW,
@@ -55,6 +58,7 @@ bool isTokenCompOp(const TokenType);
 bool isTokenAssignOp(const TokenType);
 bool isNonValueType(const TokenType);
 bool isTokenProtectedASM(const TokenType);
+Token reduceAssignOpToken(const Token&, const TokenType);
 
 // returns the size of a primitive type in bytes
 unsigned char getSizeOfType(TokenType type);

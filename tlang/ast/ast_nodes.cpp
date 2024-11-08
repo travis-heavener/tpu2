@@ -83,7 +83,7 @@ bool ASTFunction::isMainFunction() const {
 
 ASTNode* ASTStringLiteral::asCharArr() const {
     // transform a string literal into a character array literal
-    ASTArrayLiteral* pArr = new ASTArrayLiteral(token);
+    ASTArrayLiteral* pArr = new ASTArrayLiteral(originalToken);
     std::string rawString = raw.substr(1, raw.size()-2) + '\0'; // add null byte and remove quotes
     escapeString(rawString); // escape the string
 
@@ -91,8 +91,8 @@ ASTNode* ASTStringLiteral::asCharArr() const {
     Type type(TokenType::TYPE_CHAR);
     for (const char c : rawString) {
         // create wrapper expression
-        ASTExpr* pSubExpr = new ASTExpr(token);
-        ASTCharLiteral* pChar = new ASTCharLiteral(c, token);
+        ASTExpr* pSubExpr = new ASTExpr(originalToken);
+        ASTCharLiteral* pChar = new ASTCharLiteral(c, originalToken);
         pArr->push(pSubExpr);
         pSubExpr->push(pChar);
 
@@ -121,7 +121,7 @@ ASTOperator* ASTTypeCast::toSizeofOperator(scope_stack_t& scopeStack) {
     }
 
     // turn this node into an operator
-    ASTOperator* pOp = new ASTOperator(token, true);
+    ASTOperator* pOp = new ASTOperator(originalToken, true);
     pOp->setUnaryType( ASTUnaryType::TYPE_CAST );
     pOp->setType(Type(TokenType::TYPE_INT, true));
 
@@ -137,7 +137,7 @@ ASTOperator* ASTTypeCast::toSizeofOperator(scope_stack_t& scopeStack) {
 
 ASTOperator* ASTTypeCast::toOperator(ASTNode* pChild) {
     // turn this node into an operator
-    ASTOperator* pOp = new ASTOperator(token, true);
+    ASTOperator* pOp = new ASTOperator(originalToken, true);
     pOp->push(pChild);
     pOp->setUnaryType( ASTUnaryType::TYPE_CAST );
     pOp->setType(this->getTypeRef());
@@ -308,6 +308,139 @@ void ASTTypedNode::inferSubscriptTypes(scope_stack_t& scopeStack) {
 // sets the value to be an lvalue IF it is a valid lvalue itself
 void ASTTypedNode::setIsLValue(bool isLValue) {
     this->_isLValue = isLValue;
+}
+
+// clone this current node
+ASTTypedNode* ASTTypedNode::clone() {
+    throw TDevException("Failed to clone ASTTypedNode base class");
+}
+
+void ASTTypedNode::copyChildren(ASTTypedNode* pNode) {
+    // update own type
+    pNode->type = type;
+    pNode->_isLValue = _isLValue;
+    pNode->_isChildOfAddressOp = _isChildOfAddressOp;
+
+    try {
+        for (ASTNode* pChild : children) {
+            ASTTypedNode* pTypedChild = dynamic_cast<ASTTypedNode*>(pChild);
+            if (pTypedChild == nullptr)
+                throw TDevException("Failed to clone node (cast to ASTTypedNode failed)");
+
+            // assuming the cast succeeded, push the cloned node
+            pNode->push( pTypedChild->clone() );
+        }
+
+        // copy subscripts
+        for (ASTTypedNode* pSub : subscripts)
+            pNode->addSubscript( pSub->clone() );
+
+        // typed-node specifics
+        pNode->type = type;
+        pNode->_isLValue = _isLValue;
+        pNode->_isChildOfAddressOp = _isChildOfAddressOp;
+    } catch (TException& e) {
+        delete pNode;
+        throw; // rethrow
+    }
+}
+
+ASTTypedNode* ASTExpr::clone() {
+    ASTExpr* pClone = new ASTExpr(originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTOperator::clone() {
+    ASTOperator* pOp = new ASTOperator(originalToken, isUnary);
+    copyChildren(pOp); // copy children
+
+    pOp->unaryType = unaryType;
+    pOp->opType = opType;
+    pOp->_isNullified = _isNullified;
+    pOp->_forcedSizeof = _forcedSizeof;
+
+    return pOp;
+}
+
+ASTTypedNode* ASTInlineASM::clone() {
+    ASTInlineASM* pNode = new ASTInlineASM(originalToken, raw);
+    copyChildren(pNode); // copy children
+    return pNode;
+}
+
+ASTTypedNode* ASMProtectedInstruction::clone() {
+    ASMProtectedInstruction* pNode = new ASMProtectedInstruction(originalToken);
+    copyChildren(pNode); // copy children
+    return pNode;
+}
+
+ASTTypedNode* ASTArraySubscript::clone() {
+    ASTArraySubscript* pClone = new ASTArraySubscript(originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTMemberAccessor::clone() {
+    ASTMemberAccessor* pClone = new ASTMemberAccessor(originalToken, name);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTFunctionCall::clone() {
+    ASTFunctionCall* pClone = new ASTFunctionCall(originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTIdentifier::clone() {
+    // DON'T UPDATE isInAssignExpr (this entire method is literally called for rvalues)
+    ASTIdentifier* pClone = new ASTIdentifier(originalToken, false);
+    pClone->originalType = originalType;
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTArrayLiteral::clone() {
+    ASTArrayLiteral* pClone = new ASTArrayLiteral(originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTBoolLiteral::clone() {
+    ASTBoolLiteral* pClone = new ASTBoolLiteral(val, originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTCharLiteral::clone() {
+    ASTCharLiteral* pClone = new ASTCharLiteral(val, originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTFloatLiteral::clone() {
+    ASTFloatLiteral* pClone = new ASTFloatLiteral(val, originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTIntLiteral::clone() {
+    ASTFloatLiteral* pClone = new ASTFloatLiteral(val, originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTVoidLiteral::clone() {
+    ASTVoidLiteral* pClone = new ASTVoidLiteral(originalToken);
+    copyChildren(pClone); // copy children
+    return pClone;
+}
+
+ASTTypedNode* ASTStringLiteral::clone() {
+    ASTStringLiteral* pClone = new ASTStringLiteral(originalToken, str);
+    copyChildren(pClone); // copy children
+    return pClone;
 }
 
 // get the result type of an operation
@@ -580,31 +713,61 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 pB->setIsLValue(false);
                 break;
             }
-            case TokenType::ASSIGN: {
-                // set left arg to lvalue if identifier
-                if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
-                    pA->setIsLValue(true);
+            default: {
+                if (isTokenAssignOp(opType)) {
+                    // set left arg to lvalue if identifier
+                    if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
+                        pA->setIsLValue(true);
 
-                // if dereferenced value, set as lvalue
-                if (pA->getNodeType() == ASTNodeType::UNARY_OP &&
-                    static_cast<ASTOperator*>(pA)->getOpTokenType() == TokenType::ASTERISK)
-                    pA->setIsLValue(true);
+                    // if dereferenced value, set as lvalue
+                    if (pA->getNodeType() == ASTNodeType::UNARY_OP &&
+                        static_cast<ASTOperator*>(pA)->getOpTokenType() == TokenType::ASTERISK)
+                        pA->setIsLValue(true);
 
-                // verify left arg is lvalue and isn't still an array (is fully subscripted/dereferenced)
-                if (!pA->isLValue() || typeA.isArray()) throw TInvalidOperationException(err);
+                    // verify left arg is lvalue and isn't still an array (is fully subscripted/dereferenced)
+                    if (!pA->isLValue() || typeA.isArray()) throw TInvalidOperationException(err);
 
-                // verify right arg is not void
-                if (typeB.isVoidNonPtr()) throw TIllegalVoidUseException(err);
+                    // verify right arg is not void
+                    if (typeB.isVoidNonPtr()) throw TIllegalVoidUseException(err);
 
-                // verify not assigning to a const type
-                if (typeA.isConst()) throw TConstAssignmentException(err);
+                    // verify not assigning to a const type
+                    if (typeA.isConst()) throw TConstAssignmentException(err);
 
-                this->setType( typeA ); // take type of left argument
-                pB->setIsLValue(false); // revoke lvalue status from child
-                pB->setType( typeA ); // force left value to take type
-                break;
+                    this->setType( typeA ); // take type of left argument
+                    pB->setIsLValue(false); // revoke lvalue status from child
+                    pB->setType( typeA ); // force left value to take type
+
+                    // break compound operators apart
+                    if (opType != TokenType::ASSIGN) {
+                        // clone pA
+                        ASTTypedNode* pCloneA = pA->clone();
+                        pCloneA->setIsLValue(false);
+
+                        // determine the operator type
+                        Token opToken = reduceAssignOpToken(originalToken, opType);
+
+                        // create an operator
+                        ASTOperator* pCloneOp = new ASTOperator(opToken, false);
+                        pCloneOp->push(pCloneA);
+                        pCloneOp->push(pB);
+
+                        // force sub-operator type
+                        pCloneOp->setIsLValue(false); // revoke lvalue status from child
+                        pCloneOp->setType( typeA ); // force left value to take type
+
+                        // append children to this
+                        this->removeChild(1); // remove old rvalue
+                        this->push( pCloneOp );
+
+                        // update own type as an assignment op
+                        this->opType = TokenType::ASSIGN;
+                    }
+                    break;
+                }
+
+                // base case, invalid operation type
+                throw TTypeInferException(err);
             }
-            default: throw TTypeInferException(err);
         }
     }
 

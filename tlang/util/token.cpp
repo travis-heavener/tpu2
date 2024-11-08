@@ -29,7 +29,7 @@ bool isTokenBinaryOp(const TokenType type) {
            type == OP_SUB || type == ASTERISK || type == OP_DIV || type == OP_MOD ||
            type == OP_BIT_OR || type == AMPERSAND || type == OP_BIT_XOR ||
            type == OP_BOOL_OR || type == OP_BOOL_AND || type == OP_EQ || type == OP_NEQ ||
-           type == ASSIGN;
+           isTokenAssignOp(type);
 }
 
 // true if the token is a literal
@@ -46,12 +46,28 @@ bool isTokenCompOp(const TokenType type) {
 
 // true if the token is an assignment operator
 bool isTokenAssignOp(const TokenType type) {
-    return type == ASSIGN;
+    return type == ASSIGN || type == OP_ADD_EQ || type == OP_SUB_EQ || type == OP_MUL_EQ || type == OP_DIV_EQ || type == OP_MOD_EQ || type == OP_LSHIFT_EQ || type == OP_RSHIFT_EQ || type == OP_BIT_AND_EQ || type == OP_BIT_OR_EQ || type == OP_BIT_XOR_EQ;
 }
 
 bool isTokenProtectedASM(const TokenType type) {
     return type == ASM_LOAD_AX || type == ASM_LOAD_BX || type == ASM_LOAD_CX || type == ASM_LOAD_DX ||
            type == ASM_READ_AX || type == ASM_READ_BX || type == ASM_READ_CX || type == ASM_READ_DX;
+}
+
+Token reduceAssignOpToken(const Token& refToken, const TokenType type) {
+    switch (type) {
+        case OP_ADD_EQ:     return Token(refToken.err, "+=",  OP_ADD);
+        case OP_SUB_EQ:     return Token(refToken.err, "-=",  OP_SUB);
+        case OP_MUL_EQ:     return Token(refToken.err, "*=",  ASTERISK);
+        case OP_DIV_EQ:     return Token(refToken.err, "/=",  OP_DIV);
+        case OP_MOD_EQ:     return Token(refToken.err, "%=",  OP_MOD);
+        case OP_LSHIFT_EQ:  return Token(refToken.err, "<<=", OP_LSHIFT);
+        case OP_RSHIFT_EQ:  return Token(refToken.err, ">>=", OP_RSHIFT);
+        case OP_BIT_AND_EQ: return Token(refToken.err, "&=",  AMPERSAND);
+        case OP_BIT_OR_EQ:  return Token(refToken.err, "|=",  OP_BIT_OR);
+        case OP_BIT_XOR_EQ: return Token(refToken.err, "^=",  OP_BIT_XOR);
+        default: throw TDevException("Invalid token type in reduceAssignOpToken" + std::to_string(type));
+    }
 }
 
 // returns the size of a primitive type in bytes
