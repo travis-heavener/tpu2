@@ -141,20 +141,20 @@ not reg16                   0x29 /1
 
 Shifts the first operand left as many times as the value of the second operand, storing in the first operand.
 shl reg8, imm8              0x2A /0
-shl reg16, imm16            0x2A /1
+shl reg16, imm8             0x2A /1
 shl reg8, reg8              0x2A /2
-shl reg16, reg16            0x2A /3
+shl reg16, reg8             0x2A /3
 sshl reg8, imm8             0x2A /0  (signed)
-sshl reg16, imm16           0x2A /1  (signed)
+sshl reg16, imm8            0x2A /1  (signed)
 sshl reg8, reg8             0x2A /2  (signed)
-sshl reg16, reg16           0x2A /3  (signed)
+sshl reg16, reg8            0x2A /3  (signed)
 
 Shifts the first operand right as many times as the value of the second operand, storing in the first operand.
 shr reg8, imm8              0x2B /0
-shr reg16, imm16            0x2B /1
+shr reg16, imm8             0x2B /1
 shr reg8, reg8              0x2B /2
-shr reg16, reg16            0x2B /3
+shr reg16, reg8             0x2B /3
 sshr reg8, imm8             0x2B /0  (signed)
-sshr reg16, imm16           0x2B /1  (signed)
+sshr reg16, imm8            0x2B /1  (signed)
 sshr reg8, reg8             0x2B /2  (signed)
-sshr reg16, reg16           0x2B /3  (signed)
+sshr reg16, reg8            0x2B /3  (signed)

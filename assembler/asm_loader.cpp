@@ -479,9 +479,13 @@ void parseADDSUBLogic(const std::vector<std::string>& args, Memory& memory, u16&
         throw std::invalid_argument("Invalid second argument to arith/logic.");
 
     // allow 16-bit and 8-bit mismatch for shl/shr
-    if ((instruction == OPCode::SHL || instruction == OPCode::SHR) && statusA == ARG_REG16 && statusB == ARG_REG8) {
-        statusB = ARG_REG16; // doesn't change any functionality, just prevents exception throwing
-        bytesToWrite.push_back(0);
+    if (instruction == OPCode::SHL || instruction == OPCode::SHR) {
+        if (statusB == ARG_IMM16 || statusB == ARG_REG16)
+            throw std::invalid_argument("Invalid second argument to shl/shr (expected 8-bit).");
+
+        // doesn't change any functionality, just prevents exception throwing
+        if (statusB == ARG_IMM8) statusB = ARG_IMM16;
+        if (statusB == ARG_REG8) statusB = ARG_REG16;
     }
 
     // determine MOD byte

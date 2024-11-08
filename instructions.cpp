@@ -743,10 +743,10 @@ namespace instructions {
                 setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x80, isOverflow);
                 break;
             }
-            case 1:   // reg16, imm16
-            case 3: { // reg16, reg16
+            case 1:   // reg16, imm8
+            case 3: { // reg16, reg8
                 u16 A = tpu.readRegister16(regA).getValue();
-                u16 numShifts = (argsFormat == 2) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 numShifts = (argsFormat == 3) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
                 u16 value = A << std::min((int)numShifts, 16);
 
                 if (isSignedOp) value |= A & 0x8000; // re-add sign bit
@@ -791,10 +791,10 @@ namespace instructions {
                 setFlags(tpu, isCarry, getParity(value), value == 0, value & 0x80, isOverflow);
                 break;
             }
-            case 1:   // reg16, imm16
-            case 3: { // reg16, reg16
+            case 1:   // reg16, imm8
+            case 3: { // reg16, reg8
                 u16 A = tpu.readRegister16(regA).getValue();
-                u16 numShifts = (argsFormat == 2) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 numShifts = (argsFormat == 3) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
                 u16 value = A >> std::min((int)numShifts, 16);
 
                 if (isSignedOp) value |= A & 0x8000; // re-add sign bit

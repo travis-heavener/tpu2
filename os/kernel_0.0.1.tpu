@@ -27,11 +27,17 @@ _main:
     popw BX
     popw AX
     sw BX, 0(AX)
-    pushw -2(SP)
-    mov BX, 1
+    mov AX, SP
+    sub AX, 2
+    pushw AX
+    pushw -4(SP)
+    mov BX, 2
     popw AX
     shl AX, BL
-    mov DX, AX
+    mov BX, AX
+    popw AX
+    sw BX, 0(AX)
+    lw DX, -2(SP)
     sw DX, -4(SP)
     sub SP, 2
     _mainE:
