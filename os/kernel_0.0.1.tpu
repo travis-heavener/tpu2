@@ -547,7 +547,11 @@ _main:
     xor BH, BH
     popw AX
     sb BL, 0(AX)
-    mov DX, 0
+    pushw 1
+    mov BX, 0
+    popw AX
+    sdiv BX
+    mov DX, AX
     sw DX, -2(SP)
     _mainE:
     popw BX
