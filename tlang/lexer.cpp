@@ -27,8 +27,14 @@ void tokenize(std::ifstream& inHandle, std::vector<Token>& tokens, cwd_stack& cw
 
     line_t lineNumber = 0;
     while (std::getline(inHandle, line)) {
+        // skip blank lines
+        if (line.size() == 0) {
+            ++lineNumber;
+            continue;
+        }
+
         // remove trailing \r if present (CRLF for Windows systems)
-        if (*line.rbegin() == '\r') line.pop_back();
+        if (line.back() == '\r') line.pop_back();
 
         // tokenize line
         tokenizeLine(line, tokens, ++lineNumber, cwdStack, filename);

@@ -445,6 +445,9 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
             }
         }
     } else if (!this->isUnary) {
+        if (children.size() < 2)
+            throw TSyntaxException(err);
+
         ASTTypedNode* pA = static_cast<ASTTypedNode*>(children[0]);
         ASTTypedNode* pB = static_cast<ASTTypedNode*>(children[1]);
         Type typeA = pA->getTypeRef();
