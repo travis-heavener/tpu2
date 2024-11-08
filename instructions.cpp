@@ -528,7 +528,6 @@ namespace instructions {
             case 0: case 2: { // imm8, reg8
                 u8 uA = tpu.readRegister8(Register::AL).getValue();
                 u8 uB = (argsFormat == 0) ? tpu.readByte(memory).getValue() : readReg8(tpu, memory);
-                if (uB == 0) throw std::invalid_argument("Division by zero.");
                 u8 dividend = uA / uB;
                 u8 remainder = uA % uB;
 
@@ -549,7 +548,6 @@ namespace instructions {
             case 1: case 3: { // imm16 & reg16
                 u16 uA = tpu.readRegister16(Register::AX).getValue();
                 u16 uB = (argsFormat == 1) ? tpu.readWord(memory).getValue() : readReg16(tpu, memory);
-                if (uB == 0) throw std::invalid_argument("Division by zero.");
                 u16 dividend = uA / uB;
                 u16 remainder = uA % uB;
 
