@@ -122,12 +122,12 @@ int atoi(const char* str) {
         // grab value
         val = val * 10;
         val = val + str[i] - '0';
-        i = i + 1;
+        i += 1;
     }
 
     // grab negative
     if (str[0] == '-') {
-        val = val * -1;
+        val *= -1;
     }
 
     return val;
@@ -139,7 +139,7 @@ const char* itoa(const int n) {
     int len = 1 + (n < 0);
     int tempNum = n;
     while (tempNum = tempNum / 10) {
-        len = len + 1;
+        len += 1;
     }
 
     // allocate string (with space for null terminator)
@@ -148,14 +148,14 @@ const char* itoa(const int n) {
     // write the entire string
     int i = 0;
     tempNum = n;
-    for (i = len; i >= 0; i = i - 1) {
+    for (i = len; i >= 0; i -= 1) {
         if (i == 0 && n < 0) {
             str[i] = '-';
         } else if (i == len) {
             str[i] = '\0';
         } else {
             str[i] = abs(tempNum % 10) + '0';
-            tempNum = tempNum / 10;
+            tempNum /= 10;
         }
     }
 

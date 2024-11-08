@@ -8,7 +8,7 @@ int strlen(const char* str) {
     int i = 0;
 
     while (str[i] != '\0') {
-        i = i + 1;
+        i += 1;
     }
 
     return i;
@@ -19,7 +19,7 @@ char* strcpy(char* dest, const char* src) {
 
     // copy the string
     int i;
-    for (i = 0; i <= len; i = i + 1) {
+    for (i = 0; i <= len; i += 1) {
         dest[i] = src[i];
     }
 
@@ -33,7 +33,7 @@ char* strcat(char* dest, const char* src) {
 
     // copy the string
     int i;
-    for (i = 0; i <= srcLen; i = i + 1) {
+    for (i = 0; i <= srcLen; i += 1) {
         dest[destLen + i] = src[i];
     }
 
