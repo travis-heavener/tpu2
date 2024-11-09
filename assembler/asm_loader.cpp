@@ -11,7 +11,7 @@
 
 // abstractions from processLineToText for readability
 void parseLBLWSBSW(const std::vector<std::string>&, Memory&, u16&, u8);
-void parseMOV(const std::vector<std::string>&, Memory&, u16&);
+void parseMOV(const std::vector<std::string>&, Memory&, u16&, label_map_t&, label_replace_vec_t&);
 void parseADDSUBLogic(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseMULDIVBUF(const std::vector<std::string>&, Memory&, u16&, OPCode, bool);
 void parseNOT(const std::vector<std::string>&, Memory&, u16&);
@@ -230,6 +230,7 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
 // process an individual line from .data section and load it into memory
 void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_map_t& labelMap) {
     // normalize formatting
+    stripComments(line); // remove comments
     trimString(line);
 
     // skip blank lines
@@ -276,6 +277,8 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
 
         // insert into label map
         labelMap.insert({labelName, Label(dataType, startIndex)});
+    } else if (dataType == DATA_TYPE_U16) { // parse as u16
+        // verify value is valid
     } else {
         throw std::invalid_argument("Invalid data type: " + dataType);
     }
@@ -376,7 +379,7 @@ void processLineToText(std::string& line, Memory& memory, u16& instIndex, label_
         parsePOP(args, memory, instIndex, kwd == "popw");
     } else if (kwd == "mov") {
         checkArgs(args, 2); // check for extra args
-        parseMOV(args, memory, instIndex);
+        parseMOV(args, memory, instIndex, labelMap, labelsToReplace);
     } else if (kwd == "add" || kwd == "sub" || kwd == "sadd" || kwd == "ssub" || kwd == "and" || kwd == "or" || kwd == "xor" || kwd == "cmp" || kwd == "scmp" || kwd == "shl" || kwd == "shr" || kwd == "sshl" || kwd == "sshr") {
         checkArgs(args, 2); // check for extra args
         OPCode code = (kwd == "add" || kwd == "sadd") ? OPCode::ADD : (kwd == "ssub" || kwd == "sub") ? OPCode::SUB :
@@ -433,7 +436,7 @@ void parseLBLWSBSW(const std::vector<std::string>& args, Memory& memory, u16& in
     for (u8 b : bytesToWrite) memory[instIndex++] = b;
 }
 
-void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex) {
+void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instIndex, label_map_t& labelMap, label_replace_vec_t& labelsToReplace) {
     // extract args
     std::vector<u8> bytesToWrite;
     u8 opCode;
@@ -444,18 +447,37 @@ void parseMOV(const std::vector<std::string>& args, Memory& memory, u16& instInd
         throw std::invalid_argument("Invalid first argument to mov.");
 
     u8 statusB = resolveArgument(args[1], bytesToWrite, statusA == ARG_REG16);
-    if (statusB != ARG_REG8 && statusB != ARG_REG16 && statusB != ARG_IMM8 && statusB != ARG_IMM16)
+    if (statusB != ARG_REG8 && statusB != ARG_REG16 && statusB != ARG_IMM8 && statusB != ARG_IMM16 && statusB != ARG_LABEL)
         throw std::invalid_argument("Invalid second argument to mov.");
 
-    // determine MOD byte
+    // determine opcode
     if (statusA == ARG_REG8) {
         if      (statusB == ARG_REG8)   opCode = OPCode::MOV;
         else if (statusB == ARG_IMM8)   opCode = OPCode::MOVI;
         else throw std::invalid_argument("8-bit and 16-bit register mismatch in mov.");
     } else {
-        if      (statusB == ARG_REG16)  opCode = OPCode::MOVW;
-        else if (statusB == ARG_IMM16)  opCode = OPCode::MOVWI;
-        else throw std::invalid_argument("8-bit and 16-bit register mismatch in mov.");
+        if (statusB == ARG_REG16) {
+            opCode = OPCode::MOVW;
+        } else if (statusB == ARG_IMM16) {
+            opCode = OPCode::MOVWI;
+        } else if (statusB == ARG_LABEL) {
+            opCode = OPCode::MOVWI;
+
+            // get labels
+            if (labelMap.count(args[1]) == 0) {
+                // add to labels to replace
+                u16 labelAddr = instIndex + 2; // skip opcode and reg
+                labelsToReplace.push_back({args[1], labelAddr});
+                bytesToWrite.push_back(0); // add placeholder bytes
+                bytesToWrite.push_back(0); // add placeholder bytes
+            } else {
+                u16 destAddr = labelMap[args[1]].value;
+                bytesToWrite.push_back( destAddr & 0xFF ); // lower-half
+                bytesToWrite.push_back( (destAddr >> 8) & 0xFF ); // upper-half
+            }
+        } else {
+            throw std::invalid_argument("8-bit and 16-bit register mismatch in mov.");
+        }
     }
 
     // write bytes
