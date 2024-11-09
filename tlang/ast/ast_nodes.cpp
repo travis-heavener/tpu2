@@ -505,7 +505,11 @@ void ASTOperator::inferType(scope_stack_t& scopeStack) {
                 // set left arg to lvalue if identifier
                 if (pA->getNodeType() == ASTNodeType::IDENTIFIER)
                     pA->setIsLValue(true);
-                
+
+                // allow string literals
+                if (pA->getNodeType() == ASTNodeType::LIT_STRING)
+                    pA->setIsLValue(true);
+
                 // if dereferenced value, set as lvalue
                 if (pA->getNodeType() == ASTNodeType::UNARY_OP &&
                     static_cast<ASTOperator*>(pA)->getOpTokenType() == TokenType::ASTERISK)
