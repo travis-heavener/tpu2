@@ -405,7 +405,8 @@ void writeInstruction(const post_process_opts& opts, std::ofstream& outHandle, c
     } else { // don't minify
         // don't indent labels inside user functions
         bool isUnindented = (strippedLine.back() == ':' && strippedLine[strippedLine.size()-2] != FUNC_END_LABEL_SUFFIX &&
-            (strippedLine.find(FUNC_LABEL_PREFIX) == 0 || strippedLine.find(RESERVED_LABEL_MAIN) == 0)) || strippedLine.find("section ") == 0;
+            (strippedLine.find(FUNC_LABEL_PREFIX) == 0 || strippedLine.find(RESERVED_LABEL_MAIN) == 0 ||
+             strippedLine.find(RESERVED_LABEL_ENTRY) == 0)) || strippedLine.find("section ") == 0;
         if (isUnindented) {
             outHandle << line << '\n'; // don't indent
         } else {

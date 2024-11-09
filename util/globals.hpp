@@ -101,22 +101,24 @@ typedef uint8_t   u8;
 typedef int8_t    s8;
 
 // reserved labels
+#define RESERVED_LABEL_ENTRY    "_start"
 #define RESERVED_LABEL_MAIN     "_main"
 #define RESERVED_LABEL_MALLOC   "_malloc"
 #define RESERVED_LABEL_REALLOC  "_realloc"
 #define RESERVED_LABEL_FREE     "_free"
 
-#define DATA_TYPE_STRZ      ".strz" // null-terminated string
-#define DATA_TYPE_U16       ".u16"  // unsigned word
-#define DATA_TYPE_U8        ".u8"   // unsigned byte
-#define DATA_TYPE_S16       ".s16"  // signed word
-#define DATA_TYPE_S8        ".s8"   // signed byte
+#define DATA_TYPE_STRZ      ".strz"  // null-terminated string
+#define DATA_TYPE_U16       ".u16"   // unsigned word
+#define DATA_TYPE_U8        ".u8"    // unsigned byte
+#define DATA_TYPE_S16       ".s16"   // signed word
+#define DATA_TYPE_S8        ".s8"    // signed byte
+#define DATA_TYPE_SPACE     ".space" // blank space
 
 // for TCC
 #define FUNC_LABEL_PREFIX       "__UF" // for "user function"
 #define FUNC_END_LABEL_SUFFIX   'E' // added to the end of a function label to mark where a function ends
 #define JMP_LABEL_PREFIX        "__J" // really just used for jmp instructions
-#define STR_DATA_LABEL_PREFIX   "__US" // for "user string"
+#define DATA_LABEL_PREFIX   "__UD" // for "user data"
 
 bool isReservedKernelFuncLabel(const std::string& label);
 

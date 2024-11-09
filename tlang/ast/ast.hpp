@@ -15,7 +15,7 @@
 
 class AST {
     public:
-        ~AST() { for (ASTNode* pNode : children) delete pNode; }
+        ~AST() { for (ASTNode* pNode : children) if (pNode != nullptr) delete pNode; }
 
         void push(ASTNode* pNode) { children.push_back(pNode); }
         std::vector<ASTNode*>& getChildren() { return children; }

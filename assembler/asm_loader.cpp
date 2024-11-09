@@ -156,9 +156,9 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
     // for labels that come after instIndex
     label_replace_vec_t labelsToReplace; // [ label name, replacement start address ]
 
-    // allocate space at the start of .text to jump to the main entry point
+    // allocate space at the start of .text to jump to the entry point
     memory[memIndex++] = OPCode::JMP;
-    labelsToReplace.push_back({RESERVED_LABEL_MAIN, memIndex}); // add this jmp instruction to labelsToReplace
+    labelsToReplace.push_back({RESERVED_LABEL_ENTRY, memIndex}); // add this jmp instruction to labelsToReplace
     memIndex += 2; // make space for address
 
     int currentSection = SECTION_NONE;
@@ -195,7 +195,7 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
         }
 
         // jump to mainEntryAddr
-        if (labelMap.count(RESERVED_LABEL_MAIN) == 0)
+        if (labelMap.count(RESERVED_LABEL_ENTRY) == 0)
             throw std::invalid_argument("No main label found in file.");
 
         // fill in any labels with addresses
@@ -322,6 +322,18 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
         // push value to memory & insert into label map
         memory[memIndex++] = bytesToWrite[0];
         labelMap.insert({labelName, Label(dataType, memIndex-1)});
+    } else if (dataType == DATA_TYPE_SPACE) {
+        // verify size is valid
+        u8 status = resolveArgument(rawValue, bytesToWrite, true, false);
+        if (status != ARG_IMM16)
+            throw std::invalid_argument("Invalid .space size");
+
+        u16 size = bytesToWrite[0] | ((u16)bytesToWrite[1] << 8);
+        u16 spaceStartIndex = memIndex;
+        for (size_t i = 0; i < size; ++i)
+            memory[memIndex++] = 0;
+
+        labelMap.insert({labelName, Label(dataType, spaceStartIndex)});
     } else {
         throw std::invalid_argument("Invalid data directive: " + dataType);
     }

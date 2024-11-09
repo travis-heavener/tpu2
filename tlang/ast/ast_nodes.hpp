@@ -292,7 +292,8 @@ class ASTIdentifier : public ASTTypedNode {
 
 class ASTVarDeclaration : public ASTNode {
     public:
-        ASTVarDeclaration(const Token& token, Type type) : ASTNode(token), type(type) {};
+        ASTVarDeclaration(const Token& token, Type type) : ASTNode(token), type(type), isGlobalAssignment(false) {};
+        ASTVarDeclaration(const Token& token, Type type, const bool isGlobalAssignment) : ASTNode(token), type(type), isGlobalAssignment(isGlobalAssignment) {};
         ~ASTVarDeclaration();
         ASTNodeType getNodeType() const { return ASTNodeType::VAR_DECLARATION; };
         Type getType() const { return type; }
@@ -302,6 +303,7 @@ class ASTVarDeclaration : public ASTNode {
         ASTIdentifier* pIdentifier = nullptr;
         ASTExpr* pExpr = nullptr;
         Type type; // type of variable
+        const bool isGlobalAssignment;
 };
 
 class ASTArrayLiteral : public ASTTypedNode {

@@ -25,7 +25,8 @@
 
 class AssembledFunc {
     public:
-        AssembledFunc(const std::string& funcName, const ASTFunction& func);
+        AssembledFunc(const ASTFunction& func);
+        AssembledFunc(const ASTFunction& func, const std::string& startLabel);
 
         const std::string& getName() const { return funcName; };
         const std::string& getStartLabel() const { return startLabel; };
@@ -43,17 +44,21 @@ typedef std::multimap<std::string, AssembledFunc> label_map_t;
 // data element class for elements in the .data section
 class DataElem {
     public:
-        DataElem(const std::string& raw, const std::string& type) :
-            raw(raw), type(type) {};
+        DataElem(const std::string& labelName, const std::string& raw, const std::string& type) :
+            labelName(labelName), raw(raw), type(type), spacingSize(0) {};
+        DataElem(const std::string& labelName, const std::string& raw, const std::string& type, const size_t spacingSize) :
+            labelName(labelName), raw(raw), type(type), spacingSize(spacingSize) {};
+        const std::string labelName;
         const std::string raw;
         const std::string type;
+        const size_t spacingSize; // for arrays, as an example, with .space directive
 };
 
 // generate TPU assembly code from the AST
 void generateAssembly(AST&, std::ofstream&);
 
 // for assembling functions
-void assembleFunction(ASTFunction&, std::ofstream&);
+void assembleFunction(ASTFunction&, AssembledFunc&, std::ofstream&);
 
 // for assembling body content that may or may not have its own scope
 // returns true if the current body has returned (really only matters in function scopes)

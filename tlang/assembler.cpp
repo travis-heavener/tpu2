@@ -1,4 +1,5 @@
 #include <fstream>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -13,12 +14,13 @@
 // static fields
 static size_t nextFuncLabelID = 0;
 static size_t nextJMPLabelID = 0;
-static size_t nextStringDataID = 0;
+static size_t nextDataID = 0;
 static label_map_t labelMap;
 static std::vector<DataElem> dataElements;
+static std::map<std::string, std::pair<Type, std::string>> globalScope; // identifier name, {type, label}
 
-AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& func) {
-    this->funcName = funcName;
+AssembledFunc::AssembledFunc(const ASTFunction& func) {
+    this->funcName = func.getName();
 
     // determine if this is the main function
     this->paramTypes = std::vector<Type>();
@@ -32,50 +34,104 @@ AssembledFunc::AssembledFunc(const std::string& funcName, const ASTFunction& fun
     this->endLabel = this->startLabel + FUNC_END_LABEL_SUFFIX;
 }
 
+AssembledFunc::AssembledFunc(const ASTFunction& func, const std::string& startLabel) {
+    this->funcName = func.getName();
+
+    // determine if this is the main function
+    this->paramTypes = std::vector<Type>();
+    this->returnType = func.getReturnType();
+    
+    // fill in param types
+    func.loadParamTypes(this->paramTypes);
+
+    // determine labels
+    this->startLabel = startLabel;
+    this->endLabel = startLabel + FUNC_END_LABEL_SUFFIX;
+}
+
 // generate TPU assembly code from the AST
 void generateAssembly(AST& ast, std::ofstream& outHandle) {
     // write .text section
     outHandle << "section .text\n";
 
+    // store a function that is in charge of serving as the entry point
+    ASTFunction* pEntryFunc = new ASTFunction(RESERVED_LABEL_ENTRY, Token(ErrInfo(1, 0, ""), RESERVED_LABEL_ENTRY, TokenType::VOID), Type());
+    ast.push(pEntryFunc);
+
     // iterate over global functions
     std::vector<ASTNode*>& globalChildren = ast.getChildren();
-    for (ASTNode* pFunc : globalChildren) {
-        // build list of function labels
-        ASTFunction& funcNode = *static_cast<ASTFunction*>(pFunc);
+    for (size_t i = 0; i < globalChildren.size(); ++i) {
+        ASTNode* pNode = globalChildren[i];
+        // check for variable declarations
+        if (pNode->getNodeType() == ASTNodeType::VAR_DECLARATION) {
+            // add to data section
+            ASTVarDeclaration* pVarDec = static_cast<ASTVarDeclaration*>(pNode);
+            const std::string labelName = DATA_LABEL_PREFIX + std::to_string(nextDataID++);
 
-        // assemble function
-        assembleFunction(funcNode, outHandle);
+            // get the data type of the variable declaration
+            const Type& type = pVarDec->getTypeRef();
+            if (type.getNumPointers() > 0 && type.getNumArrayHints() == 0) {
+                dataElements.push_back(DataElem( labelName, "0", DATA_TYPE_U16 )); // raw pointers
+            } else if (type.getNumArrayHints() > 0 || type.isStruct()) {
+                const size_t spacingSize = type.getSizeBytes() & 0xFFFF;
+                dataElements.push_back(DataElem( labelName, std::to_string(spacingSize), DATA_TYPE_SPACE )); // arrays & structs
+            } else { // primitives
+                const size_t spacingSize = type.getSizeBytes() & 0xFFFF;
+                const bool isUnsigned = type.isUnsigned();
+                if (spacingSize == 2) {
+                    dataElements.push_back(DataElem( labelName, "0", isUnsigned ? DATA_TYPE_U16 : DATA_TYPE_S16 ));
+                } else if (spacingSize == 1) {
+                    dataElements.push_back(DataElem( labelName, "0", isUnsigned ? DATA_TYPE_U8 : DATA_TYPE_S8 ));
+                } else {
+                    throw TDevException("Invalid type size for global variable.");
+                }
+            }
+
+            // verify variable isn't already defined
+            if (globalScope.count(pVarDec->pIdentifier->raw) > 0)
+                throw TIdentifierInUseException(pVarDec->err);
+
+            // add to global scope
+            globalScope.insert({pVarDec->pIdentifier->raw, {type, labelName}});
+
+            // force variable to be handled in the entry function
+            pEntryFunc->push(pVarDec);
+            globalChildren[i] = nullptr; // mark the node for not being deleted
+        } else if (pNode->getNodeType() == ASTNodeType::FUNCTION) {
+            // build list of function labels
+            ASTFunction& funcNode = *static_cast<ASTFunction*>(pNode);
+            const std::string funcName = funcNode.getName();
+
+            // create new AssembledFunc to store name & return type
+            AssembledFunc asmFunc = (&funcNode == pEntryFunc) ? AssembledFunc(funcNode, RESERVED_LABEL_ENTRY) : AssembledFunc(funcNode);
+            labelMap.insert({funcName, asmFunc});
+            assembleFunction(funcNode, asmFunc, outHandle); // assemble function
+        } else {
+            throw TDevException("Invalid ASTNode in global scope.");
+        }
     }
 
     // write .data section
     outHandle << "section .data\n";
 
     // iterate over all data elements
-    size_t dataStrId = 0;
     for (DataElem elem : dataElements) {
-        outHandle << TAB << STR_DATA_LABEL_PREFIX << dataStrId++ << ": " <<
+        outHandle << TAB << elem.labelName << ": " <<
             elem.type << ' ' << elem.raw << '\n';
     }
 }
 
 // for assembling functions
-void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
-    // determine labelName
-    const std::string funcName = funcNode.getName();
-
-    // create new AssembledFunc to store name & return type
-    AssembledFunc asmFunc = AssembledFunc(funcName, funcNode);
-    labelMap.insert({funcName, asmFunc});
-
+void assembleFunction(ASTFunction& funcNode, AssembledFunc& asmFunc, std::ofstream& outHandle) {
     // create a scope for this body
     Scope scope;
 
     // assemble this function into the file
     outHandle << asmFunc.getStartLabel() << ":\n";
 
-    // if this is main, add return byte spacing on top of stack
+    // if this is the entry function, add return byte spacing on top of stack
     const size_t returnSize = funcNode.getReturnType().getSizeBytes();
-    if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN && returnSize > 0)
+    if (asmFunc.getStartLabel() == RESERVED_LABEL_ENTRY && returnSize > 0)
         OUT << "add SP, " << returnSize << '\n';
 
     // add return bytes to scope
@@ -95,11 +151,17 @@ void assembleFunction(ASTFunction& funcNode, std::ofstream& outHandle) {
     if (!hasReturned && returnSize > 0)
         throw TMissingReturnException(funcNode.err);
 
+    if (asmFunc.getStartLabel() == RESERVED_LABEL_ENTRY) {
+        // call the main function
+        OUT << "add SP, 2\n"; // add space for return bytes from main
+        OUT << "call " << RESERVED_LABEL_MAIN << '\n';
+    }
+
     // write return label
     OUT << asmFunc.getEndLabel() << ":\n";
 
     // stop clock after execution is done IF MAIN or return to previous label
-    if (asmFunc.getStartLabel() == RESERVED_LABEL_MAIN) {
+    if (asmFunc.getStartLabel() == RESERVED_LABEL_ENTRY) {
         // handle return status
         OUT << "popw BX\n"; // pop return status to AX
         OUT << "mov AX, 3\n"; // specify syscall type
@@ -129,9 +191,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 ASTWhileLoop& loop = *static_cast<ASTWhileLoop*>(&child);
 
                 // create label for the start of the loop body (here)
+                // AND determine the label where all branches merge
                 const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-
-                // determine the label where all branches merge
                 const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
                 // append loopStartLabel
@@ -175,9 +236,8 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 scope.pop(resultSize);
 
                 // create label for the start of the loop body (here)
+                // AND determine the label where all branches merge
                 const std::string loopStartLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
-
-                // determine the label where all branches merge
                 const std::string mergeLabel = JMP_LABEL_PREFIX + std::to_string(nextJMPLabelID++);
 
                 // append loopStartLabel
@@ -270,12 +330,31 @@ bool assembleBody(ASTNode* pHead, std::ofstream& outHandle, Scope& scope, const 
                 } else { // has assignment, assemble its expression
                     assembleExpression(*pVarChild->pExpr, outHandle, scope);
 
-                    // remove any placeholders
+                    // remove any placeholders since declareVariable re-adds them
                     scope.pop(typeSize);
                 }
 
                 // add variable to scope
-                scope.declareVariable(varType, pVarChild->pIdentifier->raw, pVarChild->pIdentifier->err);
+                if (!pVarChild->isGlobalAssignment) {
+                    scope.declareVariable(varType, pVarChild->pIdentifier->raw, pVarChild->pIdentifier->err);
+                } else {
+                    // move the value into the global variable
+                    if (globalScope.count(pVarChild->pIdentifier->raw) == 0)
+                        throw TUnknownIdentifierException(pVarChild->err);
+
+                    auto globalPair = globalScope.at(pVarChild->pIdentifier->raw);
+                    OUT << "mov AX, " << globalPair.second << '\n'; // load label to AX
+                    for (size_t j = 0; j < typeSize; ++j) {
+                        if (j+1 < typeSize) {
+                            OUT << "popw BX\n"; // pop the value off stack
+                            OUT << "sw BX, " << (typeSize - j - 2) << "(AX)\n";
+                            ++j;
+                        } else {
+                            OUT << "pop BL\n"; // pop the value off stack
+                            OUT << "sb BL, " << (typeSize - j - 1) << "(AX)\n";
+                        }
+                    }
+                }
                 break;
             }
             case ASTNodeType::RETURN: {
@@ -913,12 +992,134 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         case ASTNodeType::IDENTIFIER: {
             // lookup identifier
             ASTIdentifier& identifier = *static_cast<ASTIdentifier*>(&bodyNode);
-            size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
-            Type idenType = scope.getVariable(identifier.raw, identifier.err)->type;
+            Type idenType;
+            if (!scope.doesVarExist(identifier.raw)) {
+                // global variables
+                if (globalScope.count(identifier.raw) == 0)
+                    throw TUnknownIdentifierException(identifier.err);
 
-            // if there aren't any subscripts, handle the value here
-            if (identifier.getNumSubscripts() == 0) {
-                if (idenType.isPointer()) { // handle pointers
+                // handle the identifier
+                auto globalPair = globalScope.at(identifier.raw);
+                idenType = globalPair.first;
+
+                // push the address onto the stack
+                OUT << "pushw " << globalPair.second << '\n';
+                scope.addPlaceholder(2);
+
+                // if there aren't any subscripts, handle the value here
+                if (identifier.getNumSubscripts() == 0) {
+                    if (idenType.isPointer()) { // handle pointers
+                        // if this is an lvalue, leave the address on the stack
+                        if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
+                            const size_t typeSize = idenType.getSizeBytes();
+                            OUT << "popw AX\n"; // pop address back into AX
+                            scope.pop(2);
+
+                            for (size_t k = 0; k < typeSize; ++k) {
+                                if (k+1 < typeSize)
+                                    OUT << "pushw " << (k++) << "(AX)\n";
+                                else
+                                    OUT << "push " << k << "(AX)\n";
+                            }
+                            scope.addPlaceholder(typeSize);
+                        }
+                    } else { // handle primitives
+                        // if this is an lvalue, pass the address
+                        if (identifier.isLValue()) {
+                            // leave the address on the stack
+
+                            // if this identifier is the child of an address-of operator, force as pointer
+                            if (identifier.isChildOfAddressOp())
+                                idenType.addEmptyPointer();
+                        } else { // this is an rvalue, push the value onto the stack
+                            const size_t typeSize = idenType.getSizeBytes();
+                            OUT << "popw AX\n"; // pop address back into AX
+                            scope.pop(2);
+
+                            for (size_t j = 0; j < typeSize; ++j) {
+                                if (j+1 < typeSize)
+                                    OUT << "pushw " << (j++) << "(AX)\n";
+                                else
+                                    OUT << "push " << j << "(AX)\n";
+                            }
+                            scope.addPlaceholder(typeSize);
+                        }
+                    }
+                }
+            } else {
+                // scoped variables
+                size_t stackOffset = scope.getOffset(identifier.raw, identifier.err);
+                idenType = scope.getVariable(identifier.raw, identifier.err)->type;
+
+                // if there aren't any subscripts, handle the value here
+                if (identifier.getNumSubscripts() == 0) {
+                    if (idenType.isPointer()) { // handle pointers
+                        // if this is a reference pointer (ie. array passed as an argument), dereference it
+                        if (idenType.isReferencePointer()) {
+                            // doesn't need to be a reference pointer anymore
+                            idenType.setIsReferencePointer(false);
+
+                            // push the referenced value
+                            const size_t typeSize = idenType.getSizeBytes();
+                            for (size_t k = 0; k < typeSize; ++k) {
+                                if (k+1 < typeSize) {
+                                    OUT << "pushw -" << stackOffset << "(SP)\n";
+                                    ++k;
+                                } else {
+                                    OUT << "push -" << stackOffset << "(SP)\n";
+                                }
+                            }
+                            scope.addPlaceholder(typeSize);
+                        } else {
+                            // push the address onto the stack
+                            OUT << "mov AX, SP\n"; // move SP into AX
+                            OUT << "sub AX, " << stackOffset << '\n';
+                            OUT << "pushw AX\n";
+                            scope.addPlaceholder(2);
+                        }
+
+                        // if this is an lvalue, leave the address on the stack
+                        if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
+                            const size_t typeSize = idenType.getSizeBytes();
+                            OUT << "popw AX\n"; // pop address back into AX
+                            scope.pop(2);
+
+                            for (size_t k = 0; k < typeSize; ++k) {
+                                if (k+1 < typeSize) {
+                                    OUT << "pushw " << k << "(AX)\n";
+                                    ++k;
+                                } else {
+                                    OUT << "push " << k << "(AX)\n";
+                                }
+                            }
+                            scope.addPlaceholder(typeSize);
+                        }
+                    } else { // handle primitives
+                        // if this is an lvalue, pass the address
+                        if (identifier.isLValue()) {
+                            // push the address onto the stack
+                            OUT << "mov AX, SP\n"; // move SP into AX
+                            OUT << "sub AX, " << stackOffset << '\n';
+                            OUT << "pushw AX\n";
+                            scope.addPlaceholder(2);
+
+                            // if this identifier is the child of an address-of operator, force as pointer
+                            if (identifier.isChildOfAddressOp())
+                                idenType.addEmptyPointer();
+                        } else { // this is an rvalue, push the value onto the stack
+                            const size_t typeSize = idenType.getSizeBytes();
+                            for (size_t j = 0; j < typeSize; ++j) {
+                                if (j+1 < typeSize) {
+                                    OUT << "pushw -" << stackOffset << "(SP)\n";
+                                    ++j;
+                                } else {
+                                    OUT << "push -" << stackOffset << "(SP)\n";
+                                }
+                            }
+                            scope.addPlaceholder(typeSize);
+                        }
+                    }
+                } else {
                     // if this is a reference pointer (ie. array passed as an argument), dereference it
                     if (idenType.isReferencePointer()) {
                         // doesn't need to be a reference pointer anymore
@@ -936,77 +1137,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
                         }
                         scope.addPlaceholder(typeSize);
                     } else {
-                        // push the address onto the stack
-                        OUT << "mov AX, SP\n"; // move SP into AX
+                        // not a reference pointer, push the address
+                        OUT << "mov AX, SP\n"; // store the SP in AX
                         OUT << "sub AX, " << stackOffset << '\n';
-                        OUT << "pushw AX\n";
+                        OUT << "pushw AX\n"; // push the address of this identifier
                         scope.addPlaceholder(2);
                     }
-
-                    // if this is an lvalue, leave the address on the stack
-                    if (!idenType.isArray() && !identifier.isLValue()) { // push the value of the pointer
-                        const size_t typeSize = idenType.getSizeBytes();
-                        OUT << "popw AX\n"; // pop address back into AX
-                        scope.pop(2);
-
-                        for (size_t k = 0; k < typeSize; ++k) {
-                            if (k+1 < typeSize) {
-                                OUT << "pushw " << k << "(AX)\n";
-                                ++k;
-                            } else {
-                                OUT << "push " << k << "(AX)\n";
-                            }
-                        }
-                        scope.addPlaceholder(typeSize);
-                    }
-                } else { // handle primitives
-                    // if this is an lvalue, pass the address
-                    if (identifier.isLValue()) {
-                        // push the address onto the stack
-                        OUT << "mov AX, SP\n"; // move SP into AX
-                        OUT << "sub AX, " << stackOffset << '\n';
-                        OUT << "pushw AX\n";
-                        scope.addPlaceholder(2);
-
-                        // if this identifier is the child of an address-of operator, force as pointer
-                        if (identifier.isChildOfAddressOp())
-                            idenType.addEmptyPointer();
-                    } else { // this is an rvalue, push the value onto the stack
-                        const size_t typeSize = idenType.getSizeBytes();
-                        for (size_t j = 0; j < typeSize; ++j) {
-                            if (j+1 < typeSize) {
-                                OUT << "pushw -" << stackOffset << "(SP)\n";
-                                ++j;
-                            } else {
-                                OUT << "push -" << stackOffset << "(SP)\n";
-                            }
-                        }
-                        scope.addPlaceholder(typeSize);
-                    }
-                }
-            } else {
-                // if this is a reference pointer (ie. array passed as an argument), dereference it
-                if (idenType.isReferencePointer()) {
-                    // doesn't need to be a reference pointer anymore
-                    idenType.setIsReferencePointer(false);
-
-                    // push the referenced value
-                    const size_t typeSize = idenType.getSizeBytes();
-                    for (size_t k = 0; k < typeSize; ++k) {
-                        if (k+1 < typeSize) {
-                            OUT << "pushw -" << stackOffset << "(SP)\n";
-                            ++k;
-                        } else {
-                            OUT << "push -" << stackOffset << "(SP)\n";
-                        }
-                    }
-                    scope.addPlaceholder(typeSize);
-                } else {
-                    // not a reference pointer, push the address
-                    OUT << "mov AX, SP\n"; // store the SP in AX
-                    OUT << "sub AX, " << stackOffset << '\n';
-                    OUT << "pushw AX\n"; // push the address of this identifier
-                    scope.addPlaceholder(2);
                 }
             }
 
@@ -1072,11 +1208,12 @@ Type assembleExpression(ASTNode& bodyNode, std::ofstream& outHandle, Scope& scop
         case ASTNodeType::LIT_STRING: {
             // add to data section
             ASTStringLiteral* pStrLit = static_cast<ASTStringLiteral*>(&bodyNode);
-            dataElements.push_back(DataElem(pStrLit->raw, DATA_TYPE_STRZ));
+            const std::string labelName = DATA_LABEL_PREFIX + std::to_string(nextDataID++);
+            dataElements.push_back(DataElem(labelName, pStrLit->raw, DATA_TYPE_STRZ));
             resultType = pStrLit->getTypeRef();
 
             // write label
-            OUT << "pushw " << STR_DATA_LABEL_PREFIX << nextStringDataID++ << '\n';
+            OUT << "pushw " << labelName << '\n';
             scope.addPlaceholder(2);
             break;
         }

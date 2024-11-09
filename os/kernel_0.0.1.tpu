@@ -525,7 +525,6 @@ __UF1:
     __UF1E:
     ret
 _main:
-    add SP, 2
     mov AX, 14336
     pushw AX
     mov AX, 51200
@@ -550,6 +549,11 @@ _main:
     mov DX, 0
     sw DX, -2(SP)
     _mainE:
+    ret
+_start:
+    add SP, 2
+    call _main
+    _startE:
     popw BX
     mov AX, 3
     syscall

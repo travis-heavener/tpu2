@@ -206,25 +206,104 @@ AST* parseToAST(const std::vector<Token>& tokens) {
                 // set the start index to where the identifier name is
                 startIndex = i++;
 
+                // try as function
+                bool isFunction = true;
+
                 // verify opening parenthesis is present
-                if ( i == tokensLen || tokens[i].type != TokenType::LPAREN )
-                    throw TInvalidTokenException(tokens[i-1].err);
+                if (i == tokensLen) throw TInvalidTokenException(tokens[i-1].err);
+                if (tokens[i].type != TokenType::LPAREN) isFunction = false;
 
-                // verify closing parenthesis is present
-                endIndex = findClosingParen(tokens, i, tokensLen-1);
-                i = endIndex;
+                // handle functions
+                if (isFunction) {
+                    // verify closing parenthesis is present
+                    endIndex = findClosingParen(tokens, i, tokensLen-1);
+                    i = endIndex;
 
-                // verify opening brace is present
-                if ( i+1 == tokensLen || tokens[++i].type != TokenType::LBRACE )
-                    throw TInvalidTokenException(tokens[i].err);
-                
-                // verify closing brace is present
-                endIndex = findClosingBrace(tokens, i, tokensLen-1);
-                i = endIndex;
+                    // verify opening brace is present
+                    if ( i+1 == tokensLen || tokens[++i].type != TokenType::LBRACE )
+                        throw TInvalidTokenException(tokens[i].err);
+                    
+                    // verify closing brace is present
+                    endIndex = findClosingBrace(tokens, i, tokensLen-1);
+                    i = endIndex;
 
-                // all good to go
-                endIndex = i;
-                pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST, type) );
+                    // all good to go
+                    endIndex = i;
+                    pAST->push( parseFunction(tokens, startIndex, endIndex, scopeStack, pAST, type) );
+                } else {
+                    // get all array size hints (only allow integer sizes)
+                    bool hasImplicitArraySizeHints = false;
+                    if (tokens[i].type == TokenType::LBRACKET) {
+                        size_t j, numHints = 0;
+                        for (j = i; j < tokensLen && tokens[j].type == TokenType::LBRACKET; (void)j) {
+                            if (tokens[j+1].type == TokenType::LIT_INT || numHints > 0) {
+                                // verify next token is an int literal
+                                if (tokens[j+1].type != TokenType::LIT_INT)
+                                    throw TInvalidTokenException(tokens[i+1].err);
+
+                                // verify next token is an RBRACKET
+                                if (tokens[j+2].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+2].err);
+
+                                // add with value otherwise
+                                type.addHintPointer( std::stol(tokens[j+1].raw) );
+                                j += 3;
+                            } else {
+                                // verify next token is an RBRACKET
+                                if (tokens[j+1].type != TokenType::RBRACKET)
+                                    throw TInvalidTokenException(tokens[j+1].err);
+
+                                // add empty array modifier if first bracket pair
+                                type.addHintPointer( TYPE_EMPTY_PTR );
+                                j += 2;
+                                hasImplicitArraySizeHints = true;
+                            }
+                            numHints++;
+                        }
+                        i = j;
+                    }
+
+                    // prevent implicit array size hints here
+                    if (hasImplicitArraySizeHints)
+                        throw TSyntaxException(tokens[startIndex+1].err);
+
+                    // parse the identifier
+                    ASTVarDeclaration* pVarDec = new ASTVarDeclaration(tokens[startIndex], type, true);
+                    pAST->push( pVarDec );
+                    pVarDec->pIdentifier = new ASTIdentifier(tokens[startIndex], true);
+
+                    // handle variable declarations
+                    if (tokens[i].type != TokenType::SEMICOLON) {
+                        if (tokens[i].type != TokenType::ASSIGN)
+                            throw TInvalidTokenException(tokens[i].err);
+
+                        // verify semicolon is present
+                        size_t defStartIndex = ++i;
+                        while (i < tokensLen && tokens[i].type != TokenType::SEMICOLON)
+                            ++i;
+
+                        if (i == tokensLen)
+                            throw TSyntaxException(tokens[defStartIndex].err);
+
+                        // parse the expression
+                        ASTExpr* pExpr = static_cast<ASTExpr*>(parseExpression(tokens, defStartIndex, i-1, scopeStack, true));
+                        pVarDec->pExpr = pExpr;
+
+                        // update variable declaration's type
+                        pVarDec->updateType( type );
+                        type = pVarDec->type;
+                    }
+
+                    // if this is a struct, fetch any necessary size data
+                    if (type.isStruct()) {
+                        const Type structType = lookupParserStruct(scopeStack, type.getStructName(), tokens[start].err);
+                        type.copyStructFields(structType);
+                    }
+
+                    // declare a parser variable
+                    ParserVariable* pParserVar = new ParserVariable(type);
+                    declareParserVariable(scopeStack, tokens[startIndex].raw, pParserVar, tokens[startIndex].err);
+                }
             } else {
                 // handle invalid usage
                 throw TSyntaxException(tokens[i].err);
