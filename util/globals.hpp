@@ -76,16 +76,16 @@
 #define CPI_MEM_WRITE       (u16)ceil((double)MEM_WRITE_TIME * CLOCK_FREQ_HZ)
 
 // additional CPI for arithmetic simulation
-#define CPI_ADD             1
-#define CPI_SUB             1
-#define CPI_MUL             4
-#define CPI_DIV             4
+#define CPI_ADD             2
+#define CPI_SUB             2
+#define CPI_MUL             5
+#define CPI_DIV             5
 #define CPI_AND             1
 #define CPI_OR              1
 #define CPI_XOR             1
 #define CPI_NOT             1
-#define CPI_SHL             1
-#define CPI_SHR             1
+#define CPI_SHL             2
+#define CPI_SHR             2
 
 /********************************************************/
 /*                    MACROS & TYPES                    */
