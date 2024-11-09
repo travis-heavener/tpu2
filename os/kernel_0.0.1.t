@@ -23,6 +23,9 @@
 #define HEAP_FREE   0
 #define HEAP_USED   1
 
+// Declare the heap pointer
+uint_8* pHeap = HEAP_START;
+
 // Used to allocate a new block on the heap.
 // Register CX: The size of allocation
 // Register DX: The allocated address, or NULL
@@ -35,9 +38,6 @@ void heap_alloc() {
         __load_DX( NULL );
         return;
     }
-
-    // Declare the heap pointer
-    uint_8* pHeap = HEAP_START;
 
     // Find the next available free block
     uint_16 i = 0;
@@ -84,9 +84,6 @@ void heap_free() {
     if (addr < HEAP_START || addr > HEAP_END) {
         return;
     }
-
-    // Declare the heap pointer
-    uint_8* pHeap = HEAP_START;
 
     // Find the block
     uint_16 i = 0;

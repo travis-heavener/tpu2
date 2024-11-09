@@ -37,8 +37,6 @@ __UF0:
     sub SP, 2
     jmp __UF0E
     __J0:
-    mov AX, 14336
-    pushw AX
     pushw 0
     __J6:
     pushw -2(SP)
@@ -54,15 +52,15 @@ __UF0:
     __J9:
     buf AL
     jz __J7
-    mov AX, SP
-    sub AX, 4
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -4(SP)
     popw AX
     add AX, BX
     pushw 0(AX)
-    mov AX, SP
-    sub AX, 6
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     pushw -6(SP)
     mov BX, 2
@@ -85,7 +83,7 @@ __UF0:
     __J12:
     push AL
     pushw -3(SP)
-    lw BX, -11(SP)
+    lw BX, -9(SP)
     popw AX
     cmp AX, BX
     jz __J13
@@ -96,7 +94,7 @@ __UF0:
     __J14:
     push AL
     pushw -4(SP)
-    pushw -12(SP)
+    pushw -10(SP)
     mov BX, 3
     popw AX
     add AX, BX
@@ -132,8 +130,8 @@ __UF0:
     and AL, BL
     buf AL
     jz __J10
-    mov AX, SP
-    sub AX, 6
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     pushw -6(SP)
     mov BX, 2
@@ -152,7 +150,7 @@ __UF0:
     popw AX
     sb BL, 0(AX)
     pushw -2(SP)
-    lw BX, -10(SP)
+    lw BX, -8(SP)
     popw AX
     cmp BX, AX
     jnc __J21
@@ -163,32 +161,32 @@ __UF0:
     __J22:
     buf AL
     jz __J20
-    mov AX, SP
-    sub AX, 6
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -6(SP)
     popw AX
     add AX, BX
     pushw AX
-    lw BX, -10(SP)
+    lw BX, -8(SP)
     popw AX
     sw BX, 0(AX)
     pushw -4(SP)
-    lw BX, -10(SP)
+    lw BX, -8(SP)
     popw AX
     add AX, BX
     mov BX, 3
     add AX, BX
     pushw AX
-    mov AX, SP
-    sub AX, 8
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -4(SP)
     popw AX
     add AX, BX
     pushw AX
     pushw -6(SP)
-    lw BX, -14(SP)
+    lw BX, -12(SP)
     popw AX
     sub AX, BX
     mov BX, 3
@@ -196,8 +194,8 @@ __UF0:
     mov BX, AX
     popw AX
     sw BX, 0(AX)
-    mov AX, SP
-    sub AX, 8
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     pushw -4(SP)
     mov BX, 2
@@ -225,7 +223,7 @@ __UF0:
     mov BX, 3
     add AX, BX
     mov DX, AX
-    sub SP, 8
+    sub SP, 6
     jmp __UF0E
     __J10:
     mov AX, SP
@@ -246,7 +244,7 @@ __UF0:
     jmp __J6
     __J7:
     mov DX, 0
-    sub SP, 6
+    sub SP, 4
     __UF0E:
     ret
 __UF1:
@@ -287,8 +285,6 @@ __UF1:
     sub SP, 2
     jmp __UF1E
     __J23:
-    mov AX, 14336
-    pushw AX
     pushw 0
     pushw 0
     __J29:
@@ -305,8 +301,8 @@ __UF1:
     __J32:
     buf AL
     jz __J30
-    mov AX, SP
-    sub AX, 6
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -6(SP)
     popw AX
@@ -320,7 +316,7 @@ __UF1:
     mov BX, 3
     add AX, BX
     pushw AX
-    lw BX, -12(SP)
+    lw BX, -10(SP)
     popw AX
     cmp AX, BX
     jz __J34
@@ -331,8 +327,8 @@ __UF1:
     __J35:
     buf AL
     jz __J33
-    mov AX, SP
-    sub AX, 8
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     pushw -8(SP)
     mov BX, 2
@@ -370,8 +366,8 @@ __UF1:
     __J38:
     buf AL
     jz __J36
-    mov AX, SP
-    sub AX, 10
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw AX, -4(SP)
     popw CX
@@ -391,8 +387,8 @@ __UF1:
     __J41:
     buf AL
     jz __J39
-    mov AX, SP
-    sub AX, 10
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -4(SP)
     popw AX
@@ -400,8 +396,8 @@ __UF1:
     mov BX, 2
     sub AX, BX
     pushw 0(AX)
-    mov AX, SP
-    sub AX, 12
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -12(SP)
     popw AX
@@ -445,8 +441,8 @@ __UF1:
     mov BX, 3
     sub AX, BX
     pushw AX
-    mov AX, SP
-    sub AX, 12
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     pushw -4(SP)
     mov BX, 2
@@ -469,8 +465,8 @@ __UF1:
     __J47:
     buf AL
     jz __J45
-    mov AX, SP
-    sub AX, 12
+    pushw __UD0
+    popw AX
     pushw 0(AX)
     lw BX, -4(SP)
     popw AX
@@ -495,7 +491,7 @@ __UF1:
     __J45:
     sub SP, 2
     __J42:
-    sub SP, 14
+    sub SP, 12
     jmp __UF1E
     __J33:
     mov AX, SP
@@ -521,7 +517,7 @@ __UF1:
     sub SP, 2
     jmp __J29
     __J30:
-    sub SP, 8
+    sub SP, 6
     __UF1E:
     ret
 _main:
@@ -551,6 +547,11 @@ _main:
     _mainE:
     ret
 _start:
+    mov AX, 14336
+    pushw AX
+    mov AX, __UD0
+    popw BX
+    sw BX, 0(AX)
     add SP, 2
     call _main
     _startE:
@@ -559,3 +560,4 @@ _start:
     syscall
     hlt
 section .data
+    __UD0: .u16 0
