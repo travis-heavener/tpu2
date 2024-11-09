@@ -36,12 +36,13 @@ typedef std::vector<std::pair<std::string, u16>> label_replace_vec_t;
 #define ARG_ADDR_OFFSET     5
 
 // regexs for argument resolving
-#define __REGEX_REG16 "(([ABCD]X)|([SBCI]P)|([SD]I))"
+#define __REGEX_REG16 "(([ABCD]X)|([SBCI]P)|([SD]I)|(ES))"
 #define __REGEX_IMMED "(-?((0[Bb][01]+)|(0[Xx][abcdefABCDEF\\d]+)|(\\d+)))"
 const std::regex RE_ARG_REG8("([ABCD][LH])");
 const std::regex RE_ARG_REG16("^" __REGEX_REG16 "$");
+const std::regex RE_RESERVED_NAMES("^(([ABCD][LHX])|([SBCI]P)|([SD]I)|(ES)|(section))$");
 const std::regex RE_ARG_IMMED("^" __REGEX_IMMED "$");
-const std::regex RE_ARG_LABEL("^([^-\\d]\\w+)$");
+const std::regex RE_ARG_LABEL("^([a-zA-Z_]\\w*)$");
 const std::regex RE_ARG_ADDR_OFFSET("^(" __REGEX_IMMED "\\(" __REGEX_REG16 "\\))$");
 u8 resolveArgument(const std::string&, std::vector<u8>&, const bool=false, const bool=false);
 

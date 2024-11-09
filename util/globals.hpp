@@ -109,6 +109,8 @@ typedef int8_t    s8;
 #define DATA_TYPE_STRZ      ".strz" // null-terminated string
 #define DATA_TYPE_U16       ".u16"  // unsigned word
 #define DATA_TYPE_U8        ".u8"   // unsigned byte
+#define DATA_TYPE_S16       ".s16"  // signed word
+#define DATA_TYPE_S8        ".s8"   // signed byte
 
 // for TCC
 #define FUNC_LABEL_PREFIX       "__UF" // for "user function"

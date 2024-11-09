@@ -203,16 +203,12 @@ u16 loadFileToMemory(const std::string& path, Memory& memory) {
             if (labelMap.count(labelPair.first) == 0)
                 throw std::invalid_argument("Could not find label: " + labelPair.first);
 
+            // replace with address
             Label label = labelMap[labelPair.first];
-            if (label.type == DATA_TYPE_DEFAULT || label.type == DATA_TYPE_STRZ) {
-                // replace with address
-                u16 destAddr = labelMap[labelPair.first].value;
-                u16 addr = labelPair.second;
-                memory[ addr ] = destAddr & 0x00FF;
-                memory[addr+1] = (destAddr & 0xFF00) >> 8;
-            } else {
-                throw std::invalid_argument("Invalid label type: " + labelPair.first);
-            }
+            u16 destAddr = labelMap[labelPair.first].value;
+            u16 addr = labelPair.second;
+            memory[ addr ] = destAddr & 0x00FF;
+            memory[addr+1] = (destAddr & 0xFF00) >> 8;
         }
 
         // close file
@@ -253,8 +249,13 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
     std::string rawValue = line.substr(spaceIndex+1);
     if (rawValue.size() == 0) throw std::invalid_argument("Invalid data declaration.");
 
-    // swtich on the data type provided
+    // verify the label name is valid
+    std::vector<u8> bytesToWrite;
     trimString(labelName);
+    if (resolveArgument(labelName, bytesToWrite) != ARG_LABEL)
+        throw std::invalid_argument("Invalid label name in data segment.");
+
+    // swtich on the data directive provided
     trimString(dataType);
     trimString(rawValue);
     if (dataType == DATA_TYPE_STRZ) { // parse as string
@@ -267,7 +268,7 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
         escapeString(rawValue);
 
         // insert each character onto the document
-        u16 startIndex = memIndex;
+        u16 dataStartIndex = memIndex;
         for (const char c : rawValue) {
             memory[memIndex++] = (u8)c;
         }
@@ -276,11 +277,53 @@ void processLineToData(std::string& line, Memory& memory, u16& memIndex, label_m
         memory[memIndex++] = '\0';
 
         // insert into label map
-        labelMap.insert({labelName, Label(dataType, startIndex)});
+        labelMap.insert({labelName, Label(dataType, dataStartIndex)});
     } else if (dataType == DATA_TYPE_U16) { // parse as u16
         // verify value is valid
+        u8 status = resolveArgument(rawValue, bytesToWrite, true, false);
+        if (status != ARG_IMM16)
+            throw std::invalid_argument("Invalid u16 data value");
+
+        // push value to memory
+        u16 dataStartIndex = memIndex;
+        memory[memIndex++] = bytesToWrite[0];
+        memory[memIndex++] = bytesToWrite[1];
+
+        // insert into label map
+        labelMap.insert({labelName, Label(dataType, dataStartIndex)});
+    } else if (dataType == DATA_TYPE_U8) { // parse as u8
+        // verify value is valid
+        u8 status = resolveArgument(rawValue, bytesToWrite, false, false);
+        if (status != ARG_IMM8)
+            throw std::invalid_argument("Invalid u8 data value");
+
+        // push value to memory & insert into label map
+        memory[memIndex++] = bytesToWrite[0];
+        labelMap.insert({labelName, Label(dataType, memIndex-1)});
+    } else if (dataType == DATA_TYPE_S16) { // parse as s16
+        // verify value is valid
+        u8 status = resolveArgument(rawValue, bytesToWrite, true, true);
+        if (status != ARG_IMM16)
+            throw std::invalid_argument("Invalid s16 data value");
+
+        // push value to memory
+        u16 dataStartIndex = memIndex;
+        memory[memIndex++] = bytesToWrite[0];
+        memory[memIndex++] = bytesToWrite[1];
+
+        // insert into label map
+        labelMap.insert({labelName, Label(dataType, dataStartIndex)});
+    } else if (dataType == DATA_TYPE_S8) { // parse as s8
+        // verify value is valid
+        u8 status = resolveArgument(rawValue, bytesToWrite, false, true);
+        if (status != ARG_IMM8)
+            throw std::invalid_argument("Invalid s8 data value");
+
+        // push value to memory & insert into label map
+        memory[memIndex++] = bytesToWrite[0];
+        labelMap.insert({labelName, Label(dataType, memIndex-1)});
     } else {
-        throw std::invalid_argument("Invalid data type: " + dataType);
+        throw std::invalid_argument("Invalid data directive: " + dataType);
     }
 }
 
@@ -680,6 +723,9 @@ u8 resolveArgument(const std::string& arg, std::vector<u8>& bytesToWrite, const 
         bytesToWrite.push_back( getRegisterFromString( arg.substr(arg.size()-3, 2) ) );
         return ARG_ADDR_OFFSET;
     } else if (std::regex_match(arg, RE_ARG_LABEL)) { // treat as label (becomes imm16)
+        // verify the label isn't a reserved name
+        if (std::regex_match(arg, RE_RESERVED_NAMES))
+            throw std::invalid_argument("Invalid label name (use of a reserved keyword).");
         return ARG_LABEL;
     } else if (std::regex_match(arg, RE_ARG_IMMED)) { // treat as immediate value
         bool isNeg = arg[0] == '-';
