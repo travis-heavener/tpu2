@@ -26,18 +26,41 @@ void TPU::reset() {
     __hasSuspended = false;
 }
 
-Byte TPU::readByte(Memory& memory) {
-    return memory[this->IP++];
+Byte TPU::readNextByte() {
+    return readByte(this->IP++);
 }
 
-Word TPU::readWord(Memory& memory) {
+Word TPU::readNextWord() {
+    Word value = readWord(this->IP);
+    this->IP++; this->IP++;
+    return value;
+}
+
+Byte TPU::readByte(u16 addr) const {
+    sleep(CPI_MEM_READ);
+    return memory[addr];
+}
+
+Word TPU::readWord(u16 addr) const {
     // little-endian (lower first, upper second)
-    unsigned short value = memory[this->IP++].getValue();
-    value |= ((u16)memory[this->IP++].getValue()) << 8;
+    sleep(2 * CPI_MEM_READ);
+    u16 value = memory[addr].getValue();
+    value |= ((u16)memory[addr+1].getValue()) << 8;
     return Word(value);
 }
 
-void TPU::moveToRegister(Register reg, unsigned short value) {
+void TPU::writeByte(u16 addr, u8 value) const {
+    sleep(CPI_MEM_WRITE);
+    memory[addr] = value;
+}
+
+void TPU::writeWord(u16 addr, u16 value) const {
+    sleep(2 * CPI_MEM_WRITE);
+    memory[addr] = value & 0xFF;
+    memory[addr+1] = (value >> 8) & 0xFF;
+}
+
+void TPU::moveToRegister(Register reg, u16 value) {
     switch (reg) {
         case Register::AX: AX = value; break;
         case Register::AL: AX.setLower( value & 0xFF ); break;
@@ -104,16 +127,12 @@ Byte& TPU::readRegister8(Register reg) {
     }
 }
 
-void TPU::execute(Memory& memory) {
+void TPU::execute() {
     // fetch instruction
-    Byte instruction = this->readByte(memory);
-
-    // wait cycle since TPU has to process the instruction
-    this->sleep();
+    Byte instruction = this->readNextByte();
 
     #define caseInstruction(INST) case OPCode::INST: { \
-        instructions::process##INST(*this, memory); \
-        this->sleep(); \
+        instructions::process##INST(*this); \
         break; \
     }
 
@@ -126,20 +145,17 @@ void TPU::execute(Memory& memory) {
             break;
         }
         case OPCode::SYSCALL: {
-            instructions::executeSyscall(*this, memory);
-            this->sleep(); // wait since the TPU has just completed a syscall
+            instructions::executeSyscall(*this);
             break;
         }
         case OPCode::JMP: case OPCode::JZ: case OPCode::JNZ: case OPCode::JC: case OPCode::JNC: {
-            instructions::processJMP(*this, memory, opCode);
-            this->sleep();
+            instructions::processJMP(*this, opCode);
             break;
         }
         caseInstruction(CALL)
         caseInstruction(RET)
         case OPCode::MOV: case OPCode::MOVW: case OPCode::MOVI: case OPCode::MOVWI: {
-            instructions::processMOV(*this, memory, opCode);
-            this->sleep();
+            instructions::processMOV(*this, opCode);
             break;
         }
         caseInstruction(LB)
@@ -148,13 +164,11 @@ void TPU::execute(Memory& memory) {
         caseInstruction(SW)
         case OPCode::PUSH: case OPCode::PUSHW: case OPCode::PUSHI:
         case OPCode::PUSHWI: case OPCode::PUSHA: case OPCode::PUSHWA: {
-            instructions::processPUSH(*this, memory, opCode);
-            this->sleep();
+            instructions::processPUSH(*this, opCode);
             break;
         }
         case OPCode::POP: case OPCode::POPW: {
-            instructions::processPOP(*this, memory, opCode);
-            this->sleep();
+            instructions::processPOP(*this, opCode);
             break;
         }
         caseInstruction(ADD)
@@ -164,8 +178,7 @@ void TPU::execute(Memory& memory) {
         caseInstruction(CMP)
         caseInstruction(BUF)
         case OPCode::AND: case OPCode::OR: case OPCode::XOR: {
-            instructions::processANDORXOR(*this, memory, opCode);
-            this->sleep();
+            instructions::processANDORXOR(*this, opCode);
             break;
         }
         caseInstruction(NOT)
@@ -182,10 +195,10 @@ void TPU::execute(Memory& memory) {
 }
 
 // starts the clock and runs until a halt instruction is encountered
-void TPU::start(Memory& memory) {
+void TPU::start() {
     while ( !this->__hasSuspended ) {
         // execute next instruction
-        this->execute(memory);
+        this->execute();
     }
 }
 
@@ -196,9 +209,8 @@ void TPU::sleep(int cycles) const {
         std::this_thread::sleep_for(std::chrono::microseconds( sleepTime ));
 }
 
-u16 TPU::getProgramStartIndex(Memory& memory) const {
-    sleep(); sleep(); // sleep for both memory reads
-    return ((u16)memory[PROGRAM_INDEX+1].getValue() << 8) | memory[PROGRAM_INDEX].getValue();
+u16 TPU::getProgramStartIndex() const {
+    return readWord(PROGRAM_INDEX).getValue();
 }
 
 // update a specific flag

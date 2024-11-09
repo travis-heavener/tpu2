@@ -34,27 +34,27 @@ constexpr bool getParity(u8 n) {
     return parity;
 }
 
-u16 getAddress(TPU& tpu, Memory& memory) {
+u16 getAddress(TPU& tpu) {
     // read the 16-bit offset & 8-bit op code for register
-    s16 offset = tpu.readWord(memory).getValue();
-    Register regCode = getRegister16FromCode( tpu.readByte(memory).getValue() );
+    s16 offset = tpu.readNextWord().getValue();
+    Register regCode = getRegister16FromCode( tpu.readNextByte().getValue() );
     return (s32)tpu.readRegister16(regCode).getValue() + offset;
 }
 
-Register getReg8(TPU& tpu, Memory& memory) {
-    return getRegister8FromCode(tpu.readByte(memory).getValue());
+Register getReg8(TPU& tpu) {
+    return getRegister8FromCode(tpu.readNextByte().getValue());
 }
 
-Register getReg16(TPU& tpu, Memory& memory) {
-    return getRegister16FromCode(tpu.readByte(memory).getValue());
+Register getReg16(TPU& tpu) {
+    return getRegister16FromCode(tpu.readNextByte().getValue());
 }
 
-u8 readReg8(TPU& tpu, Memory& memory) {
-    return tpu.readRegister8( getReg8(tpu, memory) ).getValue();
+u8 readReg8(TPU& tpu) {
+    return tpu.readRegister8( getReg8(tpu) ).getValue();
 }
 
-u16 readReg16(TPU& tpu, Memory& memory) {
-    return tpu.readRegister16( getReg16(tpu, memory) ).getValue();
+u16 readReg16(TPU& tpu) {
+    return tpu.readRegister16( getReg16(tpu) ).getValue();
 }
 
 constexpr s8 getSigned8(u8 A) { // if negative, extract unsigned to signed neg
@@ -75,7 +75,7 @@ void setFlags(TPU& tpu, u8 carry, u8 parity, u8 zero, u8 sign, u8 overflow) {
 
 namespace instructions {
     // execute a syscall, switching on the value in AX
-    void executeSyscall(TPU& tpu, Memory& memory) {
+    void executeSyscall(TPU& tpu) {
         // switch on AX register value
         u16 syscallCode = tpu.readRegister16(Register::AX).getValue();
         switch (syscallCode) {
@@ -90,14 +90,15 @@ namespace instructions {
                 const u16 DI = tpu.readRegister16(Register::DI).getValue();
 
                 while (tpu.readRegister16(Register::SI).getValue() != DI) {
+                    const char c = tpu.readByte( tpu.readRegister16(Register::SI)++ ).getValue();
                     if (syscallCode == Syscall::STDOUT) {
-                        std::cout << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
+                        std::cout << c << std::flush;
                     } else {
-                        std::cerr << (char)memory[tpu.readRegister16(Register::SI)++].getValue() << std::flush;
+                        std::cerr << c << std::flush;
                     }
                     
                     // sleep between writes
-                    tpu.sleep();
+                    tpu.sleep(CPI_DISK_WRITE);
                 }
                 break;
             }
@@ -121,7 +122,7 @@ namespace instructions {
                     for (u8 i = 0; i < length && !hasReadNewline; i++) {
                         char lastChar = getch();
                         if (lastChar == '\n') hasReadNewline = true;
-                        memory[tpu.readRegister16(Register::SI)++] = lastChar;
+                        tpu.writeByte( tpu.readRegister16(Register::SI)++, lastChar );
                     }
                     
                     // sleep between reads
@@ -176,11 +177,11 @@ namespace instructions {
         }
     }
 
-    void processJMP(TPU& tpu, Memory& memory, u8 opCode) {
+    void processJMP(TPU& tpu, u8 opCode) {
         // get operands
-        u16 destAddr = tpu.readWord(memory).getValue();
+        u16 destAddr = tpu.readNextWord().getValue();
         if (tpu.getAddressingMode() == ADDRESS_MODE_RELATIVE)
-            destAddr += tpu.getProgramStartIndex(memory);
+            destAddr += tpu.getProgramStartIndex();
 
         bool isPermitted;
         switch (opCode) {
@@ -196,124 +197,115 @@ namespace instructions {
         if (isPermitted) tpu.moveToRegister(Register::IP, destAddr);
     }
 
-    void processCALL(TPU& tpu, Memory& memory) {
+    void processCALL(TPU& tpu) {
         // Moves the instruction pointer to a named label's entry address, storing the current instruction pointer on the callstack.
 
         // get jump destination address (increments IP twice)
-        u16 destAddr = tpu.readWord(memory).getValue();
+        u16 destAddr = tpu.readNextWord().getValue();
 
         // store IP on callstack
         u16 callstackAddr = tpu.readRegister16(Register::CP).getValue();
         u16 prevIP = tpu.readRegister16(Register::IP).getValue();
-        memory[callstackAddr] = prevIP & 0x00FF;
-        memory[callstackAddr+1] = (prevIP & 0xFF00) >> 8;
+        tpu.writeWord(callstackAddr, prevIP);
 
         tpu.moveToRegister(Register::CP, callstackAddr + 2); // update callstack ptr 
         tpu.moveToRegister(Register::IP, destAddr); // jump to destination address
-        tpu.sleep(); // sleep after storing IP
     }
 
-    void processRET(TPU& tpu, Memory& memory) {
+    void processRET(TPU& tpu) {
         // Revert the instruction pointer to the previous memory address stored on top of the callstack.
         u16 callstackAddr = tpu.readRegister16(Register::CP).getValue();
-        u16 destAddr = ((u16)memory[callstackAddr-1].getValue()) << 8;
-        destAddr |= memory[callstackAddr-2].getValue();
+        u16 destAddr = tpu.readWord(callstackAddr-2).getValue();
 
         tpu.moveToRegister(Register::CP, callstackAddr - 2); // update callstack ptr
         tpu.moveToRegister(Register::IP, destAddr); // jump to destination address
-        tpu.sleep(); // sleep after storing IP
     }
 
-    void processMOV(TPU& tpu, Memory& memory, u8 opCode) {
+    void processMOV(TPU& tpu, u8 opCode) {
         // get operands
         switch (opCode) {
             case OPCode::MOVI: { // reg8, imm8
-                Register regA = getReg8(tpu, memory);
-                tpu.moveToRegister(regA, tpu.readByte(memory).getValue());
+                Register regA = getReg8(tpu);
+                tpu.moveToRegister(regA, tpu.readNextByte().getValue());
                 break;
             }
             case OPCode::MOVWI: { // reg16, imm16
-                Register regA = getReg16(tpu, memory);
-                tpu.moveToRegister(regA, tpu.readWord(memory).getValue());
+                Register regA = getReg16(tpu);
+                tpu.moveToRegister(regA, tpu.readNextWord().getValue());
                 break;
             }
             case OPCode::MOV: { // reg8, reg8
-                Register regA = getReg8(tpu, memory);
-                tpu.moveToRegister(regA, readReg8(tpu, memory));
+                Register regA = getReg8(tpu);
+                tpu.moveToRegister(regA, readReg8(tpu));
                 break;
             }
             case OPCode::MOVW: { // reg16, reg16
-                Register regA = getReg16(tpu, memory);
-                tpu.moveToRegister(regA, readReg16(tpu, memory));
+                Register regA = getReg16(tpu);
+                tpu.moveToRegister(regA, readReg16(tpu));
                 break;
             }
             default: throw std::invalid_argument("Invalid MOD byte for operation: mov.");
         }
     }
 
-    void processLB(TPU& tpu, Memory& memory) {
-        Register regA = getReg8(tpu, memory);
-        u16 addr = getAddress(tpu, memory);
-        tpu.moveToRegister(regA, memory[addr].getValue());
+    void processLB(TPU& tpu) {
+        Register regA = getReg8(tpu);
+        u16 addr = getAddress(tpu);
+        tpu.moveToRegister(regA, tpu.readByte(addr).getValue());
     }
 
-    void processLW(TPU& tpu, Memory& memory) {
-        Register regA = getReg16(tpu, memory);
-        u16 addr = getAddress(tpu, memory);
-        u16 value = memory[addr].getValue();
-        value |= ((u16)memory[addr+1].getValue()) << 8;
+    void processLW(TPU& tpu) {
+        Register regA = getReg16(tpu);
+        u16 addr = getAddress(tpu);
+        u16 value = tpu.readWord(addr).getValue();
         tpu.moveToRegister(regA, value);
     }
 
-    void processSB(TPU& tpu, Memory& memory) {
-        u8 value = readReg8(tpu, memory);
-        u16 addr = getAddress(tpu, memory);
-        memory[addr] = value;
+    void processSB(TPU& tpu) {
+        u8 value = readReg8(tpu);
+        u16 addr = getAddress(tpu);
+        tpu.writeByte(addr, value);
     }
 
-    void processSW(TPU& tpu, Memory& memory) {
-        u16 value = readReg16(tpu, memory);
-        u16 addr = getAddress(tpu, memory);
-        memory[addr] = value & 0xFF;
-        memory[addr+1] = (value >> 8) & 0xFF;
+    void processSW(TPU& tpu) {
+        u16 value = readReg16(tpu);
+        u16 addr = getAddress(tpu);
+        tpu.writeWord(addr, value);
     }
 
-    void processPUSH(TPU& tpu, Memory& memory, u8 opCode) {
+    void processPUSH(TPU& tpu, u8 opCode) {
         // get operands
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
         u8 writeSize = 1;
         switch (opCode) {
             case OPCode::PUSH: { // reg8
-                memory[oldAddr] = readReg8(tpu, memory);
+                tpu.writeByte(oldAddr, readReg8(tpu));
                 break;
             }
             case OPCode::PUSHW: { // reg16
-                u16 value = readReg16(tpu, memory);
-                memory[oldAddr] = value & 0xFF;
-                memory[oldAddr+1] = (value >> 8) & 0xFF;
+                u16 value = readReg16(tpu);
+                tpu.writeWord(oldAddr, value);
                 ++writeSize;
                 break;
             }
             case OPCode::PUSHI: { // imm8
-                memory[oldAddr] = tpu.readByte(memory);
+                tpu.writeByte(oldAddr, tpu.readNextByte());
                 break;
             }
             case OPCode::PUSHWI: { // imm16
-                u16 value = tpu.readWord(memory).getValue();
-                memory[oldAddr]   = value & 0xFF;
-                memory[oldAddr+1] = (value >> 8) & 0xFF;
+                u16 value = tpu.readNextWord().getValue();
+                tpu.writeWord(oldAddr, value);
                 ++writeSize;
                 break;
             }
             case OPCode::PUSHA: { // addr
-                u16 addr = getAddress(tpu, memory);
-                memory[oldAddr] = memory[addr];
+                u16 addr = getAddress(tpu);
+                tpu.writeByte(oldAddr, tpu.readByte(addr));
                 break;
             }
             case OPCode::PUSHWA: { // addr (pushw)
-                u16 addr = getAddress(tpu, memory);
-                memory[oldAddr] = memory[addr];
-                memory[oldAddr+1] = memory[addr+1];
+                u16 addr = getAddress(tpu);
+                tpu.writeWord(oldAddr, tpu.readWord(addr));
                 ++writeSize;
                 break;
             }
@@ -324,21 +316,20 @@ namespace instructions {
         tpu.moveToRegister(Register::SP, oldAddr + writeSize);
     }
 
-    void processPOP(TPU& tpu, Memory& memory, u8 opCode) {
+    void processPOP(TPU& tpu, u8 opCode) {
         // get operands
         u16 oldAddr = tpu.readRegister16(Register::SP).getValue();
         u8 writeSize = 1;
         switch (opCode) {
             case OPCode::POP: { // reg8
-                Register regA = getReg8(tpu, memory);
-                u8 value = memory[oldAddr-1].getValue();
+                Register regA = getReg8(tpu);
+                u8 value = tpu.readByte(oldAddr-1).getValue();
                 tpu.moveToRegister(regA, value);
                 break;
             }
             case OPCode::POPW: { // reg16
-                Register regA = getReg16(tpu, memory);
-                u16 value = memory[oldAddr-2].getValue();
-                value |= ((u16)memory[oldAddr-1].getValue()) << 8;
+                Register regA = getReg16(tpu);
+                u16 value = tpu.readWord(oldAddr-2).getValue();
                 tpu.moveToRegister(regA, value);
                 ++writeSize;
                 break;
@@ -350,24 +341,24 @@ namespace instructions {
         tpu.moveToRegister(Register::SP, oldAddr - writeSize);
     }
 
-    void processADD(TPU& tpu, Memory& memory) {
+    void processADD(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_ADD); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
         const bool isSignedOp = mod.getValue() & 8;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
 
         // get operands
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 uA = tpu.readRegister8(regA).getValue();
-                u8 uB = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 uB = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 sum8 = uA + uB;
                 bool isCarry = ((u16)uA + (u16)uB) > 0xFF;
 
@@ -387,7 +378,7 @@ namespace instructions {
             case 1:   // reg16, imm16
             case 3: { // reg16, reg16
                 u16 uA = tpu.readRegister16(regA).getValue();
-                u16 uB = (argsFormat == 3) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 uB = (argsFormat == 3) ? readReg16(tpu) : tpu.readNextWord().getValue();
                 u16 sum16 = uA + uB;
                 bool isCarry = ((u32)uA + (u32)uB) > 0xFFFF;
 
@@ -408,24 +399,24 @@ namespace instructions {
         }
     }
 
-    void processSUB(TPU& tpu, Memory& memory) {
+    void processSUB(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_SUB); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
         const bool isSignedOp = mod.getValue() & 8;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
 
         // get operands
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 uA = tpu.readRegister8(regA).getValue();
-                u8 uB = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 uB = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 diff8 = uA - uB;
                 bool isBorrow = uB > uA;
 
@@ -444,7 +435,7 @@ namespace instructions {
             case 1:   // reg16, imm16
             case 3: { // reg16, reg16
                 u16 uA = tpu.readRegister16(regA).getValue();
-                u16 uB = (argsFormat == 3) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 uB = (argsFormat == 3) ? readReg16(tpu) : tpu.readNextWord().getValue();
                 u16 diff16 = uA - uB;
                 bool isBorrow = uB > uA;
 
@@ -464,10 +455,10 @@ namespace instructions {
         }
     }
 
-    void processMUL(TPU& tpu, Memory& memory) {
+    void processMUL(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_MUL); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
@@ -475,7 +466,7 @@ namespace instructions {
         switch (argsFormat) {
             case 0: case 2: { // imm8, reg8
                 u8 uA = tpu.readRegister8(Register::AL).getValue();
-                u8 uB = (argsFormat == 0) ? tpu.readByte(memory).getValue() : readReg8(tpu, memory);
+                u8 uB = (argsFormat == 0) ? tpu.readNextByte().getValue() : readReg8(tpu);
                 u16 product = uA * uB;
                 bool isCarry = product > 0xFF;
 
@@ -494,7 +485,7 @@ namespace instructions {
             }
             case 1: case 3: { // imm16 & reg16
                 u16 uA = tpu.readRegister16(Register::AX).getValue();
-                u16 uB = (argsFormat == 1) ? tpu.readWord(memory).getValue() : readReg16(tpu, memory);
+                u16 uB = (argsFormat == 1) ? tpu.readNextWord().getValue() : readReg16(tpu);
                 u32 product = uA * uB;
                 bool isCarry = product > 0xFFFF;
 
@@ -516,10 +507,10 @@ namespace instructions {
         }
     }
 
-    void processDIV(TPU& tpu, Memory& memory) {
+    void processDIV(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_DIV); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
@@ -527,7 +518,7 @@ namespace instructions {
         switch (argsFormat) {
             case 0: case 2: { // imm8, reg8
                 u8 uA = tpu.readRegister8(Register::AL).getValue();
-                u8 uB = (argsFormat == 0) ? tpu.readByte(memory).getValue() : readReg8(tpu, memory);
+                u8 uB = (argsFormat == 0) ? tpu.readNextByte().getValue() : readReg8(tpu);
                 u8 dividend = uA / uB;
                 u8 remainder = uA % uB;
 
@@ -547,7 +538,7 @@ namespace instructions {
             }
             case 1: case 3: { // imm16 & reg16
                 u16 uA = tpu.readRegister16(Register::AX).getValue();
-                u16 uB = (argsFormat == 1) ? tpu.readWord(memory).getValue() : readReg16(tpu, memory);
+                u16 uB = (argsFormat == 1) ? tpu.readNextWord().getValue() : readReg16(tpu);
                 u16 dividend = uA / uB;
                 u16 remainder = uA % uB;
 
@@ -569,24 +560,24 @@ namespace instructions {
         }
     }
 
-    void processCMP(TPU& tpu, Memory& memory) {
+    void processCMP(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_SUB); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
         const bool isSignedOp = mod.getValue() & 8;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
 
         // get operands
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 uA = tpu.readRegister8(regA).getValue();
-                u8 uB = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 uB = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 diff8 = uA - uB;
                 bool isBorrow = uB > uA;
 
@@ -605,7 +596,7 @@ namespace instructions {
             case 1:   // reg16, imm16
             case 3: { // reg16, reg16
                 u16 uA = tpu.readRegister16(regA).getValue();
-                u16 uB = (argsFormat == 3) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 uB = (argsFormat == 3) ? readReg16(tpu) : tpu.readNextWord().getValue();
                 u16 diff16 = uA - uB;
                 bool isBorrow = uB > uA;
 
@@ -625,20 +616,19 @@ namespace instructions {
         }
     }
 
-    void processBUF(TPU& tpu, Memory& memory) {
+    void processBUF(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
 
         // get operands
         u16 value;
         const u8 argsFormat = mod.getValue() & 7;
         const bool is16Bit = argsFormat & 1; // 1 or 3
         switch (argsFormat) {
-            case 0: value = tpu.readByte(memory).getValue(); break; // imm8
-            case 1: value = tpu.readWord(memory).getValue(); break; // imm16
-            case 2: value = readReg8(tpu, memory); break; // reg8
-            case 3: value = readReg16(tpu, memory); break; // reg16
+            case 0: value = tpu.readNextByte().getValue(); break; // imm8
+            case 1: value = tpu.readNextWord().getValue(); break; // imm16
+            case 2: value = readReg8(tpu); break; // reg8
+            case 3: value = readReg16(tpu); break; // reg16
             default: throw std::invalid_argument("Invalid MOD byte for operation: buf.");
         }
 
@@ -646,21 +636,23 @@ namespace instructions {
         setFlags(tpu, 0, getParity(value), value == 0, value & (is16Bit ? 0x8000 : 0x80), 0);
     }
 
-    void processANDORXOR(TPU& tpu, Memory& memory, u8 opCode) {
+    void processANDORXOR(TPU& tpu, u8 opCode) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        if (opCode == OPCode::AND) tpu.sleep(CPI_ADD); // sleep for avg. CPI
+        else if (opCode == OPCode::OR) tpu.sleep(CPI_OR); // sleep for avg. CPI
+        else if (opCode == OPCode::XOR) tpu.sleep(CPI_XOR); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 uA = tpu.readRegister8(regA).getValue();
-                u8 uB = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 uB = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 result = opCode == OPCode::AND ? (uA & uB) : (opCode == OPCode::OR ? (uA | uB) : (uA ^ uB));
 
                 // store result & update flags
@@ -673,7 +665,7 @@ namespace instructions {
             case 1:   // reg16, imm16
             case 3: { // reg16, reg16
                 u16 uA = tpu.readRegister16(regA).getValue();
-                u16 uB = (argsFormat == 3) ? readReg16(tpu, memory) : tpu.readWord(memory).getValue();
+                u16 uB = (argsFormat == 3) ? readReg16(tpu) : tpu.readNextWord().getValue();
                 u16 result = opCode == OPCode::AND ? (uA & uB) : (opCode == OPCode::OR ? (uA | uB) : (uA ^ uB));
 
                 // store result & update flags
@@ -693,20 +685,20 @@ namespace instructions {
         }
     }
 
-    void processNOT(TPU& tpu, Memory& memory) {
+    void processNOT(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_NOT); // sleep for avg. CPI
 
         // get operands
         switch (mod.getValue() & 0b111) {
             case 0: { // reg8
-                Register regA = getReg8(tpu, memory);
+                Register regA = getReg8(tpu);
                 tpu.moveToRegister( regA, ~tpu.readRegister8(regA).getValue() );
                 break;
             }
             case 1: { // reg16
-                Register regA = getReg16(tpu, memory);
+                Register regA = getReg16(tpu);
                 tpu.moveToRegister( regA, ~tpu.readRegister16(regA).getValue() );
                 break;
             }
@@ -714,24 +706,24 @@ namespace instructions {
         }
     }
 
-    void processSHL(TPU& tpu, Memory& memory) {
+    void processSHL(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_SHL); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
         const bool isSignedOp = mod.getValue() & 8;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
 
         // get operands
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 A = tpu.readRegister8(regA).getValue();
-                u8 numShifts = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 numShifts = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 value = A << std::min((int)numShifts, 8);
                 if (isSignedOp) value |= A & 0x80; // re-add sign bit
 
@@ -746,7 +738,7 @@ namespace instructions {
             case 1:   // reg16, imm8
             case 3: { // reg16, reg8
                 u16 A = tpu.readRegister16(regA).getValue();
-                u16 numShifts = (argsFormat == 3) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u16 numShifts = (argsFormat == 3) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u16 value = A << std::min((int)numShifts, 16);
 
                 if (isSignedOp) value |= A & 0x8000; // re-add sign bit
@@ -762,24 +754,24 @@ namespace instructions {
         }
     }
 
-    void processSHR(TPU& tpu, Memory& memory) {
+    void processSHR(TPU& tpu) {
         // determine operands from mod byte
-        Byte mod = tpu.readByte(memory);
-        tpu.sleep(); // wait since TPU has to process mod byte
+        Byte mod = tpu.readNextByte();
+        tpu.sleep(CPI_SHR); // sleep for avg. CPI
 
         // get MOD byte
         const u8 argsFormat = mod.getValue() & 7;
         const bool isSignedOp = mod.getValue() & 8;
 
         // get first operand (even MOD-bytes are reg8s first)
-        Register regA = (argsFormat & 1) ? getReg16(tpu, memory) : getReg8(tpu, memory);
+        Register regA = (argsFormat & 1) ? getReg16(tpu) : getReg8(tpu);
 
         // get operands
         switch (argsFormat) {
             case 0:   // reg8, imm8
             case 2: { // reg8, reg8
                 u8 A = tpu.readRegister8(regA).getValue();
-                u8 numShifts = (argsFormat == 2) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u8 numShifts = (argsFormat == 2) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u8 value = A >> std::min((int)numShifts, 8);
                 if (isSignedOp) value |= A & 0x80; // re-add sign bit
 
@@ -794,7 +786,7 @@ namespace instructions {
             case 1:   // reg16, imm8
             case 3: { // reg16, reg8
                 u16 A = tpu.readRegister16(regA).getValue();
-                u16 numShifts = (argsFormat == 3) ? readReg8(tpu, memory) : tpu.readByte(memory).getValue();
+                u16 numShifts = (argsFormat == 3) ? readReg8(tpu) : tpu.readNextByte().getValue();
                 u16 value = A >> std::min((int)numShifts, 16);
 
                 if (isSignedOp) value |= A & 0x8000; // re-add sign bit

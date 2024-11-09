@@ -60,8 +60,8 @@ int main(int argc, char* argv[]) {
     }
 
     // initialize the processor & memory
-    TPU tpu(CLOCK_FREQ_HZ);
-    Memory memory;
+    Memory memory, reservedMem;
+    TPU tpu(CLOCK_FREQ_HZ, memory, reservedMem);
 
     // load the OS from the disk image
     // first 2 KiB of the disk is partitioned for the OS
@@ -73,11 +73,11 @@ int main(int argc, char* argv[]) {
 
     try {
         // start the CPU's clock and wait
-        tpu.start(memory);
+        tpu.start();
 
         std::cout << tpu.readRegister16(Register::AX) << ' ' << tpu.readRegister16(Register::BX) << '\n';
         std::cout << tpu.readRegister16(Register::CX) << ' ' << tpu.readRegister16(Register::DX) << '\n';
-        std::cout << (memory)[tpu.readRegister16(Register::SP).getValue()-1] << '\n';
+        std::cout << tpu.readWord(tpu.readRegister16(SP).getValue()-2) << '\n';
         std::cout << tpu.readRegister16(Register::SP).getValue() << '\n';
         std::cout << "Flags: " << (s16)tpu.readRegister16(Register::FLAGS).getValue() << ".\n";
 

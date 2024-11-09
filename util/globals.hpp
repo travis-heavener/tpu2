@@ -65,9 +65,27 @@
 
 // CPI for various instructions
 #define DISK_READ_TIME      1e-5 // response time to read 1 byte from disk (100,000 bytes/sec)
-#define DISK_WRITE_TIME     2e-6 // response time to write 1 byte to disk (20,000 bytes/sec)
+#define DISK_WRITE_TIME     5e-5 // response time to write 1 byte to disk (20,000 bytes/sec)
+#define MEM_READ_TIME       1e-7 // response time to read 1 byte from memory (10,000,000 bytes/sec)
+#define MEM_WRITE_TIME      5e-7 // response time to write 1 byte to memory (2,000,000 bytes/sec)
+
+// TOTAL CPI
 #define CPI_DISK_READ       (u16)ceil((double)DISK_READ_TIME * CLOCK_FREQ_HZ)
 #define CPI_DISK_WRITE      (u16)ceil((double)DISK_WRITE_TIME * CLOCK_FREQ_HZ)
+#define CPI_MEM_READ        (u16)ceil((double)MEM_READ_TIME * CLOCK_FREQ_HZ)
+#define CPI_MEM_WRITE       (u16)ceil((double)MEM_WRITE_TIME * CLOCK_FREQ_HZ)
+
+// additional CPI for arithmetic simulation
+#define CPI_ADD             1
+#define CPI_SUB             1
+#define CPI_MUL             4
+#define CPI_DIV             4
+#define CPI_AND             1
+#define CPI_OR              1
+#define CPI_XOR             1
+#define CPI_NOT             1
+#define CPI_SHL             1
+#define CPI_SHR             1
 
 /********************************************************/
 /*                    MACROS & TYPES                    */

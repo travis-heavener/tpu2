@@ -6,27 +6,27 @@
 
 // abstraction from TPU.cpp to make processing instructions more tidy
 namespace instructions {
-    void executeSyscall(TPU& tpu, Memory& memory);
-    void processCALL(TPU& tpu, Memory& memory);
-    void processJMP(TPU& tpu, Memory& memory, u8);
-    void processRET(TPU& tpu, Memory& memory);
-    void processMOV(TPU& tpu, Memory& memory, u8);
-    void processLB(TPU& tpu, Memory& memory);
-    void processLW(TPU& tpu, Memory& memory);
-    void processSB(TPU& tpu, Memory& memory);
-    void processSW(TPU& tpu, Memory& memory);
-    void processPUSH(TPU& tpu, Memory& memory, u8);
-    void processPOP(TPU& tpu, Memory& memory, u8);
-    void processADD(TPU& tpu, Memory& memory);
-    void processSUB(TPU& tpu, Memory& memory);
-    void processMUL(TPU& tpu, Memory& memory);
-    void processDIV(TPU& tpu, Memory& memory);
-    void processCMP(TPU& tpu, Memory& memory);
-    void processBUF(TPU& tpu, Memory& memory);
-    void processANDORXOR(TPU& tpu, Memory& memory, u8);
-    void processNOT(TPU& tpu, Memory& memory);
-    void processSHL(TPU& tpu, Memory& memory);
-    void processSHR(TPU& tpu, Memory& memory);
+    void executeSyscall(TPU& tpu);
+    void processCALL(TPU& tpu);
+    void processJMP(TPU& tpu, u8);
+    void processRET(TPU& tpu);
+    void processMOV(TPU& tpu, u8);
+    void processLB(TPU& tpu);
+    void processLW(TPU& tpu);
+    void processSB(TPU& tpu);
+    void processSW(TPU& tpu);
+    void processPUSH(TPU& tpu, u8);
+    void processPOP(TPU& tpu, u8);
+    void processADD(TPU& tpu);
+    void processSUB(TPU& tpu);
+    void processMUL(TPU& tpu);
+    void processDIV(TPU& tpu);
+    void processCMP(TPU& tpu);
+    void processBUF(TPU& tpu);
+    void processANDORXOR(TPU& tpu, u8);
+    void processNOT(TPU& tpu);
+    void processSHL(TPU& tpu);
+    void processSHR(TPU& tpu);
 };
 
 #endif
