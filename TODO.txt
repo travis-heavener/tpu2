@@ -27,11 +27,19 @@ Kernel
     - push old BP then set BP to SP
     - jump to end label & reset SP to BP
     - set a new flag (bit 15) when the IP is in reserved memory, cleared when in free memory
+    - Reserved partition:
+        - Kernel (8KiB)
+        - Kernel Stack (2KiB)
+        - OS (32KiB)
+        - OS Stack (2KiB)
+        - Unallocated (20KiB)
 
 TPU
 - Add global keyword to specify entry point
 - Make instruction_set.txt a MD file
 - Update stdio.t to use SI for input source in stdout syscall and DI for output source in stdin syscall
+
+**************************************************************************************************************
 
 Additional Notes
 - New: look for a type in an expression too, if no identifier is present then it's only valid with sizeof operator or as a parameter (don't store in scope, just make space for in scope/on stack). This let's variable declarations work in expressions, but only allow if it's the very beginning of the expression (add a flag to bypass this for things like return or conditional expressions, just want a result not a declaration)!!
