@@ -18,6 +18,15 @@ T
 Kernel
 - Prevent writing to memory addresses outside of .text and .data in loadFileToMemory
 - Prevent accessing things outside of stack, .data section, and heap (not available from kernel); results in segmentation fault
+- Add sysret & reserved partition
+    - add auxiliary 64KiB Memory bank for syscalls (OS & kernel), call as usual but syscall also switches the active Memory bank (need to make ret switch back after)
+    - sysexit
+    - store stack start address in BP
+    - revise stack handling for scopes
+    - verify scopes aren't not being deleted? (that weird GDB thing)
+    - push old BP then set BP to SP
+    - jump to end label & reset SP to BP
+    - set a new flag (bit 15) when the IP is in reserved memory, cleared when in free memory
 
 TPU
 - Add global keyword to specify entry point
