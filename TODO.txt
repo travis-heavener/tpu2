@@ -1,0 +1,45 @@
+Post
+- Remove instructions after unconditional jmp but before the next label (any label, not just the jmp-ing label)
+- When writing a new instruction compounded from others, don't write yet but set line and strippedLine so it can be considered for further combination
+
+Lexer
+- Optimize lexer
+
+T
+- Add ltrimstr, rtrimstr, trimstr, and strcmp
+- Allow const char* strings (in .data) as children of inline ASM
+- Add flag for compiler to show stack trace on errors
+  - Add callstack for verbose error logging
+- Add break (jmp to end of loop label) and continue (jmp to loop condition label)
+- Warn when comparing between unsigned & signed
+- Add support for variadic functions
+- Force char to be unsigned by default
+
+Kernel
+- Prevent writing to memory addresses outside of .text and .data in loadFileToMemory
+- Prevent accessing things outside of stack, .data section, and heap (not available from kernel); results in segmentation fault
+
+TPU
+- Add global keyword to specify entry point
+- Make instruction_set.txt a MD file
+- Update stdio.t to use SI for input source in stdout syscall and DI for output source in stdin syscall
+
+Additional Notes
+- New: look for a type in an expression too, if no identifier is present then it's only valid with sizeof operator or as a parameter (don't store in scope, just make space for in scope/on stack). This let's variable declarations work in expressions, but only allow if it's the very beginning of the expression (add a flag to bypass this for things like return or conditional expressions, just want a result not a declaration)!!
+
+OS Notes:
+- Improve TCC & assembler compile times
+
+The issue now is that i need a way to store literally where each program is, like a filesystem
+I need a naming system for files, since the bytes here don't mean anything unless I can name the programs and all that
+
+This is where the reserved partition comes in, the OS needs names for all the programs it knows, thus I need an index
+
+Force data section strings to be immutable and read-only so that multiple duplicate string literals in T can be mapped to the same label
+ 
+^^^^^^^ the above has issues
+X) need to find a way to store .data section into binary
+2) need to store program start index in the first 2 bytes of reserved memory
+X) since one program can run at once, we can store things in .data as usual (it resets for each program)
+X) ^^^^^ this might actually not be true if we need .data for the kernel/OS (but then again, we have reserved pool for this)
+5) most importantly, we need to store the end instruction index somewhere so we know how many sectors are needed*/
